@@ -4,9 +4,16 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "python3 scripts/tool-dates.py || true",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "start": "npx --yes serve out",
+    "preview": "npx --yes serve out",
+    "deploy:cf": "pnpm build && npx --yes wrangler pages deploy out --project-name tools --branch main --commit-dirty=true",
+    "lint": "eslint",
+    "postinstall": "git config core.hooksPath .githooks || true",
+    "skin:tools": "python3 scripts/skin-tools.py",
+    "check:tools": "python3 scripts/check-tools.py",
+    "tool-dates": "python3 scripts/tool-dates.py"
   },
   "dependencies": {
     "next": "16.2.12",

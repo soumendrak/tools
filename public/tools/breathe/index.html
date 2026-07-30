@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Breathe — Guided Breathing Exercise</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='42' fill='none' stroke='%23ff6b35' stroke-width='5'/%3E%3Ccircle cx='50' cy='50' r='22' fill='none' stroke='%23ff6b35' stroke-width='5'/%3E%3C/svg%3E">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --bg: #0a0a14;
+    --surface: #16162a;
+    --accent: #ff6b35;
+    --accent-light: #ff8c42;
+    --accent-dark: #d94f1a;
+    --accent-glow: rgba(255, 107, 53, 0.15);
+    --accent-subtle: rgba(255, 107, 53, 0.06);
+    --text: #f0ece4;
+    --text-dim: #8a8a9a;
+    --text-muted: #5a5a6e;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --mono: "SF Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+}
+
+html, body { height: 100%; }
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* ─── Header ─── */
+header {
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+h1 {
+    font-size: 1.8rem;
+    font-weight: 200;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--text);
+    opacity: 0.5;
+}
+
+header .tagline {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    margin-top: 4px;
+    font-weight: 400;
+}
+
+/* ─── Circle ─── */
+.circle-wrapper {
+    position: relative;
+    width: 320px;
+    height: 320px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.circle-wrapper::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1px solid var(--accent-subtle);
+    pointer-events: none;
+}
+
+.circle-wrapper::after {
+    content: "";
+    position: absolute;
+    width: 98px;
+    height: 98px;
+    border-radius: 50%;
+    border: 1px solid var(--accent-subtle);
+    pointer-events: none;
+    opacity: 0.5;
+}
+
+.breath-circle {
+    width: 280px;
+    height: 280px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 32%, var(--accent-light), var(--accent) 40%, var(--accent-dark) 72%, #7a2a0a 100%);
+    box-shadow:
+        0 0 40px var(--accent-glow),
+        0 0 80px rgba(255, 107, 53, 0.06);
+    transform: scale(0.35);
+    position: relative;
+    z-index: 1;
+    will-change: transform;
+}
+
+/* ─── Overlay ─── */
+.overlay {
+    position: absolute;
+    z-index: 2;
+    text-align: center;
+    pointer-events: none;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.phase-name {
+    font-size: 1.3rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    opacity: 0.92;
+    margin-bottom: 6px;
+    transition: opacity 0.2s ease;
+}
+
+.phase-name.idle { opacity: 0.5; font-weight: 400; }
+.phase-name.paused { opacity: 0.5; font-weight: 400; }
+
+.timer {
+    font-size: 2.8rem;
+    font-weight: 200;
+    font-family: var(--mono);
+    color: var(--text);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.timer.idle { color: var(--text-muted); }
+
+/* ─── Controls ─── */
+.controls {
+    margin-top: 36px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 22px;
+    width: 100%;
+    max-width: 380px;
+}
+
+/* Mode selector pills */
+.mode-selector {
+    display: flex;
+    gap: 6px;
+    background: var(--surface);
+    padding: 5px;
+    border-radius: var(--radius-md);
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.mode-btn {
+    flex: 1;
+    min-width: 60px;
+    padding: 9px 8px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-dim);
+    font-family: var(--font);
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    text-align: center;
+    line-height: 1.3;
+}
+
+.mode-btn:hover {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.mode-btn.active {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 2px 12px rgba(255, 107, 53, 0.25);
+}
+
+.mode-btn .caption {
+    display: block;
+    font-size: 0.62rem;
+    font-weight: 400;
+    opacity: 0.6;
+    margin-top: 1px;
+}
+
+.mode-btn.active .caption { opacity: 0.85; }
+
+/* Start / Stop button */
+.start-btn {
+    position: relative;
+    padding: 14px 52px;
+    border: 2px solid var(--accent);
+    border-radius: 50px;
+    background: transparent;
+    color: var(--accent);
+    font-family: var(--font);
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.start-btn:hover {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 0 32px rgba(255, 107, 53, 0.25);
+}
+
+.start-btn:active {
+    transform: scale(0.97);
+}
+
+.start-btn.running {
+    background: rgba(255, 107, 53, 0.12);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.start-btn.running:hover {
+    background: rgba(255, 77, 20, 0.25);
+    border-color: #ff4d14;
+    color: #ff4d14;
+    box-shadow: 0 0 32px rgba(255, 77, 20, 0.15);
+}
+
+.status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.status-dot.active {
+    opacity: 1;
+    animation: breathe-dot 2s ease-in-out infinite;
+}
+
+@keyframes breathe-dot {
+    0%, 100% { opacity: 0.4; transform: scale(1); }
+    50%      { opacity: 1;   transform: scale(1.3); }
+}
+
+/* Session info row */
+.session-info {
+    display: flex;
+    gap: 32px;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+}
+
+.session-info .stat {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.session-info .stat-label {
+    opacity: 0.55;
+    font-weight: 400;
+}
+
+.session-info .stat-value {
+    font-family: var(--mono);
+    color: var(--text);
+    font-weight: 450;
+    min-width: 4ch;
+}
+
+/* ─── Custom Mode Builder ─── */
+.custom-builder {
+    width: 100%;
+    max-width: 380px;
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    background: var(--surface);
+    border-radius: var(--radius-md);
+    margin-top: -10px;
+}
+.custom-builder.open { display: flex; }
+
+.custom-builder .builder-title {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    text-align: center;
+}
+
+.custom-builder .builder-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.custom-builder .builder-row label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    min-width: 40px;
+}
+
+.custom-builder .builder-row input[type="number"] {
+    background: var(--bg);
+    border: 1px solid var(--text-muted);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 0.85rem;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    width: 55px;
+    text-align: center;
+    outline: none;
+}
+.custom-builder .builder-row input[type="number"]:focus {
+    border-color: var(--accent);
+}
+
+.custom-builder .builder-save-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 6px 20px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    align-self: center;
+    margin-top: 4px;
+}
+.custom-builder .builder-save-btn:hover { background: var(--accent-dark); }
+
+.custom-builder .builder-status {
+    font-size: 0.65rem;
+    color: #4caf7d;
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+.custom-builder .builder-status.show { opacity: 1; }
+
+.custom-builder .builder-row .sep {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 480px) {
+    body { padding: 16px; }
+    header { margin-bottom: 20px; }
+    h1 { font-size: 1.4rem; }
+
+    .circle-wrapper {
+        width: 220px;
+        height: 220px;
+    }
+    .breath-circle {
+        width: 190px;
+        height: 190px;
+    }
+    .circle-wrapper::after {
+        width: 66px;
+        height: 66px;
+    }
+
+    .phase-name { font-size: 1.05rem; }
+    .timer { font-size: 2.1rem; }
+
+    .controls { margin-top: 24px; gap: 16px; }
+    .mode-btn { font-size: 0.72rem; padding: 7px 4px; }
+    .mode-btn .caption { font-size: 0.55rem; }
+    .start-btn { padding: 12px 36px; font-size: 0.88rem; }
+    .session-info { gap: 18px; font-size: 0.72rem; }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+    .circle-wrapper {
+        width: 270px;
+        height: 270px;
+    }
+    .breath-circle {
+        width: 240px;
+        height: 240px;
+    }
+    .circle-wrapper::after {
+        width: 84px;
+        height: 84px;
+    }
+}
+
+@media (max-height: 700px) {
+    header { margin-bottom: 12px; }
+    h1 { font-size: 1.3rem; }
+    header .tagline { display: none; }
+    .circle-wrapper {
+        width: 190px;
+        height: 190px;
+    }
+    .breath-circle {
+        width: 165px;
+        height: 165px;
+    }
+    .circle-wrapper::after {
+        width: 58px;
+        height: 58px;
+    }
+    .phase-name { font-size: 0.95rem; }
+    .timer { font-size: 1.8rem; }
+    .controls { margin-top: 14px; gap: 12px; }
+    .start-btn { padding: 10px 30px; font-size: 0.82rem; }
+    .session-info { font-size: 0.7rem; gap: 14px; }
+}
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+
+<!-- ─── Header ─── -->
+<header>
+    <h1>breathe</h1>
+    <div class="tagline">guided breathing exercise</div>
+</header>
+
+<!-- ─── Circle Visualization ─── -->
+<div class="circle-wrapper">
+    <div class="breath-circle" id="breathCircle"></div>
+    <div class="overlay">
+        <div class="phase-name idle" id="phaseName">Press Start</div>
+        <div class="timer idle" id="timerDisplay">&ndash;&ndash;</div>
+    </div>
+</div>
+
+<!-- ─── Controls ─── -->
+<div class="controls">
+    <div class="mode-selector" id="modeSelector">
+        <button class="mode-btn active" data-mode="4-7-8">
+            4-7-8
+            <span class="caption">Relaxing</span>
+        </button>
+        <button class="mode-btn" data-mode="4-4-4">
+            4-4-4
+            <span class="caption">Box Breathing</span>
+        </button>
+        <button class="mode-btn" data-mode="4-2-4">
+            4-2-4
+            <span class="caption">Energizing</span>
+        </button>
+        <button class="mode-btn" data-mode="custom">
+            Custom
+            <span class="caption">Your Mode</span>
+        </button>
+    </div>
+
+    <button class="start-btn" id="startBtn">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="btnLabel">Start</span>
+    </button>
+
+    <div class="session-info">
+        <span class="stat">
+            <span class="stat-label">Session</span>
+            <span class="stat-value" id="sessionTime">00:00</span>
+        </span>
+        <span class="stat">
+            <span class="stat-label">Cycles</span>
+            <span class="stat-value" id="cyclesCount">0</span>
+        </span>
+    </div>
+</div>
+
+<!-- ─── Custom Breathing Mode Builder ─── -->
+<div class="custom-builder" id="customBuilder">
+    <div class="builder-title">⚙ Custom Breathing Pattern</div>
+    <div class="builder-row">
+        <label>Inhale</label>
+        <input type="number" id="customInhale" min="1" max="20" value="4">
+        <span class="sep">s</span>
+        <label>Hold</label>
+        <input type="number" id="customHold1" min="0" max="20" value="4">
+        <span class="sep">s</span>
+        <label>Exhale</label>
+        <input type="number" id="customExhale" min="1" max="20" value="4">
+        <span class="sep">s</span>
+        <label>Hold</label>
+        <input type="number" id="customHold2" min="0" max="20" value="4">
+        <span class="sep">s</span>
+    </div>
+    <button class="builder-save-btn" id="customSaveBtn">Save &amp; Apply</button>
+    <div class="builder-status" id="customStatus">✓ Saved!</div>
+</div>
+
+<script>
+(function () {
+    "use strict";
+
+    /* ── DOM refs ── */
+    const circle       = document.getElementById("breathCircle");
+    const phaseName    = document.getElementById("phaseName");
+    const timerDisplay = document.getElementById("timerDisplay");
+    const startBtn     = document.getElementById("startBtn");
+    const btnLabel     = document.getElementById("btnLabel");
+    const statusDot    = document.getElementById("statusDot");
+    const sessionTime  = document.getElementById("sessionTime");
+    const cyclesCount  = document.getElementById("cyclesCount");
+    const modeBtns     = document.querySelectorAll(".mode-btn");
+    const customBuilder = document.getElementById("customBuilder");
+    const customInhale  = document.getElementById("customInhale");
+    const customHold1   = document.getElementById("customHold1");
+    const customExhale  = document.getElementById("customExhale");
+    const customHold2   = document.getElementById("customHold2");
+    const customSaveBtn = document.getElementById("customSaveBtn");
+    const customStatus  = document.getElementById("customStatus");
+
+    /* ── Breathing mode definitions ── */
+    const MODES = {
+        "4-7-8": {
+            phases: [
+                { name: "Breathe In",  duration: 4, scale: 1    },
+                { name: "Hold",        duration: 7, scale: 1    },
+                { name: "Breathe Out", duration: 8, scale: 0.35 }
+            ]
+        },
+        "4-4-4": {
+            phases: [
+                { name: "Breathe In",  duration: 4, scale: 1    },
+                { name: "Hold",        duration: 4, scale: 1    },
+                { name: "Breathe Out", duration: 4, scale: 0.35 },
+                { name: "Hold",        duration: 4, scale: 0.35 }
+            ]
+        },
+        "4-2-4": {
+            phases: [
+                { name: "Breathe In",  duration: 4, scale: 1    },
+                { name: "Hold",        duration: 2, scale: 1    },
+                { name: "Breathe Out", duration: 4, scale: 0.35 }
+            ]
+        },
+        "custom": null // filled from localStorage or defaults
+    };
+
+    /* ── State ── */
+    let mode          = "4-7-8";
+    let isRunning     = false;
+    let phaseIndex    = 0;
+    let phaseStart    = 0;
+    let sessionStart  = 0;
+    let cycles        = 0;
+    let rafId         = null;
+    let sessionTimer  = null;
+
+    /* ── Custom mode persistence ── */
+    function loadCustomMode() {
+        try {
+            const raw = localStorage.getItem("br_custom");
+            if (raw) {
+                const data = JSON.parse(raw);
+                if (data && Array.isArray(data.phases) && data.phases.length > 0) {
+                    MODES["custom"] = { phases: data.phases };
+                    customInhale.value = data.phases[0] ? data.phases[0].duration : 4;
+                    if (data.phases[1]) customHold1.value = data.phases[1].duration;
+                    if (data.phases[2]) customExhale.value = data.phases[2].duration;
+                    if (data.phases[3]) customHold2.value = data.phases[3].duration;
+                    return;
+                }
+            }
+        } catch(e) {}
+        // Default custom mode
+        MODES["custom"] = {
+            phases: [
+                { name: "Breathe In",  duration: 4, scale: 1    },
+                { name: "Hold",        duration: 4, scale: 1    },
+                { name: "Breathe Out", duration: 4, scale: 0.35 },
+                { name: "Hold",        duration: 4, scale: 0.35 }
+            ]
+        };
+    }
+
+    function saveCustomMode() {
+        const inhale = parseInt(customInhale.value) || 4;
+        const hold1  = parseInt(customHold1.value) || 4;
+        const exhale = parseInt(customExhale.value) || 4;
+        const hold2  = parseInt(customHold2.value) || 4;
+        const phases = [
+            { name: "Breathe In",  duration: Math.max(1, inhale), scale: 1    },
+            { name: "Hold",        duration: Math.max(0, hold1),  scale: 1    },
+            { name: "Breathe Out", duration: Math.max(1, exhale), scale: 0.35 },
+            { name: "Hold",        duration: Math.max(0, hold2),  scale: 0.35 }
+        ];
+        // Remove trailing holds if zero
+        while (phases.length > 1 && phases[phases.length - 1].duration === 0) {
+            phases.pop();
+        }
+        MODES["custom"] = { phases: phases };
+        try {
+            localStorage.setItem("br_custom", JSON.stringify({ phases: phases }));
+        } catch(e) {}
+    }
+
+    /* ── Helpers ── */
+    function getPhases() {
+        const m = MODES[mode];
+        return m && m.phases ? m.phases : [];
+    }
+
+    function easeInOut(t) {
+        return t < 0.5
+            ? 2 * t * t
+            : -1 + (4 - 2 * t) * t;
+    }
+
+    function fmtTime(totalSec) {
+        var m = Math.floor(totalSec / 60);
+        var s = Math.floor(totalSec % 60);
+        return (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
+    }
+
+    /* ── UI updates ── */
+    function showPhase(index) {
+        var phases = getPhases();
+        var p = phases[index];
+        phaseName.textContent = p.name;
+        phaseName.className = "phase-name";
+        timerDisplay.textContent = p.duration;
+        timerDisplay.className = "timer";
+    }
+
+    function setIdle() {
+        phaseName.textContent = "Press Start";
+        phaseName.className = "phase-name idle";
+        timerDisplay.textContent = "\u2014\u2014";
+        timerDisplay.className = "timer idle";
+    }
+
+    function updateSessionTime() {
+        if (sessionStart > 0) {
+            var elapsed = Math.floor((Date.now() - sessionStart) / 1000);
+            sessionTime.textContent = fmtTime(elapsed);
+        } else {
+            sessionTime.textContent = "00:00";
+        }
+    }
+
+    function setMode(newMode) {
+        var wasRunning = isRunning;
+        if (isRunning) stop();
+        mode = newMode;
+        cycles = 0;
+        cyclesCount.textContent = "0";
+        phaseIndex = 0;
+        sessionStart = 0;
+        updateSessionTime();
+
+        modeBtns.forEach(function(btn) {
+            var active = btn.dataset.mode === mode;
+            btn.classList.toggle("active", active);
+        });
+
+        // Show/hide custom builder
+        if (mode === "custom") {
+            customBuilder.classList.add("open");
+        } else {
+            customBuilder.classList.remove("open");
+        }
+
+        if (wasRunning) {
+            start();
+        } else {
+            setIdle();
+            circle.style.transition = "none";
+            circle.style.transform = "scale(0.35)";
+            circle.style.transition = "";
+        }
+    }
+
+    /* ── Animation ── */
+    function animate(timestamp) {
+        if (!isRunning) return;
+        var phases = getPhases();
+        if (!phases.length) { stop(); return; }
+
+        var p = phases[phaseIndex];
+        var elapsed = (timestamp - phaseStart) / 1000;
+        var remaining = Math.max(0, p.duration - elapsed);
+        var progress = elapsed / p.duration;
+
+        // Update timer countdown
+        timerDisplay.textContent = Math.ceil(remaining);
+
+        // Scale animation
+        var currentScale = 0.35;
+        if (p.scale !== undefined) {
+            var startScale = 0.35;
+            var endScale = p.scale;
+            var t = Math.min(1, progress);
+            var eased = easeInOut(t);
+            currentScale = startScale + (endScale - startScale) * eased;
+        }
+        circle.style.transform = "scale(" + currentScale + ")";
+
+        if (elapsed >= p.duration) {
+            // Move to next phase
+            phaseIndex = (phaseIndex + 1) % phases.length;
+            if (phaseIndex === 0) {
+                cycles++;
+                cyclesCount.textContent = cycles;
+            }
+            phaseStart = timestamp;
+            showPhase(phaseIndex);
+        }
+
+        rafId = requestAnimationFrame(animate);
+    }
+
+    /* ── Start / Stop ── */
+    function start() {
+        if (isRunning) return;
+        var phases = getPhases();
+        if (!phases.length) return;
+
+        isRunning = true;
+        sessionStart = sessionStart || Date.now();
+        phaseIndex = 0;
+        phaseStart = performance.now();
+
+        btnLabel.textContent = "Stop";
+        startBtn.classList.add("running");
+        statusDot.classList.add("active");
+        showPhase(0);
+
+        if (sessionTimer) clearInterval(sessionTimer);
+        sessionTimer = setInterval(updateSessionTime, 1000);
+
+        rafId = requestAnimationFrame(animate);
+    }
+
+    function stop() {
+        isRunning = false;
+        btnLabel.textContent = "Start";
+        startBtn.classList.remove("running");
+        statusDot.classList.remove("active");
+
+        if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+        if (sessionTimer) { clearInterval(sessionTimer); sessionTimer = null; }
+        setIdle();
+        circle.style.transform = "scale(0.35)";
+    }
+
+    /* ── Event bindings ── */
+    modeBtns.forEach(function(btn) {
+        btn.addEventListener("click", function() {
+            var newMode = this.dataset.mode;
+            if (newMode === mode) return;
+            setMode(newMode);
+        });
+    });
+
+    startBtn.addEventListener("click", function() {
+        if (isRunning) { stop(); return; }
+        start();
+    });
+
+    customSaveBtn.addEventListener("click", function() {
+        saveCustomMode();
+        customStatus.classList.add("show");
+        setTimeout(function() { customStatus.classList.remove("show"); }, 2000);
+        // If custom mode is active, restart to apply new timing
+        if (mode === "custom") {
+            var wasRunning = isRunning;
+            stop();
+            // Reset state
+            cycles = 0;
+            cyclesCount.textContent = "0";
+            phaseIndex = 0;
+            sessionStart = 0;
+            updateSessionTime();
+            if (wasRunning) start();
+        }
+    });
+
+    /* ── Init ── */
+    loadCustomMode();
+    setMode("4-7-8");
+})();
+</script>
+</body>
+</html>

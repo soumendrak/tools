@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="or">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ଓଡ଼ିଆ ସମୟ — Odia Numerals Clock</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48' fill='%231a1a2e' stroke='%23ff6b35' stroke-width='4'/%3E%3Ctext x='50' y='72' text-anchor='middle' font-size='56' font-family='serif' fill='%23ff6b35'%3E%E0%AD%A8%3C/text%3E%3C/svg%3E">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  @font-face {
+    font-family: 'Noto Sans Oriya';
+    font-style: normal;
+    font-weight: 400 700;
+    src: local('Noto Sans Oriya'), local('Noto Sans Oriya Regular'),
+         local('Noto Sans Oriya Bold'), local('Nirmala UI'), local('Kalinga'),
+         local('Siddhanta'), local('SansSerif');
+  }
+
+  :root {
+    --bg: #0d0d1a;
+    --bg-card: #141428;
+    --bg-toggle: #1e1e3a;
+    --orange: #ff6b35;
+    --orange-glow: #ff6b3566;
+    --orange-dim: #ff6b3522;
+    --text: #e8e8f0;
+    --text-dim: #8888aa;
+    --border: #2a2a4a;
+    --radius: 20px;
+  }
+
+  body {
+    font-family: 'Noto Sans Oriya', 'Nirmala UI', 'Kalinga', 'Siddhanta', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background-image:
+      radial-gradient(ellipse at 20% 50%, #1a0a2e 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 50%, #1a0a2e 0%, transparent 60%);
+  }
+
+  .container {
+    max-width: 720px;
+    width: 100%;
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    padding: 48px 40px 40px;
+    box-shadow:
+      0 0 60px var(--orange-dim),
+      0 8px 32px rgba(0,0,0,0.6);
+    border: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+  }
+
+  /* Decorative OM motif */
+  .om-motif {
+    font-size: 48px;
+    color: var(--orange);
+    opacity: 0.12;
+    position: absolute;
+    top: 12px;
+    right: 24px;
+    line-height: 1;
+    user-select: none;
+    pointer-events: none;
+    font-family: serif;
+  }
+  .om-motif::before { content: "୐"; }
+
+  /* Corner decorative lines */
+  .corner { position: absolute; width: 40px; height: 40px; border-color: var(--orange); opacity: 0.25; }
+  .corner-tl { top: 16px; left: 16px; border-top: 2px solid; border-left: 2px solid; border-radius: 4px 0 0 0; }
+  .corner-tr { top: 16px; right: 16px; border-top: 2px solid; border-right: 2px solid; border-radius: 0 4px 0 0; }
+  .corner-bl { bottom: 16px; left: 16px; border-bottom: 2px solid; border-left: 2px solid; border-radius: 0 0 0 4px; }
+  .corner-br { bottom: 16px; right: 16px; border-bottom: 2px solid; border-right: 2px solid; border-radius: 0 0 4px 0; }
+
+  .clock-display {
+    font-size: clamp(3.2rem, 14vw, 6.8rem);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    line-height: 1.1;
+    color: var(--text);
+    text-shadow: 0 0 40px var(--orange-glow), 0 0 80px var(--orange-dim);
+    margin-bottom: 8px;
+    font-variant-numeric: tabular-nums;
+    transition: opacity 0.15s;
+  }
+
+  .clock-display.words-mode {
+    font-size: clamp(1.4rem, 5vw, 2.8rem);
+    letter-spacing: 0.03em;
+    text-shadow: 0 0 20px var(--orange-glow);
+    line-height: 1.4;
+  }
+
+  .separator-blink {
+    animation: blink 1s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0.15; } }
+
+  .day-display {
+    font-size: clamp(1.1rem, 3vw, 1.6rem);
+    color: var(--orange);
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+
+  .date-display {
+    font-size: clamp(0.95rem, 2.5vw, 1.3rem);
+    color: var(--text-dim);
+    margin-bottom: 24px;
+    letter-spacing: 0.02em;
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 8px;
+  }
+
+  .toggle-btn {
+    background: var(--bg-toggle);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 8px 20px;
+    font-family: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .toggle-btn:hover {
+    border-color: var(--orange);
+    color: var(--text);
+    background: var(--orange-dim);
+  }
+  .toggle-btn.active {
+    background: var(--orange);
+    color: #0d0d1a;
+    border-color: var(--orange);
+    font-weight: 700;
+    box-shadow: 0 0 20px var(--orange-glow);
+  }
+
+  /* Footer */
+  .footer {
+    margin-top: 28px;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    opacity: 0.5;
+    letter-spacing: 0.05em;
+  }
+  .footer a {
+    color: var(--orange);
+    text-decoration: none;
+  }
+  .footer a:hover { text-decoration: underline; }
+
+  /* Responsive */
+  @media (max-width: 480px) {
+    .container { padding: 32px 20px 28px; }
+    .om-motif { font-size: 32px; top: 8px; right: 14px; }
+    .corner { width: 24px; height: 24px; }
+    .corner-tl { top: 10px; left: 10px; }
+    .corner-tr { top: 10px; right: 10px; }
+    .corner-bl { bottom: 10px; left: 10px; }
+    .corner-br { bottom: 10px; right: 10px; }
+    .toggle-btn { padding: 6px 14px; font-size: 0.78rem; }
+  }
+
+  @media (max-width: 360px) {
+    .container { padding: 24px 14px 20px; }
+    .controls { gap: 6px; }
+    .toggle-btn { padding: 5px 10px; font-size: 0.7rem; }
+  }
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<div class="container">
+  <!-- Decorative OM -->
+  <div class="om-motif"></div>
+  <!-- Corner ornaments -->
+  <div class="corner corner-tl"></div>
+  <div class="corner corner-tr"></div>
+  <div class="corner corner-bl"></div>
+  <div class="corner corner-br"></div>
+
+  <!-- Clock -->
+  <div id="clock" class="clock-display">୦୦:୦୦:୦୦</div>
+
+  <!-- Day -->
+  <div id="day" class="day-display">—</div>
+
+  <!-- Date -->
+  <div id="date" class="date-display">—</div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="toggle-btn active" id="btnFormat" data-24h="true">୨୪-ଘଣ୍ଟା</button>
+    <button class="toggle-btn" id="btnWords">ଶବ୍ଦରେ</button>
+  </div>
+
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ─── Odia numeral map ───
+  const ODIA_DIGITS = ['୦','୧','୨','୩','୪','୫','୬','୭','୮','୯'];
+
+  // ─── Days in Odia ───
+  const DAYS_ODIA = [
+    'ରବିବାର',    // Sunday
+    'ସୋମବାର',    // Monday
+    'ମଙ୍ଗଳବାର',  // Tuesday
+    'ବୁଧବାର',    // Wednesday
+    'ଗୁରୁବାର',   // Thursday
+    'ଶୁକ୍ରବାର',  // Friday
+    'ଶନିବାର'      // Saturday
+  ];
+
+  // ─── Months in Odia ───
+  const MONTHS_ODIA = [
+    'ଜାନୁଆରୀ', 'ଫେବୃଆରୀ', 'ମାର୍ଚ୍ଚ', 'ଅପ୍ରେଲ',
+    'ମଇ', 'ଜୁନ', 'ଜୁଲାଇ', 'ଅଗଷ୍ଟ',
+    'ସେପ୍ଟେମ୍ବର', 'ଅକ୍ଟୋବର', 'ନଭେମ୍ବର', 'ଡିସେମ୍ବର'
+  ];
+
+  // ─── Odia number words (0-59) ───
+  // Spellings per odishagovtexam.com section-wise counting tables (1-100).
+  const NUM_WORDS = [
+    'ଶୂନ',        // 0
+    'ଏକ',         // 1
+    'ଦୁଇ',        // 2
+    'ତିନି',       // 3
+    'ଚାରି',       // 4
+    'ପାଞ୍ଚ',      // 5
+    'ଛଅ',         // 6
+    'ସାତ',        // 7
+    'ଆଠ',         // 8
+    'ନଅ',         // 9
+    'ଦଶ',         // 10
+    'ଏଗାର',      // 11
+    'ବାର',        // 12
+    'ତେର',        // 13
+    'ଚଉଦ',       // 14
+    'ପନ୍ଦର',     // 15
+    'ଷୋହଳ',      // 16
+    'ସତର',       // 17
+    'ଅଠର',       // 18
+    'ଉଣେଇଶି',    // 19
+    'କୋଡ଼ିଏ',    // 20
+    'ଏକୋଇଶି',    // 21
+    'ବାଇଶି',      // 22
+    'ତେଇଶି',      // 23
+    'ଚବିଶି',      // 24
+    'ପଚିଶି',      // 25
+    'ଛବିଶି',      // 26
+    'ସତାଇଶି',    // 27
+    'ଅଠେଇଶି',    // 28
+    'ଅଣତିରିଶି',  // 29
+    'ତିରିଶି',     // 30
+    'ଏକତିରିଶି',  // 31
+    'ବତିଶି',      // 32
+    'ତେତିଶି',     // 33
+    'ଚଉତିରିଶି',  // 34
+    'ପଇଁତିଶି',   // 35
+    'ଛତିଶି',      // 36
+    'ସଇଁତିଶି',   // 37
+    'ଅଠତିଶି',    // 38
+    'ଅଣଚାଳିଶି',  // 39
+    'ଚାଳିଶି',     // 40
+    'ଏକଚାଳିଶି',  // 41
+    'ବୟାଳିଶି',   // 42
+    'ତେୟାଳିଶି',  // 43
+    'ଚଉରାଳିଶି',  // 44
+    'ପଇଁଚାଳିଶି', // 45
+    'ଛୟାଳିଶି',   // 46
+    'ସତଚାଳିଶି',  // 47
+    'ଅଠଚାଳିଶି',  // 48
+    'ଅଣଞ୍ଚାଶ',   // 49
+    'ପଚାଶ',      // 50
+    'ଏକାବନ',     // 51
+    'ବାଉନ',      // 52
+    'ତେପନ',      // 53
+    'ଚଉବନ',     // 54
+    'ପଞ୍ଚାବନ',   // 55
+    'ଛପନ',       // 56
+    'ସତାବନ',    // 57
+    'ଅଠାବନ',     // 58
+    'ଉଣଷାଠିଏ'    // 59
+  ];
+
+  // ─── Helpers ───
+  function toOdiaNum(n) {
+    return String(n).split('').map(ch => ODIA_DIGITS[parseInt(ch, 10)]).join('');
+  }
+
+  function padOdia(n) {
+    return toOdiaNum(String(n).padStart(2, '0'));
+  }
+
+  // ─── State ───
+  let is24h = true;
+  let showWords = false;
+
+  // ─── localStorage persistence ───
+  function loadPrefs() {
+    try {
+      const saved = localStorage.getItem('odia_clock_prefs');
+      if (saved) {
+        const prefs = JSON.parse(saved);
+        if (typeof prefs.is24h === 'boolean') is24h = prefs.is24h;
+        if (typeof prefs.showWords === 'boolean') showWords = prefs.showWords;
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function savePrefs() {
+    try {
+      localStorage.setItem('odia_clock_prefs', JSON.stringify({ is24h, showWords }));
+    } catch (e) { /* ignore */ }
+  }
+
+  const clockEl = document.getElementById('clock');
+  const dayEl   = document.getElementById('day');
+  const dateEl  = document.getElementById('date');
+  const btnFmt  = document.getElementById('btnFormat');
+  const btnWrd  = document.getElementById('btnWords');
+
+  // ─── Build time fields (numeral mode) ───
+  function buildTime(now) {
+    let h = now.getHours();
+    const m = now.getMinutes();
+    const s = now.getSeconds();
+    let period = '';
+
+    if (!is24h) {
+      period = h >= 12 ? ' ଅପରାହ୍ନ' : ' ପୂର୍ବାହ୍ନ';
+      if (h === 0) h = 12;
+      else if (h > 12) h -= 12;
+    }
+
+    return { h, m, s, period };
+  }
+
+  // ─── Time as Odia words ───
+  // Always uses 12-hour cycle with AM/PM period for natural speech,
+  // regardless of the numeral display format.
+  function wordsTime(now) {
+    const h24 = now.getHours();
+    const m   = now.getMinutes();
+    const s   = now.getSeconds();
+
+    const period = h24 >= 12 ? ' ଅପରାହ୍ନ' : ' ପୂର୍ବାହ୍ନ';
+    let h12 = h24 % 12;
+    if (h12 === 0) h12 = 12;
+
+    return NUM_WORDS[h12] + ' ଘଣ୍ଟା ' + NUM_WORDS[m] + ' ମିନିଟ ' + NUM_WORDS[s] + ' ସେକେଣ୍ଡ' + period;
+  }
+
+  // ─── Render clock display using DOM methods ───
+  function render() {
+    const now = new Date();
+
+    if (showWords) {
+      clockEl.textContent = wordsTime(now);
+      clockEl.classList.add('words-mode');
+    } else {
+      clockEl.classList.remove('words-mode');
+      const { h, m, s, period } = buildTime(now);
+
+      // Build DOM nodes — no innerHTML, fully safe
+      const nodes = [
+        document.createTextNode(padOdia(h)),
+        makeBlink(':'),
+        document.createTextNode(padOdia(m)),
+        makeBlink(':'),
+        document.createTextNode(padOdia(s))
+      ];
+
+      if (period) {
+        nodes.push(document.createTextNode(' ' + period.trim()));
+      }
+
+      clockEl.replaceChildren(...nodes);
+    }
+
+    // Day of week
+    dayEl.textContent = DAYS_ODIA[now.getDay()];
+
+    // Date: "୧୨ ମାର୍ଚ୍ଚ ୨୦୨୬"
+    const d  = now.getDate();
+    const mo = now.getMonth();
+    const y  = now.getFullYear();
+    dateEl.textContent = toOdiaNum(d) + ' ' + MONTHS_ODIA[mo] + ' ' + toOdiaNum(y);
+  }
+
+  // ─── Helper: create a blinking separator span ───
+  function makeBlink(ch) {
+    const s = document.createElement('span');
+    s.className = 'separator-blink';
+    s.textContent = ch;
+    return s;
+  }
+
+  // ─── Toggle 12h / 24h ───
+  btnFmt.addEventListener('click', function() {
+    is24h = !is24h;
+    this.classList.toggle('active');
+    this.textContent = is24h ? '୨୪-ଘଣ୍ଟା' : '୧୨-ଘଣ୍ଟା';
+    savePrefs();
+    render();
+  });
+
+  // ─── Toggle spoken words ───
+  btnWrd.addEventListener('click', function() {
+    showWords = !showWords;
+    this.classList.toggle('active');
+    savePrefs();
+    render();
+  });
+
+  // ─── Kick off ───
+  loadPrefs();
+
+  // Apply loaded preferences to UI
+  if (!is24h) {
+    btnFmt.classList.remove('active');
+    btnFmt.textContent = '୧୨-ଘଣ୍ଟା';
+  }
+  if (showWords) {
+    btnWrd.classList.add('active');
+  }
+
+  render();
+  setInterval(render, 1000);
+})();
+</script>
+</body>
+</html>

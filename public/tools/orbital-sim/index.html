@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orbital Sim</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='6' fill='%23f5b342'/%3E%3Cellipse cx='32' cy='32' rx='28' ry='10' fill='none' stroke='%234a9eff' stroke-width='1.5' transform='rotate(-20 32 32)'/%3E%3Cellipse cx='32' cy='32' rx='22' ry='8' fill='none' stroke='%23ff6b6b' stroke-width='1.5' transform='rotate(30 32 32)'/%3E%3Cellipse cx='32' cy='32' rx='15' ry='5' fill='none' stroke='%236bff6b' stroke-width='1.5' transform='rotate(-10 32 32)'/%3E%3C/svg%3E">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a12;
+    color: #d0d0e0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #app {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+    background: #0a0a12;
+  }
+
+  /* HUD */
+  #hud {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(10,10,18,0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 10px 20px;
+    font-size: 13px;
+    z-index: 10;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  #hud button {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: #d0d0e0;
+    padding: 6px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+    white-space: nowrap;
+  }
+  #hud button:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.25); }
+  #hud button:active { transform: scale(0.96); }
+  #hud button.active { background: rgba(74,158,255,0.2); border-color: #4a9eff; color: #8ec0ff; }
+  #hud .sep {
+    width: 1px;
+    height: 26px;
+    background: rgba(255,255,255,0.08);
+  }
+  .hud-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: rgba(255,255,255,0.35);
+    margin-right: 4px;
+  }
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.15);
+    outline: none;
+    transition: background 0.2s;
+    vertical-align: middle;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #4a9eff;
+    cursor: pointer;
+    transition: transform 0.15s;
+    border: 2px solid rgba(255,255,255,0.2);
+  }
+  input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+  input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #4a9eff;
+    cursor: pointer;
+    border: 2px solid rgba(255,255,255,0.2);
+  }
+  .speed-val {
+    min-width: 28px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    color: #8ec0ff;
+    font-weight: 500;
+  }
+  select { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #d0d0e0; padding: 6px 10px; border-radius: 8px; font-size: 12px; font-family: inherit; cursor: pointer; }
+  select:focus { outline: none; border-color: #4a9eff; }
+  select option { background: #1a1a2e; color: #d0d0e0; }
+  #body-count {
+    color: rgba(255,255,255,0.4);
+    font-size: 12px;
+  }
+
+  /* Tooltip */
+  #tooltip {
+    position: absolute;
+    display: none;
+    background: rgba(10,10,18,0.88);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 12px;
+    line-height: 1.6;
+    pointer-events: none;
+    z-index: 20;
+    min-width: 150px;
+  }
+  #tooltip .tt-name {
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 4px;
+    color: #fff;
+  }
+  #tooltip .tt-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+  }
+  #tooltip .tt-key { color: rgba(255,255,255,0.35); }
+  #tooltip .tt-val { color: #e0e0f0; font-variant-numeric: tabular-nums; }
+
+  /* Instructions overlay */
+  #instructions {
+    position: absolute;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255,255,255,0.2);
+    font-size: 13px;
+    text-align: center;
+    z-index: 5;
+    pointer-events: none;
+    transition: opacity 0.6s;
+  }
+  #instructions.hidden { opacity: 0; }
+
+  /* Responsive */
+  @media (max-width: 720px) {
+    #hud { top: 10px; padding: 8px 12px; gap: 8px; font-size: 12px; border-radius: 10px; }
+    #hud button { padding: 5px 10px; font-size: 12px; }
+    input[type="range"] { width: 70px; }
+    #tooltip { font-size: 11px; padding: 10px 12px; min-width: 120px; }
+  }
+  @media (max-width: 480px) {
+    #hud { gap: 5px; }
+    #hud .sep { display: none; }
+    .hud-label { font-size: 10px; }
+    input[type="range"] { width: 55px; }
+    #body-count { display: none; }
+  }
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<div id="app">
+  <canvas id="canvas"></canvas>
+
+  <div id="hud">
+    <span id="body-count">0 / 5 bodies</span>
+    <div class="sep"></div>
+    <button id="btn-pause" title="Pause / Resume">⏸ Pause</button>
+    <button id="btn-clear" title="Clear orbital trails">🗑 Clear</button>
+    <div class="sep"></div>
+    <span class="hud-label">Preset</span>
+    <select id="preset-select">
+      <option value="">— Custom —</option>
+      <option value="earth-moon">🌍 Earth + Moon</option>
+      <option value="sun-earth">🌞 Sun + Earth</option>
+      <option value="inner-planets">🪐 Inner Planets</option>
+    </select>
+    <div class="sep"></div>
+    <span class="hud-label">Speed</span>
+    <input type="range" id="speed-slider" min="0" max="3" step="0.1" value="1">
+    <span class="speed-val" id="speed-val">1.0×</span>
+  </div>
+
+  <div id="tooltip">
+    <div class="tt-name"></div>
+    <div class="tt-row"><span class="tt-key">Mass</span><span class="tt-val" id="tt-mass"></span></div>
+    <div class="tt-row"><span class="tt-key">Velocity</span><span class="tt-val" id="tt-vel"></span></div>
+    <div class="tt-row"><span class="tt-key">Distance</span><span class="tt-val" id="tt-dist"></span></div>
+  </div>
+
+  <div id="instructions">Click & drag to launch an orbiting body</div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const tooltip = document.getElementById('tooltip');
+  const ttMass = document.getElementById('tt-mass');
+  const ttVel = document.getElementById('tt-vel');
+  const ttDist = document.getElementById('tt-dist');
+  const ttName = tooltip.querySelector('.tt-name');
+  const bodyCount = document.getElementById('body-count');
+  const instructions = document.getElementById('instructions');
+
+  // ————— physics constants —————
+  const G = 800;          // gravitational constant (tuned for pixel-scale fun)
+  const SOFTEN = 20;      // softening to prevent numerical blowup at close range
+  const MAX_BODIES = 5;
+  const TRAIL_LENGTH = 600;
+
+  // ————— state —————
+  let bodies = [];
+  let paused = false;
+  let speed = 1.0;
+  let animId = null;
+  let time = 0;
+  let hoveredBody = null;
+
+  // drag state
+  let dragging = false;
+  let dragStart = { x: 0, y: 0 };
+  let dragEnd = { x: 0, y: 0 };
+
+  // stars background
+  let stars = [];
+  let starCanvas = null;
+  let starCtx = null;
+
+  // ————— star background (rendered once to an offscreen canvas) —————
+  function generateStars(w, h) {
+    stars = [];
+    for (let i = 0; i < 300; i++) {
+      stars.push({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        r: Math.random() * 1.5 + 0.3,
+        a: Math.random() * 0.7 + 0.3,
+        twinkleSpeed: Math.random() * 0.02 + 0.005,
+        twinklePhase: Math.random() * Math.PI * 2
+      });
+    }
+  }
+
+  function renderStarBackground(w, h) {
+    if (!starCanvas || starCanvas.width !== w || starCanvas.height !== h) {
+      starCanvas = document.createElement('canvas');
+      starCanvas.width = w;
+      starCanvas.height = h;
+      starCtx = starCanvas.getContext('2d');
+    }
+    starCtx.clearRect(0, 0, w, h);
+    starCtx.fillStyle = '#0a0a12';
+    starCtx.fillRect(0, 0, w, h);
+
+    // tiny background stars (fixed)
+    const tinyCount = Math.floor((w * h) / 4000);
+    for (let i = 0; i < tinyCount; i++) {
+      const x = Math.random() * w;
+      const y = Math.random() * h;
+      const r = Math.random() * 0.8 + 0.1;
+      const a = Math.random() * 0.4 + 0.1;
+      starCtx.beginPath();
+      starCtx.arc(x, y, r, 0, Math.PI * 2);
+      starCtx.fillStyle = `rgba(255,255,255,${a})`;
+      starCtx.fill();
+    }
+
+    // store twinkling stars separately
+    generateStars(w, h);
+  }
+
+  // ————— central star (always exists) —————
+  function createCentralStar(w, h) {
+    return {
+      x: w / 2,
+      y: h / 2,
+      vx: 0,
+      vy: 0,
+      mass: 1000,
+      radius: 18,
+      name: '★ Central Star',
+      color: '#f5b342',
+      glowColor: 'rgba(245,179,66,0.4)',
+      isStar: true,
+      trail: []
+    };
+  }
+
+  // ————— resize —————
+  function resize() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    renderStarBackground(canvas.width, canvas.height);
+
+    // reposition star
+    if (bodies.length > 0 && bodies[0].isStar) {
+      bodies[0].x = canvas.width / 2;
+      bodies[0].y = canvas.height / 2;
+    }
+  }
+
+  // ————— body colors —————
+  const BODY_COLORS = [
+    { color: '#ff6b6b', glow: 'rgba(255,107,107,0.35)', name: '● Crimson' },
+    { color: '#6bff6b', glow: 'rgba(107,255,107,0.35)', name: '● Emerald' },
+    { color: '#6bb5ff', glow: 'rgba(107,181,255,0.35)', name: '● Azure' },
+    { color: '#d46bff', glow: 'rgba(212,107,255,0.35)', name: '● Violet' },
+  ];
+
+  // ————— add orbiting body —————
+  function addBody(x, y, vx, vy, mass) {
+    const orbitingBodies = bodies.filter(b => !b.isStar);
+    if (orbitingBodies.length >= MAX_BODIES - 1) return false;
+
+    const idx = orbitingBodies.length;
+    const scheme = BODY_COLORS[idx % BODY_COLORS.length];
+
+    bodies.push({
+      x, y, vx, vy,
+      mass: mass || 5,
+      radius: 6,
+      name: scheme.name,
+      color: scheme.color,
+      glowColor: scheme.glow,
+      isStar: false,
+      trail: [],
+    });
+    updateBodyCount();
+    instructions.classList.add('hidden');
+    return true;
+  }
+
+  // ————— remove a body —————
+  function removeBody(body) {
+    const idx = bodies.indexOf(body);
+    if (idx > 0) { // never remove star
+      bodies.splice(idx, 1);
+      updateBodyCount();
+    }
+  }
+
+  // ————— update body count display —————
+  function updateBodyCount() {
+    const count = bodies.filter(b => !b.isStar).length;
+    bodyCount.textContent = `${count} / ${MAX_BODIES - 1} bodies`;
+  }
+
+  // ————— physics step —————
+  function physicsStep(dt) {
+    if (paused) return;
+
+    const n = bodies.length;
+    if (n < 2) return;
+
+    // symplectic Euler: update velocity first, then position
+    for (let i = 0; i < n; i++) {
+      let ax = 0, ay = 0;
+      for (let j = 0; j < n; j++) {
+        if (i === j) continue;
+        const dx = bodies[j].x - bodies[i].x;
+        const dy = bodies[j].y - bodies[i].y;
+        const distSq = dx * dx + dy * dy + SOFTEN * SOFTEN;
+        const dist = Math.sqrt(distSq);
+        const force = G * bodies[j].mass / distSq;
+        ax += force * (dx / dist);
+        ay += force * (dy / dist);
+      }
+      bodies[i].vx += ax * dt;
+      bodies[i].vy += ay * dt;
+    }
+
+    const ESCAPE_RADIUS = Math.max(canvas.width, canvas.height) * 2.5;
+    const star = bodies[0];
+    const starRadius = star.radius;
+
+    for (let i = bodies.length - 1; i >= 0; i--) {
+      const b = bodies[i];
+      if (b.isStar) {
+        // star gets a short trail too
+        b.trail.push({ x: b.x, y: b.y });
+        if (b.trail.length > 120) b.trail.shift();
+        continue;
+      }
+
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+
+      // record trail
+      b.trail.push({ x: b.x, y: b.y });
+      if (b.trail.length > TRAIL_LENGTH) b.trail.shift();
+
+      // escape check: remove if too far
+      const dx = b.x - star.x;
+      const dy = b.y - star.y;
+      const distFromStar = Math.sqrt(dx * dx + dy * dy);
+      if (distFromStar > ESCAPE_RADIUS) {
+        bodies.splice(i, 1);
+        updateBodyCount();
+        continue;
+      }
+
+      // collision with star: remove
+      if (distFromStar < starRadius + b.radius) {
+        bodies.splice(i, 1);
+        updateBodyCount();
+      }
+    }
+  }
+
+  // ————— get velocity magnitude —————
+  function getSpeed(b) {
+    return Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+  }
+
+  // ————— get distance from star —————
+  function getDistanceFromStar(b) {
+    if (bodies.length === 0) return 0;
+    const star = bodies[0];
+    return Math.sqrt((b.x - star.x) ** 2 + (b.y - star.y) ** 2);
+  }
+
+  // ————— draw —————
+  function draw() {
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    // stars background
+    ctx.drawImage(starCanvas, 0, 0);
+
+    // twinkling stars overlay
+    for (const s of stars) {
+      const twinkle = Math.sin(time * s.twinkleSpeed + s.twinklePhase) * 0.3 + 0.7;
+      const alpha = s.a * twinkle;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+      ctx.fill();
+    }
+
+    // drag preview
+    if (dragging) {
+      ctx.beginPath();
+      ctx.moveTo(dragStart.x, dragStart.y);
+      ctx.lineTo(dragEnd.x, dragEnd.y);
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // ghost ball at end
+      const dx = dragEnd.x - dragStart.x;
+      const dy = dragEnd.y - dragStart.y;
+      const velMag = Math.sqrt(dx * dx + dy * dy) * 1.5;
+      if (velMag > 5) {
+        ctx.beginPath();
+        ctx.arc(dragEnd.x, dragEnd.y, 6, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+
+      // velocity arrow label
+      if (velMag > 5) {
+        const midX = (dragStart.x + dragEnd.x) / 2 + 12;
+        const midY = (dragStart.y + dragEnd.y) / 2 - 8;
+        ctx.font = '11px -apple-system, sans-serif';
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.textAlign = 'center';
+        ctx.fillText('velocity', midX, midY);
+      }
+    }
+
+    // trails
+    for (const b of bodies) {
+      const trail = b.trail;
+      if (trail.length < 2) continue;
+      const maxLen = b.isStar ? 120 : TRAIL_LENGTH;
+      const startIdx = Math.max(0, trail.length - maxLen);
+
+      for (let i = startIdx + 1; i < trail.length; i++) {
+        const t = (i - startIdx) / (trail.length - startIdx);
+        const alpha = b.isStar ? t * 0.5 : t * 0.7;
+        const width = b.isStar ? (t * 3 + 1) : (t * 2.5 + 0.5);
+        ctx.beginPath();
+        ctx.moveTo(trail[i - 1].x, trail[i - 1].y);
+        ctx.lineTo(trail[i].x, trail[i].y);
+        ctx.strokeStyle = b.isStar
+          ? `rgba(245,179,66,${alpha * 0.5})`
+          : hexToRgba(b.color, alpha);
+        ctx.lineWidth = width;
+        ctx.stroke();
+      }
+    }
+
+    // bodies (draw orbiting first so star is on top)
+    for (let i = bodies.length - 1; i >= 0; i--) {
+      const b = bodies[i];
+      const r = b.radius;
+
+      // glow
+      if (b.isStar) {
+        const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 3);
+        grad.addColorStop(0, 'rgba(245,179,66,0.3)');
+        grad.addColorStop(0.5, 'rgba(245,179,66,0.08)');
+        grad.addColorStop(1, 'rgba(245,179,66,0)');
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, r * 3, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        // secondary glow
+        const grad2 = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 7);
+        grad2.addColorStop(0, 'rgba(245,179,66,0.08)');
+        grad2.addColorStop(1, 'rgba(245,179,66,0)');
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, r * 7, 0, Math.PI * 2);
+        ctx.fillStyle = grad2;
+        ctx.fill();
+
+        // sun rays
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        for (let a = 0; a < Math.PI * 2; a += Math.PI / 6) {
+          const len = r * 1.2 + Math.sin(time * 2 + a * 3) * 2;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(a) * r * 0.9, Math.sin(a) * r * 0.9);
+          ctx.lineTo(Math.cos(a) * len, Math.sin(a) * len);
+          ctx.strokeStyle = 'rgba(245,179,66,0.25)';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+        ctx.restore();
+      } else if (b === hoveredBody) {
+        // hover glow for orbiting bodies
+        const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, r * 2.5);
+        grad.addColorStop(0, b.glowColor);
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, r * 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+      }
+
+      // body circle
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, r, 0, Math.PI * 2);
+      if (b.isStar) {
+        const grad = ctx.createRadialGradient(b.x - r * 0.3, b.y - r * 0.3, 0, b.x, b.y, r);
+        grad.addColorStop(0, '#ffe58a');
+        grad.addColorStop(0.5, '#f5b342');
+        grad.addColorStop(1, '#d48720');
+        ctx.fillStyle = grad;
+      } else {
+        const grad = ctx.createRadialGradient(b.x - r * 0.3, b.y - r * 0.3, 0, b.x, b.y, r);
+        grad.addColorStop(0, lightenColor(b.color, 40));
+        grad.addColorStop(1, b.color);
+        ctx.fillStyle = grad;
+      }
+      ctx.fill();
+
+      // highlight
+      ctx.beginPath();
+      ctx.arc(b.x - r * 0.25, b.y - r * 0.25, r * 0.3, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.fill();
+
+      // hover ring
+      if (b === hoveredBody) {
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, r + 4, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    // update tooltip position
+    if (hoveredBody) {
+      const b = hoveredBody;
+      ttName.textContent = b.name;
+      ttMass.textContent = b.mass.toFixed(1);
+      ttVel.textContent = getSpeed(b).toFixed(1) + ' px/s';
+      ttDist.textContent = getDistanceFromStar(b).toFixed(1) + ' px';
+
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = rect.width / canvas.width;
+      const scaleY = rect.height / canvas.height;
+      const screenX = b.x * scaleX + rect.left;
+      const screenY = b.y * scaleY + rect.top;
+
+      const tipRect = tooltip.getBoundingClientRect();
+      let tx = screenX + 16;
+      let ty = screenY - tipRect.height / 2;
+
+      if (tx + tipRect.width > window.innerWidth - 10) tx = screenX - tipRect.width - 16;
+      if (ty < 10) ty = 10;
+      if (ty + tipRect.height > window.innerHeight - 10) ty = window.innerHeight - tipRect.height - 10;
+
+      tooltip.style.left = tx + 'px';
+      tooltip.style.top = ty + 'px';
+      tooltip.style.display = 'block';
+    } else {
+      tooltip.style.display = 'none';
+    }
+  }
+
+  function hexToRgba(hex, alpha) {
+    let c = hex.replace('#', '');
+    if (c.length === 3) c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2];
+    const num = parseInt(c, 16);
+    const r = (num >> 16) & 0xFF;
+    const g = (num >> 8) & 0xFF;
+    const b = num & 0xFF;
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  function lightenColor(hex, amt) {
+    let c = hex.replace('#', '');
+    if (c.length === 3) c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2];
+    let num = parseInt(c, 16);
+    let r = Math.min(255, (num >> 16) + amt);
+    let g = Math.min(255, ((num >> 8) & 0x00FF) + amt);
+    let b = Math.min(255, (num & 0x0000FF) + amt);
+    return `rgb(${r},${g},${b})`;
+  }
+
+  // ————— game loop —————
+  let lastTimestamp = 0;
+
+  function loop(timestamp) {
+    if (!lastTimestamp) lastTimestamp = timestamp;
+    let elapsed = (timestamp - lastTimestamp) / 1000;
+    lastTimestamp = timestamp;
+    elapsed = Math.min(elapsed, 0.1); // cap to prevent spiral of death
+
+    if (!paused) {
+      const stepSize = elapsed * speed;
+      physicsStep(stepSize);
+      time += stepSize;
+    }
+
+    draw();
+    animId = requestAnimationFrame(loop);
+  }
+
+  function startLoop() {
+    if (animId) cancelAnimationFrame(animId);
+    animId = requestAnimationFrame(loop);
+  }
+
+  // ————— hit testing —————
+  function getBodyAt(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const cx = (clientX - rect.left) * scaleX;
+    const cy = (clientY - rect.top) * scaleY;
+
+    // search in reverse (top-most drawn last)
+    for (let i = bodies.length - 1; i >= 0; i--) {
+      const b = bodies[i];
+      const dx = cx - b.x;
+      const dy = cy - b.y;
+      const hitR = b.isStar ? b.radius * 2.5 : b.radius + 8;
+      if (dx * dx + dy * dy < hitR * hitR) return b;
+    }
+    return null;
+  }
+
+  function getCanvasPos(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY
+    };
+  }
+
+  // ————— events —————
+  function onPointerDown(e) {
+    const pos = getCanvasPos(e.clientX, e.clientY);
+    const hit = getBodyAt(e.clientX, e.clientY);
+
+    if (hit && !hit.isStar) {
+      // remove on right-click / long press
+      removeBody(hit);
+      return;
+    }
+
+    if (bodies.filter(b => !b.isStar).length >= MAX_BODIES - 1) {
+      return; // at max
+    }
+
+    dragging = true;
+    dragStart.x = pos.x;
+    dragStart.y = pos.y;
+    dragEnd.x = pos.x;
+    dragEnd.y = pos.y;
+  }
+
+  function onPointerMove(e) {
+    const pos = getCanvasPos(e.clientX, e.clientY);
+
+    if (dragging) {
+      dragEnd.x = pos.x;
+      dragEnd.y = pos.y;
+      return;
+    }
+
+    const hit = getBodyAt(e.clientX, e.clientY);
+    if (hit && !hit.isStar) {
+      hoveredBody = hit;
+      canvas.style.cursor = 'pointer';
+    } else if (hit && hit.isStar) {
+      hoveredBody = hit;
+      canvas.style.cursor = 'default';
+    } else {
+      hoveredBody = null;
+      canvas.style.cursor = 'crosshair';
+    }
+  }
+
+  function onPointerUp(e) {
+    if (!dragging) return;
+    dragging = false;
+
+    const pos = getCanvasPos(e.clientX, e.clientY);
+    const dx = pos.x - dragStart.x;
+    const dy = pos.y - dragStart.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist < 10) return; // too short, ignore
+
+    // velocity proportional to drag vector (tunable)
+    const launchSpeed = 0.4;
+    const vx = dx * launchSpeed;
+    const vy = dy * launchSpeed;
+
+    addBody(dragStart.x, dragStart.y, vx, vy);
+  }
+
+  // mouse events
+  canvas.addEventListener('mousedown', onPointerDown);
+  canvas.addEventListener('mousemove', onPointerMove);
+  canvas.addEventListener('mouseup', onPointerUp);
+  canvas.addEventListener('mouseleave', () => {
+    dragging = false;
+    hoveredBody = null;
+    tooltip.style.display = 'none';
+    canvas.style.cursor = 'crosshair';
+  });
+
+  // touch events
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const t = e.touches[0];
+    onPointerDown({ clientX: t.clientX, clientY: t.clientY });
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    const t = e.touches[0];
+    onPointerMove({ clientX: t.clientX, clientY: t.clientY });
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (e.changedTouches.length > 0) {
+      const t = e.changedTouches[0];
+      onPointerUp({ clientX: t.clientX, clientY: t.clientY });
+    }
+  }, { passive: false });
+
+  // ————— HUD controls —————
+  const btnPause = document.getElementById('btn-pause');
+  const btnClear = document.getElementById('btn-clear');
+  const speedSlider = document.getElementById('speed-slider');
+  const speedVal = document.getElementById('speed-val');
+  const presetSelect = document.getElementById('preset-select');
+
+  btnPause.addEventListener('click', () => {
+    paused = !paused;
+    btnPause.textContent = paused ? '▶ Resume' : '⏸ Pause';
+    btnPause.classList.toggle('active', paused);
+  });
+
+  btnClear.addEventListener('click', () => {
+    for (const b of bodies) {
+      b.trail = [];
+    }
+  });
+
+  speedSlider.addEventListener('input', () => {
+    speed = parseFloat(speedSlider.value);
+    speedVal.textContent = speed.toFixed(1) + '×';
+  });
+
+  // Preset selector
+  presetSelect.addEventListener('change', () => {
+    const val = presetSelect.value;
+    if (!val) return;
+    applyPreset(val);
+    presetSelect.value = '';
+  });
+
+  // keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    if (e.key === ' ' || e.key === 'Space') {
+      e.preventDefault();
+      btnPause.click();
+    }
+    if (e.key === 'c' || e.key === 'C') {
+      btnClear.click();
+    }
+  });
+
+  // ————— init —————
+  function applyPreset(name) {
+    if (!name) return;
+    // Clear existing bodies except keep the central star reference
+    bodies = [];
+    const star = createCentralStar(canvas.width, canvas.height);
+    star.x = canvas.width / 2;
+    star.y = canvas.height / 2;
+    bodies.push(star);
+
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+
+    // Helper: compute orbital velocity magnitude for a circular orbit
+    function orbitalSpeed(distFromStar, starMass) {
+      const dSq = distFromStar * distFromStar + SOFTEN * SOFTEN;
+      return Math.sqrt(G * starMass * distFromStar / dSq);
+    }
+
+    function addPlanet(name, color, glow, offsetX, offsetY, mass, radius) {
+      bodies.push({
+        x: cx + offsetX,
+        y: cy + offsetY,
+        vx: 0,
+        vy: 0,
+        mass: mass,
+        radius: radius || 6,
+        name: name,
+        color: color,
+        glowColor: glow,
+        isStar: false,
+        trail: []
+      });
+    }
+
+    function setOrbitalVelocity(idx, dist) {
+      const b = bodies[idx];
+      const speed = orbitalSpeed(dist, star.mass);
+      // Tangential velocity (perpendicular to radius vector)
+      const dx = b.x - star.x;
+      const dy = b.y - star.y;
+      if (dx === 0 && dy === 0) return;
+      // For a body at (dx, dy) from star, tangential direction is (-dy, dx) normalized
+      const len = Math.sqrt(dx * dx + dy * dy);
+      b.vx = (-dy / len) * speed;
+      b.vy = (dx / len) * speed;
+    }
+
+    switch (name) {
+      case 'earth-moon': {
+        // Earth-like body orbiting star
+        const earthDist = 250;
+        addPlanet('🌍 Earth', '#4a9eff', 'rgba(74,158,255,0.3)', earthDist, 0, 50, 8);
+        setOrbitalVelocity(1, earthDist);
+        // Moon orbiting Earth (at index 1)
+        const moonDist = 50;
+        addPlanet('🌙 Moon', '#aaaacc', 'rgba(170,170,204,0.3)', earthDist + moonDist, 0, 5, 4);
+        // Give moon initial velocity relative to Earth's orbital velocity
+        const moonSpeed = Math.sqrt(G * bodies[1].mass * moonDist / (moonDist * moonDist + SOFTEN * SOFTEN));
+        const moonDY = earthDist + moonDist - star.x;
+        bodies[2].vx = bodies[1].vx;
+        bodies[2].vy = bodies[1].vy + (moonDist > 0 ? moonSpeed : -moonSpeed);
+        break;
+      }
+      case 'sun-earth': {
+        // Replace star with a larger sun
+        bodies[0].mass = 2000;
+        bodies[0].radius = 24;
+        bodies[0].name = '☀️ Sun';
+        const earthDist = 300;
+        addPlanet('🌍 Earth', '#4a9eff', 'rgba(74,158,255,0.3)', earthDist, 0, 50, 8);
+        setOrbitalVelocity(1, earthDist);
+        break;
+      }
+      case 'inner-planets': {
+        // Replace star with a larger sun
+        bodies[0].mass = 3000;
+        bodies[0].radius = 28;
+        bodies[0].name = '☀️ Sun';
+        // Mercury
+        addPlanet('☿ Mercury', '#b5a68a', 'rgba(181,166,138,0.3)', 120, 0, 2, 4);
+        setOrbitalVelocity(1, 120);
+        // Venus
+        addPlanet('♀ Venus', '#e8c87a', 'rgba(232,200,122,0.3)', 180, 0, 10, 6);
+        setOrbitalVelocity(2, 180);
+        // Earth
+        addPlanet('🌍 Earth', '#4a9eff', 'rgba(74,158,255,0.3)', 250, 0, 12, 7);
+        setOrbitalVelocity(3, 250);
+        // Mars
+        addPlanet('♂ Mars', '#e07050', 'rgba(224,112,80,0.3)', 330, 0, 5, 5);
+        setOrbitalVelocity(4, 330);
+        break;
+      }
+    }
+
+    time = 0;
+    updateBodyCount();
+    instructions.classList.add('hidden');
+
+    // Preserve existing orbiting bodies limits for custom mode
+    // But reset trails and keep bodies clean
+    for (const b of bodies) {
+      b.trail = [];
+    }
+
+    // Force redraw
+    paused = false;
+    btnPause.textContent = '⏸ Pause';
+    btnPause.classList.remove('active');
+  }
+
+  function init() {
+    resize();
+    bodies = [];
+    const star = createCentralStar(canvas.width, canvas.height);
+    bodies.push(star);
+
+    // spawn a demo orbiting body
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const orbitDist = 250;
+    const rSq = orbitDist * orbitDist + SOFTEN * SOFTEN;
+    const orbitalSpeed = Math.sqrt(G * star.mass * orbitDist / rSq);
+    addBody(cx + orbitDist, cy, 0, orbitalSpeed);
+    time = 0;
+    updateBodyCount();
+    startLoop();
+  }
+
+  window.addEventListener('resize', () => {
+    resize();
+  });
+
+  init();
+})();
+</script>
+</body>
+</html>

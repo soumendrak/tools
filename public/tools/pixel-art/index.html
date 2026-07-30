@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixel Art Editor</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23222' rx='4'/%3E%3Crect x='4' y='4' width='6' height='6' fill='%23ff7a00'/%3E%3Crect x='10' y='4' width='6' height='6' fill='%23ff7a00'/%3E%3Crect x='16' y='4' width='6' height='6' fill='%23ff7a00'/%3E%3Crect x='22' y='4' width='6' height='6' fill='%23ff7a00'/%3E%3Crect x='4' y='10' width='6' height='6' fill='%23ff7a00'/%3E%3Crect x='10' y='10' width='6' height='6' fill='%23ff9933'/%3E%3Crect x='16' y='10' width='6' height='6' fill='%23ff9933'/%3E%3Crect x='22' y='10' width='6' height='6' fill='%23ff7a00'/%3E%3Crect x='4' y='16' width='6' height='6' fill='%23ff7a00'/%3E%3Crect x='10' y='16' width='6' height='6' fill='%23ff9933'/%3E%3Crect x='16' y='16' width='6' height='6' fill='%23ff9933'/%3E%3Crect x='22' y='16' width='6' height='6' fill='%23ff7a00'/%3E%3Crect x='4' y='22' width='6' height='6' fill='%23ff7a00'/%3E%3Crect x='10' y='22' width='6' height='6' fill='%23ff7a00'/%3E%3Crect x='16' y='22' width='6' height='6' fill='%23ff7a00'/%3E%3Crect x='22' y='22' width='6' height='6' fill='%23ff7a00'/%3E%3C/svg%3E">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #1a1a2e;
+    --surface: #222244;
+    --surface2: #2a2a4a;
+    --border: #3a3a5a;
+    --text: #e0e0f0;
+    --text-dim: #8888aa;
+    --accent: #ff7a00;
+    --accent-hover: #ff9933;
+    --accent-glow: rgba(255,122,0,0.3);
+    --radius: 10px;
+    --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  }
+
+  html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* ── layout ── */
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    max-height: 100vh;
+  }
+
+  /* ── header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    gap: 12px;
+  }
+
+  header h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  header h1 .logo {
+    display: inline-flex;
+    width: 28px;
+    height: 28px;
+    background: var(--accent);
+    border-radius: 6px;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  /* ── buttons ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn:hover { background: #3a3a5a; border-color: var(--accent); }
+  .btn:active { transform: scale(0.96); }
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-icon {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    font-size: 1rem;
+  }
+  .btn-danger:hover { border-color: #ff4444; }
+
+  /* ── main editor area ── */
+  .editor {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    padding: 16px;
+    gap: 16px;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  /* ── left toolbar ── */
+  .toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px;
+    flex-shrink: 0;
+  }
+
+  .toolbar .btn.active-tool {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    box-shadow: 0 0 12px var(--accent-glow);
+  }
+
+  .toolbar-sep {
+    width: 100%;
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
+  }
+
+  .size-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+  }
+  .size-group label {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .size-btns {
+    display: flex;
+    gap: 3px;
+  }
+  .size-btns .btn {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+  .size-btns .btn.active-tool {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  /* ── toggle switch ── */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 4px 0;
+  }
+  .toggle-row input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 32px;
+    height: 18px;
+    background: var(--border);
+    border-radius: 10px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .toggle-row input[type="checkbox"]::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    background: var(--text);
+    border-radius: 50%;
+    transition: transform 0.2s, background 0.2s;
+  }
+  .toggle-row input[type="checkbox"]:checked {
+    background: var(--accent);
+  }
+  .toggle-row input[type="checkbox"]:checked::after {
+    transform: translateX(14px);
+    background: #fff;
+  }
+
+  /* ── canvas ── */
+  .canvas-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    padding: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .canvas-wrapper canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: 640px;
+    max-height: 640px;
+    aspect-ratio: 1 / 1;
+    border-radius: 4px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    cursor: crosshair;
+    touch-action: none;
+  }
+
+  /* ── right panel: palette ── */
+  .right-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    flex-shrink: 0;
+    min-width: 130px;
+  }
+
+  .right-panel .panel-label {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-align: center;
+  }
+
+  .palette-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+  }
+
+  .color-swatch {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 6px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .color-swatch:hover { transform: scale(1.12); z-index: 2; }
+  .color-swatch.active {
+    border-color: #fff;
+    box-shadow: 0 0 10px rgba(255,255,255,0.3);
+    transform: scale(1.08);
+  }
+
+  .current-color-display {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    background: var(--surface2);
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  }
+  .current-color-display .cc-swatch {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .current-color-display .cc-hex {
+    color: var(--text-dim);
+  }
+
+  /* ── bottom status bar ── */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 20px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    flex-shrink: 0;
+  }
+  .status-bar .status-group {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+  .status-bar kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-size: 0.65rem;
+    font-family: inherit;
+  }
+
+  /* ── responsive ── */
+  @media (max-width: 720px) {
+    header h1 { font-size: 1rem; }
+    header h1 .logo { width: 24px; height: 24px; font-size: 13px; }
+
+    .editor {
+      flex-direction: column;
+      align-items: center;
+      padding: 10px;
+      gap: 10px;
+    }
+
+    .toolbar {
+      flex-direction: row;
+      flex-wrap: wrap;
+      width: 100%;
+      justify-content: center;
+      order: 2;
+      padding: 8px;
+    }
+    .toolbar-sep { width: 1px; height: 30px; margin: 0 4px; }
+
+    .right-panel {
+      flex-direction: row;
+      flex-wrap: wrap;
+      width: 100%;
+      min-width: 0;
+      order: 3;
+      padding: 8px 12px;
+      justify-content: center;
+    }
+    .right-panel .panel-label { width: 100%; }
+    .palette-grid {
+      grid-template-columns: repeat(8, 1fr);
+      max-width: 320px;
+    }
+    .current-color-display { display: none; }
+
+    .canvas-wrapper {
+      width: 100%;
+      order: 1;
+      padding: 4px;
+    }
+    .canvas-wrapper canvas {
+      max-width: 100%;
+      max-height: calc(100vw - 20px);
+    }
+
+    .status-bar { flex-wrap: wrap; gap: 4px; }
+    .status-bar .status-group { gap: 8px; }
+  }
+
+  @media (max-width: 420px) {
+    header { padding: 8px 12px; }
+    .header-actions .btn span { display: none; }
+    .palette-grid { grid-template-columns: repeat(4, 1fr); max-width: 160px; }
+    .btn { font-size: 0.7rem; padding: 5px 10px; }
+  }
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── header ── -->
+  <header>
+    <h1><span class="logo">🎨</span> Pixel Art</h1>
+    <div class="header-actions">
+      <button class="btn btn-primary" id="exportBtn">📥 <span>Export PNG</span></button>
+    </div>
+  </header>
+
+  <!-- ── editor ── -->
+  <div class="editor">
+
+    <!-- left toolbar -->
+    <div class="toolbar" id="toolbar">
+      <button class="btn btn-icon active-tool" data-tool="pen" title="Pen (P)">✏️</button>
+      <button class="btn btn-icon" data-tool="fill" title="Fill (G)">🪣</button>
+      <button class="btn btn-icon" data-tool="eraser" title="Eraser (E)">🧹</button>
+      <div class="toolbar-sep"></div>
+      <div class="size-group">
+        <label>Size</label>
+        <div class="size-btns">
+          <button class="btn active-tool" data-size="1">1</button>
+          <button class="btn" data-size="2">2</button>
+          <button class="btn" data-size="4">4</button>
+        </div>
+      </div>
+      <div class="toolbar-sep"></div>
+      <button class="btn btn-icon" id="undoBtn" title="Undo (Ctrl+Z)">↩️</button>
+      <button class="btn btn-icon btn-danger" id="clearBtn" title="Clear canvas">🗑️</button>
+      <div class="toolbar-sep"></div>
+      <div class="size-group">
+        <label>Canvas</label>
+        <div class="size-btns" id="canvasSizeBtns">
+          <button class="btn" data-grid="32">32</button>
+          <button class="btn active-tool" data-grid="64">64</button>
+          <button class="btn" data-grid="128">128</button>
+        </div>
+      </div>
+      <div class="toolbar-sep"></div>
+      <label class="toggle-row">
+        <input type="checkbox" id="gridToggle" checked>
+        Grid
+      </label>
+    </div>
+
+    <!-- canvas -->
+    <div class="canvas-wrapper">
+      <canvas id="canvas" width="640" height="640"></canvas>
+    </div>
+
+    <!-- right panel: palette -->
+    <div class="right-panel">
+      <span class="panel-label">Palette</span>
+      <div class="palette-grid" id="paletteGrid"></div>
+      <div class="current-color-display">
+        <div class="cc-swatch" id="currentSwatch"></div>
+        <span class="cc-hex" id="currentHex">#ff7a00</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── status bar ── -->
+  <div class="status-bar">
+    <div class="status-group">
+      <span id="statusCoords">(0, 0)</span>
+      <span id="statusSize">1px</span>
+      <span id="statusTool">Pen</span>
+    </div>
+    <div class="status-group">
+      <span><kbd>LMB</kbd> paint · <kbd>RMB</kbd> erase</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  // ── constants ──
+  const CANVAS_SIZE = 640;      // internal px
+  const MAX_UNDO = 20;
+
+  let GRID_SIZE = 64;
+  let CELL_SIZE = CANVAS_SIZE / GRID_SIZE;
+
+  // ── 16 preset colors ──
+  const COLORS = [
+    '#000000', '#ffffff', '#ff0000', '#ff7f00',
+    '#ffff00', '#00ff00', '#0000ff', '#800080',
+    '#ff69b4', '#a52a2a', '#808080', '#00ced1',
+    '#ff1493', '#228b22', '#1e90ff', '#c0c0c0',
+  ];
+
+  // ── DOM refs ──
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const paletteGrid = document.getElementById('paletteGrid');
+  const currentSwatch = document.getElementById('currentSwatch');
+  const currentHex = document.getElementById('currentHex');
+  const gridToggle = document.getElementById('gridToggle');
+  const clearBtn = document.getElementById('clearBtn');
+  const undoBtn = document.getElementById('undoBtn');
+  const exportBtn = document.getElementById('exportBtn');
+  const statusCoords = document.getElementById('statusCoords');
+  const statusSize = document.getElementById('statusSize');
+  const statusTool = document.getElementById('statusTool');
+
+  // ── state ──
+  let grid = [];
+  let currentColor = COLORS[1];  // start with white
+  let currentTool = 'pen';       // 'pen' | 'eraser' | 'fill'
+  let penSize = 1;
+  let showGrid = true;
+  let isDrawing = false;
+  let undoStack = [];
+  let undoIndex = -1;  // -1 means no saved state
+
+  // ── init grid ──
+  function createEmptyGrid() {
+    const g = [];
+    for (let y = 0; y < GRID_SIZE; y++) {
+      g[y] = [];
+      for (let x = 0; x < GRID_SIZE; x++) {
+        g[y][x] = '#ffffff';  // white background
+      }
+    }
+    return g;
+  }
+
+  function initGrid() {
+    grid = createEmptyGrid();
+    undoStack = [];
+    undoIndex = -1;
+    pushUndo();
+  }
+
+  // ── undo system ──
+  function pushUndo() {
+    const snapshot = grid.map(row => [...row]);
+    // if we are not at the end, truncate future
+    if (undoIndex < undoStack.length - 1) {
+      undoStack = undoStack.slice(0, undoIndex + 1);
+    }
+    undoStack.push(snapshot);
+    if (undoStack.length > MAX_UNDO) {
+      undoStack.shift();
+    }
+    undoIndex = undoStack.length - 1;
+    updateUndoButton();
+  }
+
+  function undo() {
+    if (undoIndex <= 0) return;
+    undoIndex--;
+    grid = undoStack[undoIndex].map(row => [...row]);
+    render();
+    updateUndoButton();
+  }
+
+  function updateUndoButton() {
+    undoBtn.style.opacity = undoIndex > 0 ? '1' : '0.35';
+  }
+
+  // ── rendering ──
+  function render() {
+    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+    // draw pixels
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        ctx.fillStyle = grid[y][x];
+        ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+      }
+    }
+
+    // grid lines
+    if (showGrid) {
+      ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+      ctx.lineWidth = 0.5;
+      for (let i = 0; i <= GRID_SIZE; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * CELL_SIZE, 0);
+        ctx.lineTo(i * CELL_SIZE, CANVAS_SIZE);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, i * CELL_SIZE);
+        ctx.lineTo(CANVAS_SIZE, i * CELL_SIZE);
+        ctx.stroke();
+      }
+      // subtle border
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    }
+  }
+
+  // ── coordinate helpers ──
+  function getCanvasCoords(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;   // internal / display
+    const scaleY = canvas.height / rect.height;
+
+    let clientX, clientY;
+    if (e.touches) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+      e.preventDefault();
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
+    const mx = (clientX - rect.left) * scaleX;
+    const my = (clientY - rect.top) * scaleY;
+
+    const gx = Math.floor(mx / CELL_SIZE);
+    const gy = Math.floor(my / CELL_SIZE);
+    return { gx, gy, mx, my };
+  }
+
+  function clamp(v) {
+    return Math.max(0, Math.min(GRID_SIZE - 1, v));
+  }
+
+  // ── drawing ──
+  function paintAt(gx, gy, color) {
+    if (gx < 0 || gx >= GRID_SIZE || gy < 0 || gy >= GRID_SIZE) return;
+    const size = penSize;
+    const half = Math.floor(size / 2);
+    let changed = false;
+    for (let dy = 0; dy < size; dy++) {
+      for (let dx = 0; dx < size; dx++) {
+        const px = clamp(gx + dx - half);
+        const py = clamp(gy + dy - half);
+        if (grid[py][px] !== color) {
+          grid[py][px] = color;
+          changed = true;
+        }
+      }
+    }
+    if (changed) render();
+  }
+
+  function eraseAt(gx, gy) {
+    if (gx < 0 || gx >= GRID_SIZE || gy < 0 || gy >= GRID_SIZE) return;
+    const size = penSize;
+    const half = Math.floor(size / 2);
+    let changed = false;
+    for (let dy = 0; dy < size; dy++) {
+      for (let dx = 0; dx < size; dx++) {
+        const px = clamp(gx + dx - half);
+        const py = clamp(gy + dy - half);
+        if (grid[py][px] !== '#ffffff') {
+          grid[py][px] = '#ffffff';
+          changed = true;
+        }
+      }
+    }
+    if (changed) render();
+  }
+
+  // ── flood fill (BFS) ──
+  function floodFill(startX, startY, fillColor) {
+    if (startX < 0 || startX >= GRID_SIZE || startY < 0 || startY >= GRID_SIZE) return;
+    const targetColor = grid[startY][startX];
+    if (targetColor === fillColor) return;
+
+    const stack = [[startX, startY]];
+    grid[startY][startX] = fillColor;
+
+    while (stack.length > 0) {
+      const [cx, cy] = stack.pop();
+      const neighbors = [
+        [cx + 1, cy], [cx - 1, cy],
+        [cx, cy + 1], [cx, cy - 1]
+      ];
+      for (const [nx, ny] of neighbors) {
+        if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE && grid[ny][nx] === targetColor) {
+          grid[ny][nx] = fillColor;
+          stack.push([nx, ny]);
+        }
+      }
+    }
+    render();
+  }
+
+  // ── handle pointer down ──
+  function handlePointerDown(gx, gy, button) {
+    if (gx < 0 || gx >= GRID_SIZE || gy < 0 || gy >= GRID_SIZE) return;
+
+    if (currentTool === 'fill') {
+      const color = currentTool === 'eraser' ? '#ffffff' : currentColor;
+      pushUndo();
+      floodFill(gx, gy, color);
+      return;
+    }
+
+    pushUndo();
+
+    if (button === 2 || currentTool === 'eraser') {
+      eraseAt(gx, gy);
+    } else {
+      paintAt(gx, gy, currentColor);
+    }
+  }
+
+  function handlePointerMove(gx, gy, button) {
+    if (gx < 0 || gx >= GRID_SIZE || gy < 0 || gy >= GRID_SIZE) return;
+    if (!isDrawing) return;
+    if (currentTool === 'fill') return;
+
+    if (button === 2 || currentTool === 'eraser') {
+      eraseAt(gx, gy);
+    } else {
+      paintAt(gx, gy, currentColor);
+    }
+  }
+
+  // ── canvas events ──
+  function onMouseDown(e) {
+    const { gx, gy } = getCanvasCoords(e);
+    if (gx < 0 || gx >= GRID_SIZE || gy < 0 || gy >= GRID_SIZE) return;
+
+    if (e.button === 2) {
+      // right-click: erase mode for this stroke
+      isDrawing = true;
+      pushUndo();
+      eraseAt(gx, gy);
+      e.preventDefault();
+      return;
+    }
+
+    if (e.button !== 0) return;
+    isDrawing = true;
+    handlePointerDown(gx, gy, 0);
+    e.preventDefault();
+  }
+
+  function onMouseMove(e) {
+    const { gx, gy } = getCanvasCoords(e);
+    statusCoords.textContent = `(${clamp(gx)}, ${clamp(gy)})`;
+    if (isDrawing) {
+      handlePointerMove(gx, gy, e.button);
+    }
+  }
+
+  function onMouseUp(e) {
+    isDrawing = false;
+  }
+
+  function onMouseLeave() {
+    isDrawing = false;
+  }
+
+  function onContextMenu(e) {
+    e.preventDefault();
+  }
+
+  // ── touch events ──
+  let touchIdentifier = null;
+
+  function onTouchStart(e) {
+    e.preventDefault();
+    const touch = e.touches[0];
+    if (!touch) return;
+    touchIdentifier = touch.identifier;
+    const { gx, gy } = getCanvasCoords(e);
+    if (gx >= 0 && gx < GRID_SIZE && gy >= 0 && gy < GRID_SIZE) {
+      isDrawing = true;
+      pushUndo();
+      if (currentTool === 'eraser') {
+        eraseAt(gx, gy);
+      } else if (currentTool === 'fill') {
+        floodFill(gx, gy, currentColor);
+        isDrawing = false;
+      } else {
+        paintAt(gx, gy, currentColor);
+      }
+    }
+  }
+
+  function onTouchMove(e) {
+    e.preventDefault();
+    if (!isDrawing) return;
+    const { gx, gy } = getCanvasCoords(e);
+    if (currentTool === 'pen' && gx >= 0 && gx < GRID_SIZE && gy >= 0 && gy < GRID_SIZE) {
+      paintAt(gx, gy, currentColor);
+    }
+  }
+
+  function onTouchEnd(e) {
+    e.preventDefault();
+    isDrawing = false;
+    touchIdentifier = null;
+  }
+
+  // ── palette ──
+  function buildPalette() {
+    paletteGrid.innerHTML = '';
+    COLORS.forEach((hex, i) => {
+      const swatch = document.createElement('div');
+      swatch.className = 'color-swatch' + (hex === currentColor ? ' active' : '');
+      swatch.style.background = hex;
+      // add a subtle checkerboard for white-ish colors
+      if (hex === '#ffffff' || hex === '#c0c0c0') {
+        swatch.style.backgroundImage =
+          'linear-gradient(45deg, rgba(0,0,0,0.05) 25%, transparent 25%),' +
+          'linear-gradient(-45deg, rgba(0,0,0,0.05) 25%, transparent 25%),' +
+          'linear-gradient(45deg, transparent 75%, rgba(0,0,0,0.05) 75%),' +
+          'linear-gradient(-45deg, transparent 75%, rgba(0,0,0,0.05) 75%)';
+        swatch.style.backgroundSize = '6px 6px';
+        swatch.style.backgroundPosition = '0 0, 0 3px, 3px -3px, -3px 0';
+      }
+      swatch.title = hex;
+      swatch.dataset.color = hex;
+      swatch.addEventListener('click', () => selectColor(hex));
+      paletteGrid.appendChild(swatch);
+    });
+  }
+
+  function selectColor(hex) {
+    currentColor = hex;
+    currentSwatch.style.background = hex;
+    // checkerboard for light colors in display
+    if (hex === '#ffffff' || hex === '#c0c0c0') {
+      currentSwatch.style.backgroundImage =
+        'linear-gradient(45deg, rgba(0,0,0,0.08) 25%, transparent 25%),' +
+        'linear-gradient(-45deg, rgba(0,0,0,0.08) 25%, transparent 25%),' +
+        'linear-gradient(45deg, transparent 75%, rgba(0,0,0,0.08) 75%),' +
+        'linear-gradient(-45deg, transparent 75%, rgba(0,0,0,0.08) 75%)';
+      currentSwatch.style.backgroundSize = '6px 6px';
+      currentSwatch.style.backgroundPosition = '0 0, 0 3px, 3px -3px, -3px 0';
+    } else {
+      currentSwatch.style.backgroundImage = 'none';
+    }
+    currentHex.textContent = hex;
+    if (currentTool === 'eraser') setTool('pen');
+    // update active swatch
+    document.querySelectorAll('.color-swatch').forEach(el => {
+      el.classList.toggle('active', el.dataset.color === hex);
+    });
+  }
+
+  // ── tool management ──
+  function setTool(tool) {
+    currentTool = tool;
+    document.querySelectorAll('[data-tool]').forEach(el => {
+      el.classList.toggle('active-tool', el.dataset.tool === tool);
+    });
+    const names = { pen: 'Pen', eraser: 'Eraser', fill: 'Fill' };
+    statusTool.textContent = names[tool] || 'Pen';
+    canvas.style.cursor = tool === 'fill' ? 'cell' : 'crosshair';
+  }
+
+  function setPenSize(size) {
+    penSize = size;
+    document.querySelectorAll('[data-size]').forEach(el => {
+      el.classList.toggle('active-tool', parseInt(el.dataset.size) === size);
+    });
+    statusSize.textContent = size + 'px';
+  }
+
+  // ── clear ──
+  function clearCanvas() {
+    pushUndo();
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        grid[y][x] = '#ffffff';
+      }
+    }
+    render();
+  }
+
+  // ── canvas size ──
+  function setCanvasSize(newSize) {
+    if (newSize === GRID_SIZE) return;
+    const oldSize = GRID_SIZE;
+    const oldGrid = grid;
+
+    // Create new grid with new dimensions
+    GRID_SIZE = newSize;
+    CELL_SIZE = CANVAS_SIZE / GRID_SIZE;
+    const newGrid = createEmptyGrid();
+
+    // Copy existing pixels where they fit
+    const copySize = Math.min(oldSize, newSize);
+    for (let y = 0; y < copySize; y++) {
+      for (let x = 0; x < copySize; x++) {
+        if (y < oldGrid.length && x < oldGrid[y].length) {
+          newGrid[y][x] = oldGrid[y][x];
+        }
+      }
+    }
+
+    grid = newGrid;
+    undoStack = [];
+    undoIndex = -1;
+    pushUndo();
+
+    // Update UI active state
+    document.querySelectorAll('#canvasSizeBtns .btn').forEach(el => {
+      el.classList.toggle('active-tool', parseInt(el.dataset.grid) === newSize);
+    });
+
+    render();
+    statusSize.textContent = newSize + '×' + newSize;
+  }
+
+  // ── export ──
+  function exportPNG() {
+    // render without grid for clean export
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = GRID_SIZE;
+    exportCanvas.height = GRID_SIZE;
+    const expCtx = exportCanvas.getContext('2d');
+
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        expCtx.fillStyle = grid[y][x];
+        expCtx.fillRect(x, y, 1, 1);
+      }
+    }
+
+    const link = document.createElement('a');
+    link.download = 'pixel-art.png';
+    link.href = exportCanvas.toDataURL('image/png');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // ── keyboard shortcuts ──
+  function onKeyDown(e) {
+    const key = e.key.toLowerCase();
+    if (key === 'z' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      undo();
+      return;
+    }
+    if (key === 'p') { setTool('pen'); e.preventDefault(); return; }
+    if (key === 'e') { setTool('eraser'); e.preventDefault(); return; }
+    if (key === 'g') { setTool('fill'); e.preventDefault(); return; }
+    if (key === '1') { setPenSize(1); e.preventDefault(); return; }
+    if (key === '2') { setPenSize(2); e.preventDefault(); return; }
+    if (key === '4') { setPenSize(4); e.preventDefault(); return; }
+    if (key === 'g' && !e.ctrlKey && !e.metaKey) {
+      // already handled 'g' for fill
+    }
+  }
+
+  // ── event binding ──
+  function bindEvents() {
+    // canvas
+    canvas.addEventListener('mousedown', onMouseDown);
+    canvas.addEventListener('mousemove', onMouseMove);
+    canvas.addEventListener('mouseup', onMouseUp);
+    canvas.addEventListener('mouseleave', onMouseLeave);
+    canvas.addEventListener('contextmenu', onContextMenu);
+
+    // touch
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+    canvas.addEventListener('touchend', onTouchEnd, { passive: false });
+    canvas.addEventListener('touchcancel', onTouchEnd, { passive: false });
+
+    // toolbar tools
+    document.querySelectorAll('[data-tool]').forEach(el => {
+      el.addEventListener('click', () => setTool(el.dataset.tool));
+    });
+
+    // pen sizes
+    document.querySelectorAll('[data-size]').forEach(el => {
+      el.addEventListener('click', () => setPenSize(parseInt(el.dataset.size)));
+    });
+
+    // grid toggle
+    gridToggle.addEventListener('change', () => {
+      showGrid = gridToggle.checked;
+      render();
+    });
+
+    // canvas size buttons
+    document.querySelectorAll('#canvasSizeBtns .btn').forEach(el => {
+      el.addEventListener('click', () => setCanvasSize(parseInt(el.dataset.grid)));
+    });
+
+    // buttons
+    clearBtn.addEventListener('click', () => {
+      if (confirm('Clear all pixels?')) clearCanvas();
+    });
+    undoBtn.addEventListener('click', undo);
+    exportBtn.addEventListener('click', exportPNG);
+
+    // keyboard
+    document.addEventListener('keydown', onKeyDown);
+  }
+
+  // ── resize handler for responsive canvas ──
+  // (already handled by CSS max-width + image-rendering)
+
+  // ── init ──
+  function init() {
+    GRID_SIZE = 64;
+    CELL_SIZE = CANVAS_SIZE / GRID_SIZE;
+    initGrid();
+    buildPalette();
+    selectColor(COLORS[1]); // white
+    setTool('pen');
+    setPenSize(1);
+    // Activate 64 button as default
+    document.querySelectorAll('#canvasSizeBtns .btn').forEach(el => {
+      el.classList.toggle('active-tool', parseInt(el.dataset.grid) === 64);
+    });
+    statusSize.textContent = '64×64';
+    bindEvents();
+    render();
+  }
+
+  init();
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Typing Test</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⌨️</text></svg>">
+<style>
+:root {
+    --bg: #0a0a14;
+    --surface: #16162a;
+    --accent: #ff6b35;
+    --accent-light: #ff8c42;
+    --accent-dark: #d94f1a;
+    --accent-glow: rgba(255, 107, 53, 0.15);
+    --accent-subtle: rgba(255, 107, 53, 0.06);
+    --text: #f0ece4;
+    --text-dim: #8a8a9a;
+    --text-muted: #5a5a6e;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --mono: "SF Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 20px;
+}
+h1 {
+    text-transform: uppercase;
+    letter-spacing: 0.35em;
+    font-weight: 200;
+    opacity: 0.5;
+    font-size: 1.1rem;
+    margin-bottom: 4px;
+}
+.tagline {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    margin-bottom: 16px;
+}
+#lang-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+.lang-tab {
+    padding: 4px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    border: 1px solid var(--accent-subtle);
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    cursor: pointer;
+    font-family: var(--font);
+    transition: all 0.2s;
+}
+.lang-tab:hover { border-color: var(--accent); color: var(--text); }
+.lang-tab.active { background: var(--accent-glow); border-color: var(--accent); color: var(--accent); }
+#app {
+    width: 100%;
+    max-width: 720px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+/* Level bar */
+#level-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+#level-dots { display: flex; gap: 8px; }
+.level-dot {
+    width: 26px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 1px solid var(--accent-subtle);
+    transition: all 0.25s;
+}
+.level-dot.done { background: var(--accent-dark); border-color: var(--accent-dark); }
+.level-dot.active { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 10px var(--accent-glow); }
+#level-label {
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+}
+#level-label b { color: var(--accent); font-weight: 600; }
+#mode-row { display: flex; gap: 8px; }
+.ghost-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    cursor: pointer;
+    font-family: var(--font);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    transition: color 0.2s;
+}
+.ghost-btn:hover { color: var(--accent); background: none; }
+#custom-panel[hidden] { display: none; }
+#custom-panel {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--accent-subtle);
+    border-radius: var(--radius-md);
+    padding: 14px;
+}
+#custom-input {
+    width: 100%;
+    min-height: 90px;
+    background: var(--bg);
+    border: 1px solid var(--accent-subtle);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    resize: vertical;
+    outline: none;
+}
+#custom-input:focus { border-color: var(--accent); }
+.custom-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+#stats {
+    display: flex;
+    gap: 24px;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    flex-wrap: wrap;
+    justify-content: center;
+}
+.stat { text-align: center; }
+.stat-val { color: var(--accent); font-size: 1.2rem; font-weight: 600; }
+.stat-lbl { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); }
+#quote-display {
+    width: 100%;
+    background: var(--surface);
+    border-radius: var(--radius-md);
+    padding: 20px 24px;
+    font-size: 1.2rem;
+    line-height: 1.7;
+    font-family: var(--font);
+    min-height: 80px;
+    word-break: break-word;
+}
+#quote-display .correct { color: #4caf50; }
+#quote-display .incorrect { color: #e53935; text-decoration: underline; }
+#quote-display .cursor {
+    background: var(--accent);
+    color: var(--bg);
+    animation: blink 0.8s infinite;
+}
+#quote-display .pending { color: var(--text-muted); }
+@keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+}
+#input-area {
+    width: 100%;
+    position: relative;
+}
+textarea#textarea {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--accent-subtle);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 1rem;
+    padding: 14px 18px;
+    border-radius: var(--radius-md);
+    resize: none;
+    outline: none;
+    height: 90px;
+    transition: border-color 0.2s;
+}
+textarea#textarea:focus { border-color: var(--accent); }
+textarea::placeholder { color: var(--text-muted); }
+textarea:disabled { opacity: 0.5; }
+#done-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+button {
+    background: var(--surface);
+    border: 1px solid var(--accent-subtle);
+    color: var(--text);
+    padding: 8px 24px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-family: var(--font);
+    transition: all 0.2s;
+}
+button:hover {
+    background: var(--accent-glow);
+    border-color: var(--accent);
+}
+button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+    font-weight: 600;
+}
+button.primary:hover { background: var(--accent-light); }
+#results {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(10, 10, 20, 0.92);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+#results.show { display: flex; }
+#results-box {
+    background: var(--surface);
+    border: 1px solid var(--accent-subtle);
+    border-radius: var(--radius-lg);
+    padding: 40px;
+    text-align: center;
+    max-width: 380px;
+    width: 90%;
+}
+#results-box h2 {
+    font-weight: 200;
+    letter-spacing: 0.2em;
+    margin-bottom: 20px;
+    color: var(--accent);
+}
+#results-box .r { display: flex; justify-content: space-between; padding: 6px 0; font-size: 0.9rem; }
+#results-box .r .v { font-family: var(--mono); color: var(--accent); }
+#results-box .r .l { color: var(--text-dim); }
+#results-actions { display: flex; gap: 10px; justify-content: center; margin-top: 22px; flex-wrap: wrap; }
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<div id="app">
+<h1>Typing Test</h1>
+<div class="tagline">Clear each level to unlock a harder one — or practise your own text</div>
+<div id="lang-tabs">
+<div class="lang-tab active" data-lang="en" onclick="switchLang('en')">English</div>
+<div class="lang-tab" data-lang="or" onclick="switchLang('or')">ଓଡ଼ିଆ</div>
+<div class="lang-tab" data-lang="hi" onclick="switchLang('hi')">हिन्दी</div>
+</div>
+<div id="level-bar">
+<div id="level-dots"></div>
+<div id="level-label"></div>
+</div>
+<div id="mode-row">
+<button type="button" class="ghost-btn" id="custom-btn">✎ Use my own text</button>
+</div>
+<div id="custom-panel" hidden>
+<textarea id="custom-input" placeholder="Paste or type any text you want to practise…"></textarea>
+<div class="custom-actions">
+<button type="button" class="primary" id="custom-start">Start typing this</button>
+<button type="button" id="custom-cancel">Back to levels</button>
+</div>
+</div>
+<div id="stats">
+<div class="stat"><div class="stat-val" id="wpm">0</div><div class="stat-lbl">WPM</div></div>
+<div class="stat"><div class="stat-val" id="accuracy">100%</div><div class="stat-lbl">Accuracy</div></div>
+<div class="stat"><div class="stat-val" id="timer">0:00</div><div class="stat-lbl">Time</div></div>
+</div>
+<div id="quote-display"></div>
+<div id="input-area">
+<textarea id="textarea" placeholder="Start typing here..." disabled></textarea>
+</div>
+<div id="done-actions">
+<button id="new-test-btn">New Test</button>
+</div>
+</div>
+<div id="results">
+<div id="results-box">
+<h2 id="results-title">Test Complete!</h2>
+<div class="r"><span class="l">WPM</span><span class="v" id="r-wpm">0</span></div>
+<div class="r"><span class="l">Accuracy</span><span class="v" id="r-acc">0%</span></div>
+<div class="r"><span class="l">Time</span><span class="v" id="r-time">0:00</span></div>
+<div class="r"><span class="l">Mistakes</span><span class="v" id="r-mistakes">0</span></div>
+<div id="results-actions">
+<button id="results-next-btn" class="primary" hidden>Next level →</button>
+<button id="results-new-btn">New Test</button>
+</div>
+</div>
+</div>
+
+<script>
+// Five graded levels per language: simple sentence -> paragraph -> richer
+// vocabulary -> complex prose with punctuation -> expert (numbers & symbols).
+const LEVEL_NAMES = ["Simple sentence", "Short paragraph", "Building vocabulary", "Complex prose", "Expert"];
+
+const levelData = {
+    en: [
+        [
+            "The sun is bright and the sky is blue today.",
+            "A small cat sat on the warm mat by the door.",
+            "We like to read good books every single day."
+        ],
+        [
+            "The morning air was cool and fresh. Birds sang in the tall green trees. A gentle breeze moved across the open field, and the day began in a calm and happy way.",
+            "My friend and I went for a long walk. We talked about our plans for the week. The road was quiet and the sky was clear, so by the end we both felt calm."
+        ],
+        [
+            "Learning a new skill requires patience and steady effort. Progress often feels slow at first, yet each attempt builds real understanding. When you review your mistakes carefully, they become useful lessons rather than plain failures.",
+            "A good habit is easier to keep than to start. Choose a small action, repeat it daily, and let it grow quietly. Over weeks and months, these ordinary choices shape the person you gradually become."
+        ],
+        [
+            "Technology evolves rapidly, reshaping how we communicate, work, and learn. Although innovation brings remarkable convenience, it also demands responsibility: privacy, security, and fairness must never be treated as afterthoughts by those who build the future.",
+            "Great writing is rarely accidental; it is revised, questioned, and refined. The first draft merely captures raw thought, whereas later versions—sharpened by doubt—transform scattered ideas into arguments that are both precise and genuinely persuasive."
+        ],
+        [
+            "In 2024, researchers analysed 1,500 datasets to quantify algorithmic bias. Their conclusion — nuanced yet unambiguous — was that transparency, accountability, and rigorous evaluation (not mere optimism) determine whether emerging systems truly benefit society.",
+            "The invoice totalled $2,847.60 across 12 line-items, due within 30 days. \"Verify every figure,\" the auditor warned, \"because a 0.5% error on large volumes—compounded quarterly—can erode margins faster than any competitor ever could.\""
+        ]
+    ],
+    or: [
+        [
+            "ସୂର୍ଯ୍ୟ ପୂର୍ବ ଦିଗରେ ଉଦୟ ହୁଏ।",
+            "ଜ୍ଞାନ ହିଁ ପ୍ରକୃତ ଶକ୍ତି ଅଟେ।",
+            "ଆମେ ପ୍ରତିଦିନ ଭଲ ବହି ପଢ଼ୁ।"
+        ],
+        [
+            "ସକାଳ ପବନ ଥଣ୍ଡା ଓ ସତେଜ ଥିଲା। ଗଛରେ ଚଢ଼େଇମାନେ ଗୀତ ଗାଉଥିଲେ। ଏହା ଏକ ଶାନ୍ତ ଓ ସୁନ୍ଦର ଦିନର ଆରମ୍ଭ ଥିଲା।",
+            "ମୁଁ ଓ ମୋ ବନ୍ଧୁ ଏକ ଲମ୍ବା ବୁଲାବୁଲିକୁ ଗଲୁ। ଆମେ ସପ୍ତାହର ଯୋଜନା ବିଷୟରେ କଥାବାର୍ତ୍ତା କଲୁ। ରାସ୍ତା ଶାନ୍ତ ଥିଲା ଓ ଆକାଶ ପରିଷ୍କାର ଥିଲା।"
+        ],
+        [
+            "ନୂଆ କୌଶଳ ଶିଖିବା ପାଇଁ ଧୈର୍ଯ୍ୟ ଓ ନିରନ୍ତର ପରିଶ୍ରମ ଆବଶ୍ୟକ। ଆରମ୍ଭରେ ଅଗ୍ରଗତି ଧୀର ମନେହୁଏ, ହେଲେ ପ୍ରତ୍ୟେକ ଚେଷ୍ଟା ପ୍ରକୃତ ଜ୍ଞାନ ଗଢ଼େ।",
+            "ଏକ ଭଲ ଅଭ୍ୟାସ ଆରମ୍ଭ କରିବା ଅପେକ୍ଷା ବଜାୟ ରଖିବା ସହଜ। ଏକ ଛୋଟ କାର୍ଯ୍ୟ ବାଛ, ପ୍ରତିଦିନ ଦୋହରାଅ, ଏବଂ ଏହାକୁ ଧୀରେ ଧୀରେ ବଢ଼ିବାକୁ ଦିଅ।"
+        ],
+        [
+            "ପ୍ରଯୁକ୍ତିବିଦ୍ୟା ଦ୍ରୁତ ଗତିରେ ବଦଳୁଛି ଓ ଆମ ଜୀବନଶୈଳୀକୁ ନୂଆ ରୂପ ଦେଉଛି। ଉଦ୍ଭାବନ ସୁବିଧା ଆଣିଲେ ମଧ୍ୟ, ଗୋପନୀୟତା ଓ ସୁରକ୍ଷା ପ୍ରତି ଦାୟିତ୍ୱ କେବେ ଅବହେଳା କରାଯିବା ଉଚିତ ନୁହେଁ।"
+        ],
+        [
+            "୨୦୨୪ ମସିହାରେ ଗବେଷକମାନେ ୧,୫୦୦ ତଥ୍ୟସମୂହ ବିଶ୍ଳେଷଣ କଲେ। ସେମାନଙ୍କ ସିଦ୍ଧାନ୍ତ ସ୍ପଷ୍ଟ ଥିଲା — ସ୍ୱଚ୍ଛତା, ଉତ୍ତରଦାୟିତ୍ୱ ଓ କଠୋର ମୂଲ୍ୟାଙ୍କନ ହିଁ ନିର୍ଣ୍ଣୟ କରେ ଯେ ନୂଆ ବ୍ୟବସ୍ଥା ସମାଜ ପାଇଁ ପ୍ରକୃତରେ ଉପକାରୀ କି ନାହିଁ।"
+        ]
+    ],
+    hi: [
+        [
+            "सूरज पूरब दिशा में उगता है।",
+            "ज्ञान ही असली शक्ति है।",
+            "हम रोज़ अच्छी किताबें पढ़ते हैं।"
+        ],
+        [
+            "सुबह की हवा ठंडी और ताज़ी थी। पेड़ों पर पक्षी गीत गा रहे थे। यह एक शांत और सुंदर दिन की शुरुआत थी।",
+            "मैं और मेरा मित्र एक लंबी सैर पर गए। हमने सप्ताह की योजनाओं पर बातें कीं। रास्ता शांत था और आसमान साफ़ था।"
+        ],
+        [
+            "कोई नया कौशल सीखने के लिए धैर्य और निरंतर परिश्रम चाहिए। शुरुआत में प्रगति धीमी लगती है, पर हर प्रयास सच्ची समझ बनाता है।",
+            "अच्छी आदत शुरू करने से आसान उसे बनाए रखना है। एक छोटा काम चुनें, उसे रोज़ दोहराएँ, और उसे धीरे-धीरे बढ़ने दें।"
+        ],
+        [
+            "तकनीक तेज़ी से बदल रही है और हमारे जीवन को नया रूप दे रही है। नवाचार सुविधा लाता है, फिर भी गोपनीयता और सुरक्षा की ज़िम्मेदारी को कभी अनदेखा नहीं करना चाहिए।"
+        ],
+        [
+            "सन 2024 में शोधकर्ताओं ने 1,500 आँकड़ों का विश्लेषण किया। उनका निष्कर्ष स्पष्ट था — पारदर्शिता, जवाबदेही और कठोर मूल्यांकन ही तय करते हैं कि नई प्रणालियाँ समाज के लिए सचमुच लाभदायक हैं या नहीं।"
+        ]
+    ]
+};
+
+let currentLang = 'en';
+let currentLevel = 0;          // 0..4
+let customText = null;         // non-null => custom mode
+let clearedAll = false;        // finished level 5
+const MAX_LEVEL = 4;
+
+const quoteDisplay = document.getElementById('quote-display');
+const textarea = document.getElementById('textarea');
+const wpmEl = document.getElementById('wpm');
+const accuracyEl = document.getElementById('accuracy');
+const timerEl = document.getElementById('timer');
+const results = document.getElementById('results');
+const rWpm = document.getElementById('r-wpm');
+const rAcc = document.getElementById('r-acc');
+const rTime = document.getElementById('r-time');
+const rMistakes = document.getElementById('r-mistakes');
+const resultsTitle = document.getElementById('results-title');
+const resultsNextBtn = document.getElementById('results-next-btn');
+const resultsNewBtn = document.getElementById('results-new-btn');
+const levelDots = document.getElementById('level-dots');
+const levelLabel = document.getElementById('level-label');
+const customBtn = document.getElementById('custom-btn');
+const customPanel = document.getElementById('custom-panel');
+const customInput = document.getElementById('custom-input');
+
+let currentQuote = '';
+let timerInterval = null;
+let startTime = null;
+let elapsed = 0;
+let running = false;
+let finished = false;
+let correctChars = 0;
+let incorrectChars = 0;
+let totalTyped = 0;
+
+function renderLevelBar() {
+    if (customText !== null) {
+        levelDots.innerHTML = '';
+        for (let i = 0; i < 5; i++) {
+            const d = document.createElement('div');
+            d.className = 'level-dot';
+            levelDots.appendChild(d);
+        }
+        levelLabel.innerHTML = '<b>Custom text</b> · your own practice';
+        customBtn.textContent = '↩ Back to levels';
+        return;
+    }
+    levelDots.innerHTML = '';
+    for (let i = 0; i < 5; i++) {
+        const d = document.createElement('div');
+        d.className = 'level-dot' + (i < currentLevel ? ' done' : i === currentLevel ? ' active' : '');
+        levelDots.appendChild(d);
+    }
+    levelLabel.innerHTML = '<b>Level ' + (currentLevel + 1) + '</b> · ' + LEVEL_NAMES[currentLevel];
+    customBtn.textContent = '✎ Use my own text';
+}
+
+function getText() {
+    if (customText !== null) return customText;
+    const list = levelData[currentLang][currentLevel] || levelData.en[currentLevel];
+    return list[Math.floor(Math.random() * list.length)];
+}
+
+function switchLang(lang) {
+    currentLang = lang;
+    document.querySelectorAll('.lang-tab').forEach(t => t.classList.toggle('active', t.dataset.lang === lang));
+    customText = null;
+    customPanel.hidden = true;
+    renderLevelBar();
+    startTest();
+}
+
+function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function charHtml(ch) {
+    if (ch === ' ') return '&nbsp;';
+    return escapeHtml(ch);
+}
+function renderQuote(cursorPos) {
+    let html = '';
+    const typed = textarea.value;
+    if (cursorPos === undefined) cursorPos = typed.length;
+    for (let i = 0; i < currentQuote.length; i++) {
+        let cls = 'pending';
+        let ch = currentQuote[i];
+        if (i < typed.length) {
+            cls = (typed[i] === currentQuote[i]) ? 'correct' : 'incorrect';
+        }
+        if (i === cursorPos && i <= typed.length) {
+            html += `<span class="${cls} cursor">${charHtml(ch)}</span>`;
+        } else {
+            html += `<span class="${cls}">${charHtml(ch)}</span>`;
+        }
+    }
+    if (cursorPos >= currentQuote.length) {
+        html += `<span class="cursor" style="background:var(--accent);color:var(--bg);">&nbsp;</span>`;
+    }
+    quoteDisplay.innerHTML = html;
+}
+
+function startTest() {
+    clearInterval(timerInterval);
+    currentQuote = getText();
+    textarea.value = '';
+    textarea.disabled = false;
+    textarea.focus();
+    running = false;
+    finished = false;
+    startTime = null;
+    elapsed = 0;
+    correctChars = 0;
+    incorrectChars = 0;
+    totalTyped = 0;
+    wpmEl.textContent = '0';
+    accuracyEl.textContent = '100%';
+    timerEl.textContent = '0:00';
+    results.classList.remove('show');
+    renderQuote(0);
+}
+
+function updateStats() {
+    const typed = textarea.value;
+    let correct = 0, incorrect = 0;
+    for (let i = 0; i < typed.length && i < currentQuote.length; i++) {
+        if (typed[i] === currentQuote[i]) correct++;
+        else incorrect++;
+    }
+    correctChars = correct;
+    incorrectChars = incorrect;
+    totalTyped = typed.length;
+    const acc = totalTyped > 0 ? Math.round((correct / totalTyped) * 100) : 100;
+    accuracyEl.textContent = acc + '%';
+    if (elapsed > 0) {
+        wpmEl.textContent = Math.round((correct / 5) / (elapsed / 60));
+    }
+}
+
+function finishTest() {
+    finished = true;
+    running = false;
+    clearInterval(timerInterval);
+    textarea.disabled = true;
+    const acc = totalTyped > 0 ? Math.round((correctChars / totalTyped) * 100) : 100;
+    const wpm = elapsed > 0 ? Math.round((correctChars / 5) / (elapsed / 60)) : 0;
+    const mins = Math.floor(elapsed / 60);
+    const secs = Math.floor(elapsed % 60);
+    rWpm.textContent = wpm;
+    rAcc.textContent = acc + '%';
+    rTime.textContent = mins + ':' + String(secs).padStart(2, '0');
+    rMistakes.textContent = incorrectChars;
+
+    clearedAll = false;
+    if (customText !== null) {
+        resultsTitle.textContent = 'Nice work!';
+        resultsNextBtn.hidden = true;
+        resultsNewBtn.textContent = 'Try again';
+    } else if (currentLevel < MAX_LEVEL) {
+        resultsTitle.textContent = 'Level ' + (currentLevel + 1) + ' cleared!';
+        resultsNextBtn.hidden = false;
+        resultsNextBtn.textContent = 'Level ' + (currentLevel + 2) + ' →';
+        resultsNewBtn.textContent = 'Repeat level';
+    } else {
+        clearedAll = true;
+        resultsTitle.textContent = 'All 5 levels cleared! 🎉';
+        resultsNextBtn.hidden = true;
+        resultsNewBtn.textContent = 'Restart from Level 1';
+    }
+    setTimeout(() => results.classList.add('show'), 300);
+}
+
+textarea.addEventListener('input', () => {
+    if (finished) return;
+    if (!running && textarea.value.length > 0) {
+        running = true;
+        startTime = Date.now();
+        timerInterval = setInterval(() => {
+            elapsed = (Date.now() - startTime) / 1000;
+            const mins = Math.floor(elapsed / 60);
+            const secs = Math.floor(elapsed % 60);
+            timerEl.textContent = mins + ':' + String(secs).padStart(2, '0');
+            updateStats();
+        }, 100);
+    }
+    const typed = textarea.value;
+    if (typed.length > currentQuote.length) {
+        textarea.value = typed.slice(0, currentQuote.length);
+    }
+    renderQuote();
+    updateStats();
+
+    if (textarea.value.length >= currentQuote.length) {
+        let allCorrect = true;
+        for (let i = 0; i < currentQuote.length; i++) {
+            if (textarea.value[i] !== currentQuote[i]) { allCorrect = false; break; }
+        }
+        if (allCorrect) finishTest();
+    }
+});
+
+document.getElementById('new-test-btn').addEventListener('click', startTest);
+
+resultsNewBtn.addEventListener('click', () => {
+    if (clearedAll && customText === null) {
+        currentLevel = 0;
+        renderLevelBar();
+    }
+    startTest();
+});
+
+resultsNextBtn.addEventListener('click', () => {
+    if (currentLevel < MAX_LEVEL) currentLevel++;
+    renderLevelBar();
+    startTest();
+});
+
+// Custom-text mode
+customBtn.addEventListener('click', () => {
+    if (customText !== null) {
+        // Leave custom mode, return to levels
+        customText = null;
+        customPanel.hidden = true;
+        renderLevelBar();
+        startTest();
+        return;
+    }
+    customPanel.hidden = !customPanel.hidden;
+    if (!customPanel.hidden) customInput.focus();
+});
+
+document.getElementById('custom-start').addEventListener('click', () => {
+    const val = customInput.value.replace(/\s+/g, ' ').trim();
+    if (!val) { customInput.focus(); return; }
+    customText = val;
+    customPanel.hidden = true;
+    renderLevelBar();
+    startTest();
+});
+
+document.getElementById('custom-cancel').addEventListener('click', () => {
+    customPanel.hidden = true;
+    if (customText !== null) {
+        customText = null;
+        renderLevelBar();
+        startTest();
+    }
+});
+
+renderLevelBar();
+startTest();
+</script>
+</body>
+</html>

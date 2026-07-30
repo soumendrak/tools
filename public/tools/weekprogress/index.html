@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week Progress</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Crect x='4' y='8' width='24' height='20' rx='2' fill='none' stroke='%23ff6b35' stroke-width='2'/%3E%3Cline x1='4' y1='14' x2='28' y2='14' stroke='%23ff6b35' stroke-width='2'/%3E%3Ccircle cx='11' cy='20' r='2' fill='%23ff6b35'/%3E%3Ccircle cx='16' cy='20' r='2' fill='%23ff6b35'/%3E%3Ccircle cx='21' cy='20' r='2' fill='%23ff6b35'/%3E%3C/svg%3E">
+<style>
+:root {
+    --bg: #0a0a14;
+    --surface: #16162a;
+    --accent: #ff6b35;
+    --accent-light: #ff8c42;
+    --accent-dark: #d94f1a;
+    --accent-glow: rgba(255, 107, 53, 0.15);
+    --accent-subtle: rgba(255, 107, 53, 0.06);
+    --text: #f0ece4;
+    --text-dim: #8a8a9a;
+    --text-muted: #5a5a6e;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --mono: "SF Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+    background: var(--bg); color: var(--text); font-family: var(--font);
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding: 2rem;
+}
+.container {
+    background: var(--surface); border-radius: var(--radius-lg);
+    padding: 2.5rem; width: 100%; max-width: 480px; text-align: center;
+}
+h1 {
+    font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.35em;
+    font-weight: 200; opacity: 0.5; margin-bottom: 0.25rem;
+}
+.tagline { color: var(--text-muted); font-size: 0.7rem; margin-bottom: 1.5rem; }
+.day-name { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.5rem; }
+.week-number { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 1.5rem; }
+.progress-container { margin: 1.5rem 0; }
+.progress-bar-bg {
+    background: var(--bg); border-radius: 999px; height: 28px;
+    overflow: hidden; position: relative;
+}
+.progress-bar-fill {
+    height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent-dark), var(--accent), var(--accent-light));
+    transition: width 0.3s ease; width: 0%;
+}
+.progress-label { margin-top: 0.5rem; font-size: 2rem; font-weight: 700; font-family: var(--mono); color: var(--accent); }
+.remaining { margin-top: 0.5rem; color: var(--text-dim); font-size: 0.9rem; }
+.is-weekend { color: var(--text-muted) !important; }
+.toggle {
+    margin-top: 2rem; display: flex; align-items: center;
+    justify-content: center; gap: 0.75rem; font-size: 0.85rem; color: var(--text-dim);
+}
+.toggle label { cursor: pointer; user-select: none; }
+.toggle input[type="checkbox"] { accent-color: var(--accent); transform: scale(1.1); }
+
+/* Custom week boundaries */
+.boundary-settings {
+    margin-top: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+.boundary-settings select {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--text-muted);
+    padding: 0.3rem 0.5rem;
+    border-radius: var(--radius-sm);
+    font-family: var(--font);
+    font-size: 0.8rem;
+    cursor: pointer;
+    outline: none;
+}
+.boundary-settings select:focus { border-color: var(--accent); }
+.boundary-settings label { cursor: pointer; user-select: none; }
+
+footer { margin-top: 2rem; font-size: 0.7rem; color: var(--text-muted); }
+footer a { color: var(--text-muted); text-decoration: none; transition: color 0.2s; }
+footer a:hover { color: var(--accent); }
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<div class="container">
+    <h1>Week Progress</h1>
+    <p class="tagline">How much of the work week is gone?</p>
+    <div class="day-name" id="dayName">--</div>
+    <div class="week-number" id="weekNumber">Week --</div>
+    <div class="progress-container">
+        <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="progressFill"></div>
+        </div>
+        <div class="progress-label" id="progressPercent">0.0%</div>
+    </div>
+    <div class="remaining" id="remaining">--</div>
+    <div class="toggle">
+        <input type="checkbox" id="weekToggle">
+        <label for="weekToggle">Include weekends (7-day week)</label>
+    </div>
+    <div class="boundary-settings">
+        <div>
+            <label for="weekStartSelect">Week starts:</label>
+            <select id="weekStartSelect">
+                <option value="mon">Monday</option>
+                <option value="sun">Sunday</option>
+            </select>
+        </div>
+        <div>
+            <label for="workDaysSelect">Work week:</label>
+            <select id="workDaysSelect">
+                <option value="5">5-day</option>
+                <option value="4">4-day</option>
+            </select>
+        </div>
+    </div>
+</div>
+<script>
+function getWeekNumber(d, weekStart) {
+    const target = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    // Adjust for week start day
+    const jsDay = target.getUTCDay();
+    let dayOffset = (jsDay === 0 ? 7 : jsDay) - (weekStart === 'sun' ? (jsDay === 0 ? 0 : jsDay) : (jsDay === 0 ? 6 : jsDay - 1));
+    // Actually, use ISO week number calculation, adjusted for week start
+    // For simplicity, use the standard ISO week number which starts Monday
+    if (weekStart === 'sun') {
+        target.setUTCDate(target.getUTCDate() + 1);
+    }
+    target.setUTCDate(target.getUTCDate() + 4 - (target.getUTCDay()||7));
+    const yearStart = new Date(Date.UTC(target.getUTCFullYear(),0,1));
+    return Math.ceil((((target - yearStart) / 86400000) + 1) / 7);
+}
+function update() {
+    const now = new Date();
+    const day = now.getDay();
+    const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const includeWeekends = document.getElementById('weekToggle').checked;
+    const weekStart = document.getElementById('weekStartSelect').value; // 'mon' or 'sun'
+    const workDays = parseInt(document.getElementById('workDaysSelect').value); // 4 or 5
+    const $dayName = document.getElementById('dayName');
+    const $weekNum = document.getElementById('weekNumber');
+    const $fill = document.getElementById('progressFill');
+    const $pct = document.getElementById('progressPercent');
+    const $rem = document.getElementById('remaining');
+    const isWeekend = day === 0 || day === 6;
+    $dayName.className = 'day-name';
+
+    // Calculate week start based on selection
+    const weekStartDay = weekStart === 'sun' ? 0 : 1; // 0=Sun, 1=Mon
+    let daysSinceWeekStart = (day - weekStartDay + 7) % 7;
+
+    if (includeWeekends) {
+        // 7-day week
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - daysSinceWeekStart);
+        startOfWeek.setHours(0,0,0,0);
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 7);
+        const total = endOfWeek - startOfWeek;
+        const elapsed = now - startOfWeek;
+        const pct = Math.min(100, Math.max(0, (elapsed / total) * 100));
+        const rem = Math.max(0, endOfWeek - now);
+        const h = Math.floor(rem / 3600000);
+        const m = Math.floor((rem % 3600000) / 60000);
+        $dayName.textContent = dayNames[day];
+        $weekNum.textContent = 'Week ' + getWeekNumber(now, weekStart);
+        $fill.style.width = pct + '%';
+        $pct.textContent = pct.toFixed(1) + '%';
+        $rem.textContent = h + 'h ' + m + 'm remaining this week';
+        if (isWeekend) $dayName.classList.add('is-weekend');
+    } else {
+        // Work week only
+        if (isWeekend && weekStart === 'mon') {
+            // Weekend display
+            $dayName.textContent = dayNames[day] + ' ☕';
+            $dayName.classList.add('is-weekend');
+            $weekNum.textContent = 'Week ' + getWeekNumber(now, weekStart);
+            $fill.style.width = '100%';
+            $pct.textContent = '100%';
+            $rem.textContent = 'Enjoy your weekend!';
+            return;
+        }
+
+        // For Sun start, weekend is Sat (6)
+        if (weekStart === 'sun' && day === 6) {
+            $dayName.textContent = dayNames[day] + ' ☕';
+            $dayName.classList.add('is-weekend');
+            $weekNum.textContent = 'Week ' + getWeekNumber(now, weekStart);
+            $fill.style.width = '100%';
+            $pct.textContent = '100%';
+            $rem.textContent = 'Enjoy your weekend!';
+            return;
+        }
+
+        // For Sun start, Sunday is day 0 = start of week, not weekend
+        // So Sunday is a work day in this mode
+
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - daysSinceWeekStart);
+        startOfWeek.setHours(0,0,0,0);
+
+        // Work week length = workDays days (4 or 5)
+        const endOfWorkWeek = new Date(startOfWeek);
+        endOfWorkWeek.setDate(startOfWeek.getDate() + workDays);
+        endOfWorkWeek.setHours(23,59,59,999);
+
+        const total = endOfWorkWeek - startOfWeek;
+        const elapsed = now - startOfWeek;
+        const pct = Math.min(100, Math.max(0, (elapsed / total) * 100));
+        const rem = Math.max(0, endOfWorkWeek - now);
+        const h = Math.floor(rem / 3600000);
+        const m = Math.floor((rem % 3600000) / 60000);
+        $dayName.textContent = dayNames[day];
+        $weekNum.textContent = 'Week ' + getWeekNumber(now, weekStart);
+        $fill.style.width = pct + '%';
+        $pct.textContent = pct.toFixed(1) + '%';
+        $rem.textContent = h + 'h ' + m + 'm remaining in work week';
+    }
+}
+
+// Load saved settings
+function loadSettings() {
+    try {
+        const ws = localStorage.getItem('wp_week_start');
+        if (ws) document.getElementById('weekStartSelect').value = ws;
+        const wd = localStorage.getItem('wp_work_days');
+        if (wd) document.getElementById('workDaysSelect').value = wd;
+    } catch(e) {}
+}
+function saveSettings() {
+    try {
+        localStorage.setItem('wp_week_start', document.getElementById('weekStartSelect').value);
+        localStorage.setItem('wp_work_days', document.getElementById('workDaysSelect').value);
+    } catch(e) {}
+}
+
+loadSettings();
+document.getElementById('weekToggle').checked = localStorage.getItem('wp_weekends') === 'true';
+document.getElementById('weekToggle').addEventListener('change', function() {
+    localStorage.setItem('wp_weekends', this.checked);
+    update();
+});
+document.getElementById('weekStartSelect').addEventListener('change', function() {
+    saveSettings();
+    update();
+});
+document.getElementById('workDaysSelect').addEventListener('change', function() {
+    saveSettings();
+    update();
+});
+update();
+setInterval(update, 1000);
+</script>
+</body>
+</html>

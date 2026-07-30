@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Base64 Encoder / Decoder</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Crect x='6' y='8' width='20' height='16' rx='2' fill='none' stroke='%23ff6b35' stroke-width='2'/%3E%3Ctext x='16' y='21' font-size='12' text-anchor='middle' fill='%23ff6b35' font-family='monospace' font-weight='bold'%3E64%3C/text%3E%3C/svg%3E">
+<style>
+:root {
+    --bg: #0a0a14;
+    --surface: #16162a;
+    --accent: #ff6b35;
+    --accent-light: #ff8c42;
+    --accent-dark: #d94f1a;
+    --accent-glow: rgba(255, 107, 53, 0.15);
+    --accent-subtle: rgba(255, 107, 53, 0.06);
+    --text: #f0ece4;
+    --text-dim: #8a8a9a;
+    --text-muted: #5a5a6e;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --mono: "SF Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+    background: var(--bg); color: var(--text); font-family: var(--font);
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding: 2rem;
+}
+.container {
+    background: var(--surface); border-radius: var(--radius-lg);
+    padding: 2rem; width: 100%; max-width: 600px;
+}
+h1 {
+    font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.35em;
+    font-weight: 200; opacity: 0.5; margin-bottom: 0.25rem; text-align: center;
+}
+.tagline { color: var(--text-muted); font-size: 0.7rem; margin-bottom: 1.5rem; text-align: center; }
+.tabs {
+    display: flex; gap: 0; margin-bottom: 1.5rem;
+    background: var(--bg); border-radius: var(--radius-md); overflow: hidden;
+}
+.tab {
+    flex: 1; padding: 0.6rem; text-align: center; cursor: pointer;
+    color: var(--text-dim); font-size: 0.85rem; font-weight: 500;
+    transition: all 0.2s; user-select: none;
+}
+.tab.active { background: var(--accent); color: #fff; }
+.tab:hover:not(.active) { background: var(--accent-subtle); }
+
+/* Mode toggle */
+.mode-toggle {
+    display: flex; gap: 0; margin-bottom: 1rem;
+    background: var(--bg); border-radius: var(--radius-sm); overflow: hidden;
+    justify-content: center;
+}
+.mode-btn {
+    padding: 0.35rem 1rem; text-align: center; cursor: pointer;
+    color: var(--text-dim); font-size: 0.75rem; font-weight: 500;
+    transition: all 0.2s; user-select: none; border: 1px solid var(--text-muted);
+}
+.mode-btn:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.mode-btn:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; border-left: none; }
+.mode-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.mode-btn:hover:not(.active) { background: var(--accent-subtle); border-color: var(--accent); }
+
+.panel { display: none; }
+.panel.active { display: block; }
+.io-group { margin-bottom: 1rem; }
+.io-group label {
+    display: block; font-size: 0.75rem; color: var(--text-dim);
+    margin-bottom: 0.4rem;
+}
+textarea {
+    width: 100%; min-height: 120px; resize: vertical;
+    background: var(--bg); border: 1px solid var(--text-muted); color: var(--text);
+    padding: 0.75rem; border-radius: var(--radius-sm);
+    font-family: var(--mono); font-size: 0.85rem; line-height: 1.5;
+}
+textarea:focus { outline: none; border-color: var(--accent); }
+textarea.output { min-height: 80px; cursor: default; }
+.action-row {
+    display: flex; gap: 0.75rem; margin: 0.75rem 0;
+    flex-wrap: wrap; align-items: center;
+}
+.btn {
+    background: var(--accent-glow); color: var(--accent); border: 1px solid var(--accent);
+    padding: 0.45rem 1.2rem; border-radius: var(--radius-sm);
+    font-family: var(--font); font-size: 0.8rem; cursor: pointer;
+    transition: all 0.2s;
+}
+.btn:hover { background: var(--accent); color: #fff; }
+.btn:active { transform: scale(0.97); }
+.copy-msg {
+    font-size: 0.75rem; color: var(--accent); opacity: 0;
+    transition: opacity 0.3s;
+}
+.copy-msg.show { opacity: 1; }
+/* File upload */
+.file-zone {
+    border: 2px dashed var(--text-muted); border-radius: var(--radius-md);
+    padding: 1.5rem; text-align: center; cursor: pointer;
+    transition: all 0.2s; margin-bottom: 1rem;
+}
+.file-zone:hover, .file-zone.dragover {
+    border-color: var(--accent); background: var(--accent-subtle);
+}
+.file-zone .icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
+.file-zone .text { font-size: 0.8rem; color: var(--text-dim); }
+.file-zone .hint { font-size: 0.65rem; color: var(--text-muted); margin-top: 0.25rem; }
+.file-info {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--bg); border-radius: var(--radius-sm);
+    padding: 0.5rem 0.75rem; margin-bottom: 0.75rem; font-size: 0.8rem;
+}
+.file-info .name { color: var(--text); }
+.file-info .size { color: var(--text-dim); font-family: var(--mono); }
+.file-info .clear-btn {
+    background: none; border: none; color: var(--text-muted);
+    cursor: pointer; font-size: 0.85rem; padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+}
+.file-info .clear-btn:hover { color: #ff4444; background: rgba(255,68,68,0.1); }
+.hidden-input { display: none; }
+/* Mode indicator */
+.mode-indicator {
+    display: inline-block;
+    font-size: 0.65rem;
+    color: var(--accent);
+    background: var(--accent-subtle);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    margin-left: 0.4rem;
+}
+footer { margin-top: 2rem; font-size: 0.7rem; color: var(--text-muted); text-align: center; }
+footer a { color: var(--text-muted); text-decoration: none; transition: color 0.2s; }
+footer a:hover { color: var(--accent); }
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<div class="container">
+    <h1>Base64</h1>
+    <p class="tagline">Encode or decode text and files</p>
+    <!-- Mode toggle -->
+    <div class="mode-toggle" id="modeToggle">
+        <div class="mode-btn active" data-mode="standard">Standard</div>
+        <div class="mode-btn" data-mode="urlsafe">URL-safe</div>
+    </div>
+    <div class="tabs">
+        <div class="tab active" data-tab="encode">Encode</div>
+        <div class="tab" data-tab="decode">Decode</div>
+    </div>
+
+    <!-- Encode Panel -->
+    <div class="panel active" id="panel-encode">
+        <div class="file-zone" id="encodeDropZone">
+            <div class="icon">📁</div>
+            <div class="text">Click or drag &amp; drop a file to encode</div>
+            <div class="hint">Or type text below</div>
+        </div>
+        <input type="file" id="encodeFileInput" class="hidden-input" accept="*">
+        <div id="encodeFileInfo" class="file-info" style="display:none;">
+            <span class="name" id="encodeFileName"></span>
+            <span class="size" id="encodeFileSize"></span>
+            <button class="clear-btn" id="encodeFileClear">✕</button>
+        </div>
+        <div class="io-group">
+            <label for="encodeInput">Input Text</label>
+            <textarea id="encodeInput" placeholder="Type text to encode or drop a file above..."></textarea>
+        </div>
+        <div class="action-row">
+            <button class="btn" id="encodeBtn">Encode ▸</button>
+            <button class="btn" id="encodeCopyBtn">📋 Copy</button>
+            <span class="copy-msg" id="encodeCopyMsg">Copied!</span>
+        </div>
+        <div class="io-group">
+            <label for="encodeOutput">Base64 Output <span class="mode-indicator" id="encodeModeLabel">Standard</span></label>
+            <textarea class="output" id="encodeOutput" readonly placeholder="Result will appear here..."></textarea>
+        </div>
+    </div>
+
+    <!-- Decode Panel -->
+    <div class="panel" id="panel-decode">
+        <div class="io-group">
+            <label for="decodeInput">Base64 Input</label>
+            <textarea id="decodeInput" placeholder="Paste Base64 string to decode..."></textarea>
+        </div>
+        <div class="action-row">
+            <button class="btn" id="decodeBtn">▸ Decode</button>
+            <button class="btn" id="decodeCopyBtn">📋 Copy</button>
+            <span class="copy-msg" id="decodeCopyMsg">Copied!</span>
+        </div>
+        <div class="io-group">
+            <label for="decodeOutput">Decoded Output</label>
+            <textarea class="output" id="decodeOutput" readonly placeholder="Result will appear here..."></textarea>
+        </div>
+    </div>
+</div>
+<script>
+(function(){
+'use strict';
+
+let currentMode = 'standard'; // 'standard' or 'urlsafe'
+
+// Mode toggle
+document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        currentMode = this.dataset.mode;
+        document.getElementById('encodeModeLabel').textContent = currentMode === 'urlsafe' ? 'URL-safe' : 'Standard';
+        // Re-encode if there's input
+        const encodeInput = document.getElementById('encodeInput').value;
+        if (encodeInput) doEncode();
+        // Re-decode if there's input
+        const decodeInput = document.getElementById('decodeInput').value.trim();
+        if (decodeInput) doDecode();
+    });
+});
+
+// Tab switching
+document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', function() {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        this.classList.add('active');
+        document.getElementById('panel-' + this.dataset.tab).classList.add('active');
+    });
+});
+
+// Helpers
+function standardToUrlsafe(s) {
+    return s.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function urlsafeToStandard(s) {
+    return s.replace(/-/g, '+').replace(/_/g, '/');
+}
+
+function base64Encode(str) {
+    const standard = btoa(unescape(encodeURIComponent(str)));
+    if (currentMode === 'urlsafe') {
+        return standardToUrlsafe(standard);
+    }
+    return standard;
+}
+
+function base64Decode(str) {
+    let clean = str.trim();
+    // Auto-detect: if contains - or _, treat as URL-safe
+    const hasUrlSafeChars = /[-_]/.test(clean);
+    if (hasUrlSafeChars) {
+        clean = urlsafeToStandard(clean);
+    }
+    // Add padding if needed
+    while (clean.length % 4 !== 0) clean += '=';
+    return decodeURIComponent(escape(atob(clean)));
+}
+
+// Encode
+function doEncode() {
+    const input = document.getElementById('encodeInput').value;
+    const output = document.getElementById('encodeOutput');
+    try {
+        output.value = base64Encode(input);
+    } catch(e) {
+        output.value = 'Error: Invalid input for Base64 encoding.';
+    }
+}
+
+document.getElementById('encodeBtn').addEventListener('click', doEncode);
+
+// Decode
+function doDecode() {
+    const input = document.getElementById('decodeInput').value.trim();
+    const output = document.getElementById('decodeOutput');
+    if (!input) { output.value = ''; return; }
+    try {
+        output.value = base64Decode(input);
+    } catch(e) {
+        output.value = 'Error: Invalid Base64 string.';
+    }
+}
+
+document.getElementById('decodeBtn').addEventListener('click', doDecode);
+
+// Copy buttons
+function setupCopy(btnId, msgId, sourceId) {
+    document.getElementById(btnId).addEventListener('click', function() {
+        const text = document.getElementById(sourceId).value;
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(() => {
+            const msg = document.getElementById(msgId);
+            msg.classList.add('show');
+            setTimeout(() => msg.classList.remove('show'), 2000);
+        }).catch(() => {
+            const ta = document.getElementById(sourceId);
+            ta.select();
+            document.execCommand('copy');
+            const msg = document.getElementById(msgId);
+            msg.classList.add('show');
+            setTimeout(() => msg.classList.remove('show'), 2000);
+        });
+    });
+}
+setupCopy('encodeCopyBtn', 'encodeCopyMsg', 'encodeOutput');
+setupCopy('decodeCopyBtn', 'decodeCopyMsg', 'decodeOutput');
+
+// File upload
+const dropZone = document.getElementById('encodeDropZone');
+const fileInput = document.getElementById('encodeFileInput');
+const fileInfo = document.getElementById('encodeFileInfo');
+const fileName = document.getElementById('encodeFileName');
+const fileSize = document.getElementById('encodeFileSize');
+const fileClear = document.getElementById('encodeFileClear');
+
+dropZone.addEventListener('click', () => fileInput.click());
+
+dropZone.addEventListener('dragover', function(e) {
+    e.preventDefault(); this.classList.add('dragover');
+});
+dropZone.addEventListener('dragleave', function(e) {
+    e.preventDefault(); this.classList.remove('dragover');
+});
+dropZone.addEventListener('drop', function(e) {
+    e.preventDefault(); this.classList.remove('dragover');
+    if (e.dataTransfer.files.length > 0) {
+        handleFile(e.dataTransfer.files[0]);
+    }
+});
+fileInput.addEventListener('change', function() {
+    if (this.files.length > 0) handleFile(this.files[0]);
+});
+
+function handleFile(file) {
+    fileName.textContent = file.name;
+    fileSize.textContent = formatFileSize(file.size);
+    fileInfo.style.display = 'flex';
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const base64 = e.target.result.split(',')[1] || e.target.result;
+        document.getElementById('encodeInput').value = '[File: ' + file.name + ']';
+        document.getElementById('encodeOutput').value = currentMode === 'urlsafe' ? standardToUrlsafe(base64) : base64;
+    };
+    reader.readAsDataURL(file);
+}
+
+fileClear.addEventListener('click', function() {
+    fileInfo.style.display = 'none';
+    fileInput.value = '';
+    document.getElementById('encodeInput').value = '';
+    document.getElementById('encodeOutput').value = '';
+});
+
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+// Auto-encode on input change
+document.getElementById('encodeInput').addEventListener('input', function() {
+    if (fileInfo.style.display !== 'flex') {
+        doEncode();
+    }
+});
+
+// Live decode on input
+document.getElementById('decodeInput').addEventListener('input', function() {
+    const input = this.value.trim();
+    const output = document.getElementById('decodeOutput');
+    if (!input) { output.value = ''; return; }
+    try {
+        output.value = base64Decode(input);
+    } catch(e) {
+        // Don't show error during typing
+    }
+});
+})();
+</script>
+</body>
+</html>

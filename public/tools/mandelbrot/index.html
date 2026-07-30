@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mandelbrot Explorer</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕳️</text></svg>">
+<style>
+:root {
+    --bg: #0a0a14;
+    --surface: #16162a;
+    --accent: #ff6b35;
+    --accent-light: #ff8c42;
+    --accent-dark: #d94f1a;
+    --accent-glow: rgba(255, 107, 53, 0.15);
+    --accent-subtle: rgba(255, 107, 53, 0.06);
+    --text: #f0ece4;
+    --text-dim: #8a8a9a;
+    --text-muted: #5a5a6e;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --mono: "SF Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    overflow: hidden;
+}
+h1 {
+    text-transform: uppercase;
+    letter-spacing: 0.35em;
+    font-weight: 200;
+    opacity: 0.5;
+    font-size: 1.1rem;
+    margin-bottom: 4px;
+}
+.tagline {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    margin-bottom: 16px;
+}
+#app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+#canvas-wrap {
+    position: relative;
+    border: 1px solid var(--surface);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: #000;
+}
+#info {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--text-dim);
+}
+#coords { white-space: nowrap; }
+#iter-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+#iter-label span { color: var(--accent); }
+#controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+button {
+    background: var(--surface);
+    border: 1px solid var(--accent-subtle);
+    color: var(--text);
+    padding: 6px 16px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-family: var(--font);
+    transition: all 0.2s;
+}
+button:hover {
+    background: var(--accent-glow);
+    border-color: var(--accent);
+}
+footer {
+    margin-top: 16px;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+}
+footer a { color: var(--text-muted); text-decoration: none; }
+footer a:hover { color: var(--accent); }
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<div id="app">
+<h1>Mandelbrot Explorer</h1>
+<div class="tagline">Click to zoom · Shift+click to zoom out · Drag to pan · Scroll to adjust iterations</div>
+<div id="canvas-wrap">
+<canvas id="canvas" width="700" height="700"></canvas>
+</div>
+<div id="info">
+<div id="coords">Center: 0.0000000 + 0.0000000i</div>
+<div id="iter-label">Iterations: <span id="iter-display">200</span></div>
+</div>
+<div id="controls">
+<button id="reset-btn">Reset</button>
+<select id="scheme-select" style="background:var(--surface);color:var(--text);border:1px solid var(--accent-subtle);padding:6px 12px;border-radius:var(--radius-sm);font-size:0.75rem;font-family:var(--font);cursor:pointer;">
+<option value="classic">Classic B&amp;W</option>
+<option value="electric" selected>Electric Blue</option>
+<option value="fire">Fire</option>
+<option value="rainbow">Rainbow</option>
+<option value="pastel">Pastel</option>
+</select>
+</div>
+</div>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const coordsEl = document.getElementById('coords');
+const iterDisplay = document.getElementById('iter-display');
+
+const W = 700, H = 700;
+let maxIter = 200;
+let xMin = -2.5, xMax = 1.0, yMin = -1.25, yMax = 1.25;
+let dragging = false;
+let dragStartX, dragStartY, dragXMin, dragYMin;
+let colorScheme = 'electric';
+
+function mapToComplex(px, py) {
+    const re = xMin + (px / W) * (xMax - xMin);
+    const im = yMin + (py / H) * (yMax - yMin);
+    return [re, im];
+}
+
+function hslToRgb(h, s, l) {
+    h = ((h % 360) + 360) % 360;
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    const m = l - c / 2;
+    let r, g, b;
+    if (h < 60) { r = c; g = x; b = 0; }
+    else if (h < 120) { r = x; g = c; b = 0; }
+    else if (h < 180) { r = 0; g = c; b = x; }
+    else if (h < 240) { r = 0; g = x; b = c; }
+    else if (h < 300) { r = x; g = 0; b = c; }
+    else { r = c; g = 0; b = x; }
+    return [(r + m) * 255, (g + m) * 255, (b + m) * 255];
+}
+
+function mandelbrotColor(cr, ci) {
+    let zr = 0, zi = 0;
+    let n = 0;
+    while (n < maxIter) {
+        const zr2 = zr * zr, zi2 = zi * zi;
+        if (zr2 + zi2 > 4) break;
+        zi = 2 * zr * zi + ci;
+        zr = zr2 - zi2 + cr;
+        n++;
+    }
+    if (n === maxIter) return [0, 0, 0];
+    // smooth iteration count
+    const log_zn = Math.log(zr * zr + zi * zi) / 2;
+    const nu = Math.log(log_zn / Math.log(2)) / Math.log(2);
+    const t = (n + 1 - nu) / maxIter;
+
+    switch (colorScheme) {
+        case 'classic': {
+            // Classic B&W: binary coloring
+            const v = n % 2 === 0 ? 0 : 255;
+            return [v, v, v];
+        }
+        case 'fire': {
+            // Fire: red-orange-yellow gradient
+            const r = Math.min(1, t * 4);
+            const g = Math.min(1, Math.max(0, (t - 0.2) * 3));
+            const b = Math.min(1, Math.max(0, (t - 0.5) * 3)) * 0.3;
+            return [r * 255, g * 255, b * 255];
+        }
+        case 'rainbow': {
+            // Rainbow: full hue sweep
+            const hue = (t * 360 + 0) % 360;
+            const sat = 0.9;
+            const lig = 0.4 + 0.5 * Math.sin(t * Math.PI);
+            return hslToRgb(hue, sat, lig);
+        }
+        case 'pastel': {
+            // Pastel: soft pastel colors
+            const hue = (t * 300 + 180) % 360;
+            const sat = 0.4 + 0.3 * Math.sin(t * Math.PI);
+            const lig = 0.7 + 0.2 * Math.sin(t * Math.PI * 2);
+            return hslToRgb(hue, sat, lig);
+        }
+        case 'electric':
+        default: {
+            // Electric Blue: orange -> deep blue -> black (original)
+            const hue = 30 - t * 220;
+            const sat = 0.9 - t * 0.3;
+            const lig = 0.3 + t * 0.5;
+            return hslToRgb(hue, sat, lig);
+        }
+    }
+}
+
+function render() {
+    const imgData = ctx.createImageData(W, H);
+    const data = imgData.data;
+    for (let py = 0; py < H; py++) {
+        for (let px = 0; px < W; px++) {
+            const [cr, ci] = mapToComplex(px, py);
+            const [r, g, b] = mandelbrotColor(cr, ci);
+            const idx = (py * W + px) * 4;
+            data[idx] = r;
+            data[idx + 1] = g;
+            data[idx + 2] = b;
+            data[idx + 3] = 255;
+        }
+    }
+    ctx.putImageData(imgData, 0, 0);
+    updateCoords();
+}
+
+function updateCoords() {
+    const cx = (xMin + xMax) / 2;
+    const cy = (yMin + yMax) / 2;
+    coordsEl.textContent = `Center: ${cx.toFixed(7)} ${cy >= 0 ? '+' : '-'} ${Math.abs(cy).toFixed(7)}i`;
+    iterDisplay.textContent = maxIter;
+}
+
+canvas.addEventListener('click', (e) => {
+    if (dragging) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const [cr, ci] = mapToComplex(mx, my);
+    const zoomFactor = e.shiftKey ? 1.8 : 0.5;
+    const newW = (xMax - xMin) * zoomFactor;
+    const newH = (yMax - yMin) * zoomFactor;
+    xMin = cr - newW / 2;
+    xMax = cr + newW / 2;
+    yMin = ci - newH / 2;
+    yMax = ci + newH / 2;
+    render();
+});
+
+canvas.addEventListener('mousedown', (e) => {
+    dragging = true;
+    const rect = canvas.getBoundingClientRect();
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    dragXMin = xMin;
+    dragYMin = yMin;
+});
+
+window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const rect = canvas.getBoundingClientRect();
+    const dx = (e.clientX - dragStartX) / W * (xMax - xMin);
+    const dy = (e.clientY - dragStartY) / H * (yMax - yMin);
+    xMin = dragXMin - dx;
+    xMax = xMin + (xMax - xMin);
+    yMin = dragYMin - dy;
+    yMax = yMin + (yMax - yMin);
+    render();
+});
+
+window.addEventListener('mouseup', () => { dragging = false; });
+
+canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -20 : 20;
+    maxIter = Math.max(20, Math.min(2000, maxIter + delta));
+    iterDisplay.textContent = maxIter;
+    render();
+}, { passive: false });
+
+canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const [cr, ci] = mapToComplex(mx, my);
+    canvas.title = `${cr.toFixed(6)} ${ci >= 0 ? '+' : '-'} ${Math.abs(ci).toFixed(6)}i`;
+});
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+    xMin = -2.5; xMax = 1.0; yMin = -1.25; yMax = 1.25;
+    maxIter = 200;
+    render();
+});
+
+document.getElementById('scheme-select').addEventListener('change', function() {
+    colorScheme = this.value;
+    render();
+});
+
+render();
+</script>
+</body>
+</html>

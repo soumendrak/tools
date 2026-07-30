@@ -1,26 +1,165 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Light is the default; [data-theme="dark"] overrides. A no-FOUC inline
+   script sets data-theme on <html> before paint. */
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+  --background: #f7f0e6;
+  --foreground: #2a201a;
+  --muted: #6f6255;
+  --accent: #b4522e;
+  --accent-soft: #9c4527;
+  --card: #fffdfa;
+  --border: #e6dccc;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #231c17;
+  --foreground: #f2ebe0;
+  --muted: #b0a496;
+  --accent: #d17d5c;
+  --accent-soft: #e19b7f;
+  --card: #2d251f;
+  --border: #3a3129;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-card: var(--card);
+  --color-border: var(--border);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+::selection {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* --- Entrance animations (load) --- */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-rise {
+  animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* --- Scroll-driven reveals (zero JS; falls back to visible) --- */
+@supports (animation-timeline: view()) {
+  .reveal {
+    animation: rise 1ms linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+}
+
+/* --- Hero gradient orbs --- */
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(60px, -40px) scale(1.1);
+  }
+  66% {
+    transform: translate(-40px, 30px) scale(0.95);
+  }
+}
+
+.orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  opacity: 0.22;
+  pointer-events: none;
+  animation: drift 18s ease-in-out infinite;
+}
+
+:root[data-theme="dark"] .orb {
+  opacity: 0.3;
+}
+
+/* --- Animated gradient headline (adapts to theme via --foreground) --- */
+@keyframes shimmer {
+  to {
+    background-position: 200% center;
+  }
+}
+
+.gradient-text {
+  background: linear-gradient(
+    90deg,
+    var(--foreground) 0%,
+    var(--accent) 40%,
+    var(--accent-soft) 55%,
+    var(--foreground) 70%
+  );
+  background-size: 200% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: shimmer 6s linear infinite;
+}
+
+/* --- Tool cards --- */
+.tool-card {
+  transition:
+    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.25s,
+    box-shadow 0.25s;
+}
+
+.tool-card:hover,
+.tool-card:focus-within {
+  transform: translateY(-4px);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  box-shadow: 0 12px 40px -12px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .animate-rise,
+  .reveal,
+  .orb,
+  .gradient-text {
+    animation: none !important;
+  }
+  .tool-card,
+  .tool-card:hover {
+    transition: none;
+    transform: none;
+  }
 }

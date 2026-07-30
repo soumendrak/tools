@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deadline Counter</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Crect x='6' y='12' width='20' height='14' rx='2' fill='none' stroke='%23ff6b35' stroke-width='2'/%3E%3Cline x1='6' y1='18' x2='26' y2='18' stroke='%23ff6b35' stroke-width='2'/%3E%3Ccircle cx='11' cy='23' r='1.5' fill='%23ff6b35'/%3E%3Ccircle cx='16' cy='23' r='1.5' fill='%23ff6b35'/%3E%3Ccircle cx='21' cy='23' r='1.5' fill='%23ff6b35'/%3E%3Cline x1='16' y1='4' x2='16' y2='10' stroke='%23ff6b35' stroke-width='2' stroke-linecap='round'/%3E%3Cline x1='22' y1='6' x2='20' y2='10' stroke='%23ff6b35' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+:root {
+    --bg: #0a0a14;
+    --surface: #16162a;
+    --accent: #ff6b35;
+    --accent-light: #ff8c42;
+    --accent-dark: #d94f1a;
+    --accent-glow: rgba(255, 107, 53, 0.15);
+    --accent-subtle: rgba(255, 107, 53, 0.06);
+    --text: #f0ece4;
+    --text-dim: #8a8a9a;
+    --text-muted: #5a5a6e;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --mono: "SF Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+    --card-bg: #1e1e38;
+    --card-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+    background: var(--bg); color: var(--text); font-family: var(--font);
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; padding: 2rem;
+}
+.container {
+    width: 100%; max-width: 720px; text-align: center;
+}
+h1 {
+    font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.35em;
+    font-weight: 200; opacity: 0.5; margin-bottom: 0.25rem;
+}
+.tagline { color: var(--text-muted); font-size: 0.7rem; margin-bottom: 1.5rem; }
+.deadlines { display: flex; flex-direction: column; gap: 1.5rem; }
+.deadline-card {
+    background: var(--surface); border-radius: var(--radius-lg);
+    padding: 1.5rem; position: relative; overflow: hidden;
+}
+.deadline-title {
+    font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem;
+    color: var(--accent-light);
+}
+.deadline-actions {
+    position: absolute; top: 1rem; right: 1rem;
+    display: flex; gap: 0.5rem;
+}
+.deadline-actions button {
+    background: none; border: none; color: var(--text-muted);
+    cursor: pointer; font-size: 0.85rem; padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm); transition: all 0.2s;
+}
+.deadline-actions button:hover { color: var(--accent); background: var(--accent-subtle); }
+.deadline-actions .delete-btn:hover { color: #ff4444; background: rgba(255,68,68,0.1); }
+.flip-clock {
+    display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap;
+}
+.flip-unit { text-align: center; }
+.flip-card {
+    background: var(--card-bg); border-radius: var(--radius-sm);
+    padding: 0.75rem 0.5rem; min-width: 60px;
+    box-shadow: var(--card-shadow);
+    font-family: var(--mono); font-size: 2rem; font-weight: 700;
+    color: var(--accent); position: relative;
+    border-bottom: 3px solid var(--accent-dark);
+}
+.flip-label {
+    font-size: 0.65rem; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.1em; margin-top: 0.35rem;
+}
+.expired-message {
+    font-size: 1.5rem; font-weight: 700; color: var(--accent);
+    padding: 1rem;
+}
+/* Confetti */
+.confetti-container {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 1000; overflow: hidden;
+}
+.confetti-piece {
+    position: absolute; width: 10px; height: 10px;
+    animation: confettiFall linear forwards;
+}
+@keyframes confettiFall {
+    0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+/* Add form */
+.add-form {
+    background: var(--surface); border-radius: var(--radius-lg);
+    padding: 1.5rem; margin-top: 1rem;
+}
+.add-form h2 {
+    font-size: 0.9rem; font-weight: 400; color: var(--text-dim);
+    margin-bottom: 1rem;
+}
+.form-row {
+    display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center;
+    margin-bottom: 0.75rem;
+}
+.form-row input {
+    background: var(--bg); border: 1px solid var(--text-muted); color: var(--text);
+    padding: 0.5rem 0.75rem; border-radius: var(--radius-sm);
+    font-family: var(--font); font-size: 0.85rem;
+}
+.form-row input:focus { outline: none; border-color: var(--accent); }
+.form-row input[type="text"] { flex: 1; min-width: 160px; }
+.form-row input[type="date"], .form-row input[type="time"] { min-width: 130px; }
+.add-btn {
+    background: var(--accent); color: #fff; border: none;
+    padding: 0.5rem 1.5rem; border-radius: var(--radius-sm);
+    font-family: var(--font); font-size: 0.85rem; cursor: pointer;
+    transition: background 0.2s;
+}
+.add-btn:hover { background: var(--accent-dark); }
+.share-btn {
+    background: var(--accent-subtle); color: var(--accent); border: 1px solid var(--accent);
+    padding: 0.5rem 1.5rem; border-radius: var(--radius-sm);
+    font-family: var(--font); font-size: 0.85rem; cursor: pointer;
+    transition: all 0.2s; margin-left: 0.5rem;
+}
+.share-btn:hover { background: var(--accent); color: #fff; }
+.share-btn.copied { background: #4caf7d; border-color: #4caf7d; color: #fff; }
+.empty-state {
+    color: var(--text-muted); padding: 2rem; font-size: 0.9rem;
+}
+footer { margin-top: 2rem; font-size: 0.7rem; color: var(--text-muted); }
+footer a { color: var(--text-muted); text-decoration: none; transition: color 0.2s; }
+footer a:hover { color: var(--accent); }
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<div class="container">
+    <h1>Deadline Counter</h1>
+    <p class="tagline">Flip-card countdowns for your important dates</p>
+    <div class="deadlines" id="deadlinesContainer"></div>
+    <div class="add-form">
+        <h2>+ New Deadline</h2>
+        <div class="form-row">
+            <input type="text" id="newTitle" placeholder="Title (e.g. Project Launch)" maxlength="40">
+            <input type="date" id="newDate">
+            <input type="time" id="newTime" value="23:59">
+            <button class="share-btn" id="loadShareBtn" title="Load from share link">📋 Load Link</button>
+        </div>
+        <button class="add-btn" id="addDeadlineBtn">Add Deadline</button>
+    </div>
+</div>
+<script>
+const STORAGE_KEY = 'dc_deadlines';
+let deadlines = [];
+let expiredStates = new Map();
+
+function loadDeadlines() {
+    try {
+        const data = localStorage.getItem(STORAGE_KEY);
+        if (data) { deadlines = JSON.parse(data); }
+    } catch(e) { deadlines = []; }
+}
+function saveDeadlines() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(deadlines));
+}
+
+function createConfetti(container) {
+    const colors = ['#ff6b35','#ff8c42','#ff4444','#ffcc00','#44ff88','#4488ff','#ff44ff'];
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < 60; i++) {
+        const el = document.createElement('div');
+        el.className = 'confetti-piece';
+        el.style.left = Math.random() * 100 + '%';
+        el.style.background = colors[Math.floor(Math.random() * colors.length)];
+        el.style.width = (Math.random() * 8 + 4) + 'px';
+        el.style.height = (Math.random() * 8 + 4) + 'px';
+        el.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+        el.style.animationDuration = (Math.random() * 2 + 1.5) + 's';
+        el.style.animationDelay = (Math.random() * 0.5) + 's';
+        frag.appendChild(el);
+    }
+    container.appendChild(frag);
+    setTimeout(() => { if (container.parentNode) container.parentNode.removeChild(container); }, 4000);
+}
+
+function pad(n) { return String(n).padStart(2, '0'); }
+
+// ─── Shareable Link Functions ──────────────────────────────────────
+
+function encodeDeadlineToUrl(title, date, time) {
+    if (!date) return null;
+    const params = new URLSearchParams();
+    if (title) params.set('title', title);
+    params.set('date', date);
+    if (time && time !== '23:59') params.set('time', time);
+    return window.location.origin + window.location.pathname + '?' + params.toString();
+}
+
+function parseSharedDeadline() {
+    const params = new URLSearchParams(window.location.search);
+    const title = params.get('title') || '';
+    const date = params.get('date') || '';
+    const time = params.get('time') || '';
+    if (date) {
+        return { title, date, time };
+    }
+    return null;
+}
+
+function generateShareUrl(idx) {
+    const d = deadlines[idx];
+    if (!d) return null;
+    return encodeDeadlineToUrl(d.title, d.date, d.time);
+}
+
+function copyShareUrl(idx) {
+    const url = generateShareUrl(idx);
+    if (!url) return;
+    // Update all share buttons briefly
+    const btns = document.querySelectorAll('.share-deadline-btn');
+    navigator.clipboard.writeText(url).then(() => {
+        btns.forEach(b => {
+            if (parseInt(b.dataset.idx) === idx) {
+                b.textContent = '✓ Copied!';
+                b.classList.add('copied');
+                setTimeout(() => {
+                    b.textContent = '🔗 Share';
+                    b.classList.remove('copied');
+                }, 2000);
+            }
+        });
+    }).catch(() => {
+        // Fallback: prompt
+        prompt('Copy this link to share:', url);
+    });
+}
+
+function loadFromShareLink() {
+    const shared = parseSharedDeadline();
+    if (shared) {
+        document.getElementById('newTitle').value = shared.title;
+        document.getElementById('newDate').value = shared.date;
+        document.getElementById('newTime').value = shared.time || '23:59';
+        // Auto-add the shared deadline
+        document.getElementById('addDeadlineBtn').click();
+        // Clean URL without reload
+        if (window.history.replaceState) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }
+}
+
+document.getElementById('loadShareBtn').addEventListener('click', function() {
+    const url = prompt('Paste a shareable deadline link:');
+    if (!url) return;
+    try {
+        const u = new URL(url);
+        const params = new URLSearchParams(u.search);
+        const title = params.get('title') || '';
+        const date = params.get('date') || '';
+        const time = params.get('time') || '';
+        if (date) {
+            document.getElementById('newTitle').value = title;
+            document.getElementById('newDate').value = date;
+            document.getElementById('newTime').value = time || '23:59';
+        } else {
+            alert('No valid deadline found in that link.');
+        }
+    } catch(e) {
+        alert('Invalid URL.');
+    }
+});
+
+// ─── Render ────────────────────────────────────────────────────────
+
+function renderDeadlines() {
+    const container = document.getElementById('deadlinesContainer');
+    if (deadlines.length === 0) {
+        container.innerHTML = '<div class="empty-state">No deadlines yet. Add one above!</div>';
+        return;
+    }
+    let html = '';
+    const now = Date.now();
+    for (let i = 0; i < deadlines.length; i++) {
+        const d = deadlines[i];
+        const target = new Date(d.date + 'T' + (d.time || '23:59:00'));
+        const diff = target.getTime() - now;
+        const expired = diff <= 0;
+        let flipHtml;
+        if (expired) {
+            flipHtml = '<div class="expired-message">🚀 TIME\'S UP!</div>';
+            if (!expiredStates.get(i)) {
+                expiredStates.set(i, true);
+                setTimeout(() => {
+                    const confettiBox = document.createElement('div');
+                    confettiBox.className = 'confetti-container';
+                    document.body.appendChild(confettiBox);
+                    createConfetti(confettiBox);
+                }, 100);
+            }
+        } else {
+            expiredStates.set(i, false);
+            const totalSec = Math.floor(diff / 1000);
+            const days = Math.floor(totalSec / 86400);
+            const hours = Math.floor((totalSec % 86400) / 3600);
+            const mins = Math.floor((totalSec % 3600) / 60);
+            const secs = totalSec % 60;
+            flipHtml = '<div class="flip-clock">' +
+                '<div class="flip-unit"><div class="flip-card">'+pad(days)+'</div><div class="flip-label">Days</div></div>' +
+                '<div class="flip-unit"><div class="flip-card">'+pad(hours)+'</div><div class="flip-label">Hours</div></div>' +
+                '<div class="flip-unit"><div class="flip-card">'+pad(mins)+'</div><div class="flip-label">Mins</div></div>' +
+                '<div class="flip-unit"><div class="flip-card">'+pad(secs)+'</div><div class="flip-label">Secs</div></div>' +
+                '</div>';
+        }
+        html += '<div class="deadline-card">' +
+            '<div class="deadline-title">' + escapeHtml(d.title || 'Untitled') + '</div>' +
+            '<div class="deadline-actions">' +
+            '<button class="share-deadline-btn" data-idx="'+i+'" title="Share">🔗 Share</button>' +
+            '<button class="edit-btn" data-idx="'+i+'" title="Edit">✎</button>' +
+            '<button class="delete-btn" data-idx="'+i+'" title="Delete">✕</button>' +
+            '</div>' +
+            flipHtml +
+            '</div>';
+    }
+    container.innerHTML = html;
+
+    // Bind events
+    container.querySelectorAll('.share-deadline-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const idx = parseInt(this.dataset.idx);
+            copyShareUrl(idx);
+        });
+    });
+    container.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const idx = parseInt(this.dataset.idx);
+            editDeadline(idx);
+        });
+    });
+    container.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const idx = parseInt(this.dataset.idx);
+            deadlines.splice(idx, 1);
+            expiredStates.delete(idx);
+            saveDeadlines();
+            renderDeadlines();
+        });
+    });
+}
+
+function escapeHtml(s) {
+    const div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+}
+
+function editDeadline(idx) {
+    const d = deadlines[idx];
+    const newTitle = prompt('Title:', d.title) || d.title;
+    const newDate = prompt('Date (YYYY-MM-DD):', d.date) || d.date;
+    const newTime = prompt('Time (HH:MM):', d.time || '23:59') || d.time || '23:59';
+    deadlines[idx] = { title: newTitle, date: newDate, time: newTime };
+    saveDeadlines();
+    renderDeadlines();
+}
+
+document.getElementById('addDeadlineBtn').addEventListener('click', function() {
+    const title = document.getElementById('newTitle').value.trim() || 'Untitled';
+    const date = document.getElementById('newDate').value;
+    const time = document.getElementById('newTime').value || '23:59';
+    if (!date) { alert('Please select a date.'); return; }
+    deadlines.push({ title, date, time });
+    saveDeadlines();
+    renderDeadlines();
+    document.getElementById('newTitle').value = '';
+    document.getElementById('newDate').value = '';
+    document.getElementById('newTime').value = '23:59';
+});
+
+// Auto-load from share link on page open
+loadFromShareLink();
+
+loadDeadlines();
+renderDeadlines();
+setInterval(renderDeadlines, 1000);
+</script>
+</body>
+</html>

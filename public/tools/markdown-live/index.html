@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>markdown-live</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>✍</text></svg>">
+<style>
+:root {
+    --bg: #0a0a14;
+    --surface: #16162a;
+    --accent: #ff6b35;
+    --accent-light: #ff8c42;
+    --accent-dark: #d94f1a;
+    --accent-glow: rgba(255, 107, 53, 0.15);
+    --accent-subtle: rgba(255, 107, 53, 0.06);
+    --text: #f0ece4;
+    --text-dim: #8a8a9a;
+    --text-muted: #5a5a6e;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --mono: "SF Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.container {
+    width: 100%;
+    max-width: 1400px;
+    padding: 2rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+h1 {
+    text-transform: uppercase;
+    letter-spacing: 0.35em;
+    font-weight: 200;
+    opacity: 0.5;
+    font-size: 1.5rem;
+}
+.tagline { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.3rem; }
+.tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+.tab {
+    padding: 0.5rem 1.2rem;
+    background: var(--surface);
+    border: 1px solid var(--text-muted);
+    border-radius: var(--radius-sm);
+    color: var(--text-dim);
+    cursor: pointer;
+    font-family: var(--font);
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+.tab:hover { border-color: var(--accent); color: var(--text); }
+.tab.active { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+.editor-wrap {
+    display: flex;
+    gap: 1rem;
+    flex: 1;
+    min-height: 0;
+}
+.editor-wrap.preview-only .editor-pane { display: none; }
+.editor-wrap.preview-only .preview-pane { display: flex; }
+.editor-wrap.editor-only .editor-pane { display: flex; }
+.editor-wrap.editor-only .preview-pane { display: none; }
+.editor-pane, .preview-pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.editor-pane textarea {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--text-muted);
+    border-radius: var(--radius-md);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    padding: 1.2rem;
+    resize: none;
+    outline: none;
+    line-height: 1.7;
+    transition: border-color 0.2s;
+}
+.editor-pane textarea:focus { border-color: var(--accent); }
+.preview-pane {
+    background: var(--surface);
+    border: 1px solid var(--text-muted);
+    border-radius: var(--radius-md);
+    padding: 1.2rem;
+    overflow-y: auto;
+    line-height: 1.7;
+}
+.preview-pane h1 { text-transform: none; letter-spacing: 0; font-weight: 600; opacity: 1; font-size: 2rem; margin: 1.5rem 0 0.5rem; }
+.preview-pane h2 { font-size: 1.5rem; margin: 1.2rem 0 0.4rem; color: var(--accent-light); }
+.preview-pane h3 { font-size: 1.2rem; margin: 1rem 0 0.3rem; }
+.preview-pane p { margin: 0.6rem 0; }
+.preview-pane strong { color: var(--accent-light); }
+.preview-pane em { color: var(--accent); }
+.preview-pane a { color: var(--accent); text-decoration: underline; }
+.preview-pane ul, .preview-pane ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+.preview-pane li { margin: 0.2rem 0; }
+.preview-pane pre {
+    background: var(--bg);
+    padding: 1rem;
+    border-radius: var(--radius-sm);
+    overflow-x: auto;
+    margin: 0.8rem 0;
+    border-left: 3px solid var(--accent);
+}
+.preview-pane code {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+}
+.preview-pane pre code { background: none; padding: 0; }
+.preview-pane blockquote {
+    border-left: 3px solid var(--accent);
+    padding-left: 1rem;
+    margin: 0.8rem 0;
+    color: var(--text-dim);
+    font-style: italic;
+}
+.preview-pane hr {
+    border: none;
+    border-top: 1px solid var(--text-muted);
+    margin: 1.5rem 0;
+}
+.preview-pane code:not(pre code) {
+    background: var(--accent-subtle);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+}
+.toolbar {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.8rem;
+    justify-content: flex-end;
+}
+.btn {
+    padding: 0.5rem 1.2rem;
+    background: var(--surface);
+    border: 1px solid var(--text-muted);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    cursor: pointer;
+    font-family: var(--font);
+    font-size: 0.8rem;
+    transition: all 0.2s;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-light); }
+footer {
+    text-align: center;
+    padding: 1.5rem;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+footer a { color: var(--text-muted); text-decoration: none; }
+footer a:hover { color: var(--accent); }
+@media (max-width: 768px) {
+    .container { padding: 1rem; }
+    .editor-wrap { flex-direction: column; }
+}
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<div class="container">
+<header>
+    <h1>markdown-live</h1>
+    <p class="tagline">Live Markdown Preview</p>
+</header>
+<div class="tabs">
+    <div class="tab active" data-view="split">Split</div>
+    <div class="tab" data-view="editor">Editor</div>
+    <div class="tab" data-view="preview">Preview</div>
+</div>
+<div class="editor-wrap" id="editorWrap">
+    <div class="editor-pane">
+        <textarea id="mdInput" spellcheck="false" placeholder="Type markdown here..."></textarea>
+    </div>
+    <div class="preview-pane" id="previewPane"></div>
+</div>
+<div class="toolbar">
+    <button class="btn btn-primary" id="copyBtn">Copy HTML</button>
+</div>
+</div>
+<script>
+(function(){
+'use strict';
+
+function parseMarkdown(text) {
+    if (!text) return '<p style="color:var(--text-muted)">Start typing to see preview...</p>';
+    let html = '';
+    const lines = text.split('\n');
+    let inCodeBlock = false;
+    let codeContent = '';
+    let inList = false;
+    let inBlockquote = false;
+    let inTable = false;
+    let tableRows = [];
+    let taskList = false;
+
+    function closeList() { if (inList) { html += '</ul>\n'; inList = false; taskList = false; } }
+    function closeBlockquote() { if (inBlockquote) { html += '</blockquote>\n'; inBlockquote = false; } }
+    function closeTable() { if (inTable) { html += renderTable(tableRows); inTable = false; tableRows = []; } }
+
+    function renderTable(rows) {
+        if (rows.length < 2) return '';
+        let out = '<table style="border-collapse:collapse;width:100%;margin:0.8rem 0;font-size:0.85rem">\n';
+        // Header row (first)
+        const headers = parseTableRow(rows[0]);
+        out += '<thead><tr>';
+        headers.forEach(h => {
+            out += '<th style="border:1px solid var(--text-muted);padding:6px 10px;text-align:left;background:var(--accent-subtle);font-weight:600">' + parseInline(h.trim()) + '</th>';
+        });
+        out += '</tr></thead>\n<tbody>\n';
+        // Skip separator row (second)
+        for (let i = 2; i < rows.length; i++) {
+            const cells = parseTableRow(rows[i]);
+            if (cells.length === 0) continue;
+            out += '<tr>';
+            cells.forEach(c => {
+                out += '<td style="border:1px solid var(--text-muted);padding:6px 10px">' + parseInline(c.trim()) + '</td>';
+            });
+            out += '</tr>\n';
+        }
+        out += '</tbody>\n</table>\n';
+        return out;
+    }
+
+    function parseTableRow(line) {
+        const parts = [];
+        let current = '';
+        let inCell = false;
+        for (let i = 0; i < line.length; i++) {
+            const ch = line[i];
+            if (ch === '|') {
+                if (!inCell && current.trim() === '') {
+                    current = '';
+                    inCell = true;
+                    continue;
+                }
+                parts.push(current);
+                current = '';
+                inCell = true;
+            } else {
+                current += ch;
+                inCell = true;
+            }
+        }
+        if (inCell) parts.push(current);
+        return parts;
+    }
+
+    function isTableSeparator(line) {
+        return /^\|?[\s:-]+\|[\s:-]+(\|[\s:-]+)*\|?$/.test(line);
+    }
+
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+
+        if (line.startsWith('```')) {
+            if (inCodeBlock) {
+                html += '<pre><code>' + escapeHtml(codeContent) + '</code></pre>\n';
+                codeContent = '';
+                inCodeBlock = false;
+            } else {
+                closeList(); closeBlockquote();
+                inCodeBlock = true;
+            }
+            continue;
+        }
+
+        if (inCodeBlock) {
+            codeContent += (codeContent ? '\n' : '') + line;
+            continue;
+        }
+
+        if (line.trim() === '') {
+            closeList(); closeBlockquote(); closeTable();
+            continue;
+        }
+
+        // Table detection
+        if (line.startsWith('|') && line.endsWith('|')) {
+            closeList(); closeBlockquote();
+            const cells = parseTableRow(line);
+            if (cells.length >= 2) {
+                if (isTableSeparator(line)) {
+                    // Separator row
+                    if (inTable) tableRows.push(line);
+                    continue;
+                }
+                if (!inTable) {
+                    inTable = true;
+                    tableRows = [line];
+                } else {
+                    tableRows.push(line);
+                }
+                continue;
+            }
+        }
+        // If we were building a table but this line isn't a table row, render it
+        if (inTable && !line.startsWith('|')) {
+            closeTable();
+        }
+        if (inTable) continue;
+
+        closeList();
+
+        // Task list item
+        const taskMatch = line.match(/^(\s*)[-*+]\s+\[([ xX])\]\s+(.+)/);
+        if (taskMatch) {
+            const checked = taskMatch[2] === 'x' || taskMatch[2] === 'X';
+            const text = taskMatch[3];
+            if (!inList) { html += '<ul style="list-style:none;padding-left:1.5rem">\n'; inList = true; }
+            html += '<li style="margin:0.2rem 0">';
+            html += '<input type="checkbox" ' + (checked ? 'checked ' : '') + 'disabled style="accent-color:var(--accent);margin-right:0.4rem">';
+            html += parseInline(text) + '</li>\n';
+            continue;
+        }
+
+        if (line.startsWith('> ')) {
+            closeBlockquote();
+            inBlockquote = true;
+            html += '<blockquote><p>' + parseInline(line.slice(2)) + '</p></blockquote>\n';
+            continue;
+        }
+
+        if (line.startsWith('---') && line.trim() === '---') {
+            html += '<hr>\n';
+            continue;
+        }
+
+        let headerMatch = line.match(/^(#{1,3})\s+(.+)/);
+        if (headerMatch) {
+            const level = headerMatch[1].length;
+            html += '<h' + level + '>' + parseInline(headerMatch[2]) + '</h' + level + '>\n';
+            continue;
+        }
+
+        if (line.match(/^[-*+]\s+/)) {
+            if (!inList) { html += '<ul>\n'; inList = true; }
+            html += '<li>' + parseInline(line.replace(/^[-*+]\s+/, '')) + '</li>\n';
+            continue;
+        }
+
+        html += '<p>' + parseInline(line) + '</p>\n';
+    }
+
+    if (inCodeBlock) {
+        html += '<pre><code>' + escapeHtml(codeContent) + '</code></pre>\n';
+    }
+    closeList(); closeBlockquote(); closeTable();
+    return html;
+}
+
+function parseInline(text) {
+    return escapeHtml(text)
+        .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/~~(.+?)~~/g, '<s>$1</s>')
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>');
+}
+
+function escapeHtml(str) {
+    const map = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+    return str.replace(/[&<>"']/g, c => map[c]);
+}
+
+const textarea = document.getElementById('mdInput');
+const preview = document.getElementById('previewPane');
+const editorWrap = document.getElementById('editorWrap');
+const tabs = document.querySelectorAll('.tab');
+const copyBtn = document.getElementById('copyBtn');
+
+const placeholder = `# Welcome to markdown-live
+
+## This is a live preview editor
+
+Type **markdown** on the left, see *rendered* HTML on the right.
+
+### Features
+
+- **Bold** text using \*\*text\*\*
+- *Italic* text using \*text\*  
+- ~~Strikethrough~~ using \~\~text\~\~
+- [Links](https://example.com)
+- `inline code` and code blocks
+
+> Blockquotes for emphasis
+
+### Task Lists
+
+- [x] Completed task
+- [ ] Unfinished task
+- [ ] Another todo item
+
+### Tables
+
+| Feature | Status |
+|---------|--------|
+| Tables | ✅ |
+| Task lists | ✅ |
+| Strikethrough | ✅ |
+
+Horizontal rule:
+
+---
+
+\`\`\`
+// Code blocks with syntax
+function greet(name) {
+    return "Hello, " + name;
+}
+\`\`\`
+
+Everything updates in real time.`;
+
+textarea.value = placeholder;
+
+function update() {
+    preview.innerHTML = parseMarkdown(textarea.value);
+}
+
+textarea.addEventListener('input', update);
+
+tabs.forEach(tab => {
+    tab.addEventListener('click', function() {
+        tabs.forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+        const view = this.dataset.view;
+        editorWrap.className = 'editor-wrap ' + (view === 'editor' ? 'editor-only' : view === 'preview' ? 'preview-only' : '');
+    });
+});
+
+copyBtn.addEventListener('click', function() {
+    const html = parseMarkdown(textarea.value);
+    const fullHtml = '<div>' + html + '</div>';
+    navigator.clipboard.writeText(fullHtml).then(() => {
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => { copyBtn.textContent = 'Copy HTML'; }, 2000);
+    }).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = fullHtml;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => { copyBtn.textContent = 'Copy HTML'; }, 2000);
+    });
+});
+
+update();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matching Game</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎴</text></svg>">
+<style>
+:root {
+    --bg: #0a0a14;
+    --surface: #16162a;
+    --accent: #ff6b35;
+    --accent-light: #ff8c42;
+    --accent-dark: #d94f1a;
+    --accent-glow: rgba(255, 107, 53, 0.15);
+    --accent-subtle: rgba(255, 107, 53, 0.06);
+    --text: #f0ece4;
+    --text-dim: #8a8a9a;
+    --text-muted: #5a5a6e;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --mono: "SF Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 20px;
+}
+h1 {
+    text-transform: uppercase;
+    letter-spacing: 0.35em;
+    font-weight: 200;
+    opacity: 0.5;
+    font-size: 1.1rem;
+    margin-bottom: 4px;
+}
+.tagline {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    margin-bottom: 16px;
+}
+#app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+#stats {
+    display: flex;
+    gap: 32px;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    flex-wrap: wrap;
+    justify-content: center;
+}
+.stat { text-align: center; }
+.stat-val { color: var(--accent); font-size: 1.2rem; font-weight: 600; }
+.stat-lbl { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); }
+#grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    max-width: 420px;
+    width: 100%;
+}
+.card {
+    aspect-ratio: 1;
+    perspective: 600px;
+    cursor: pointer;
+}
+.card-inner {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transition: transform 0.5s ease;
+    transform-style: preserve-3d;
+    border-radius: var(--radius-md);
+}
+.card.flipped .card-inner {
+    transform: rotateY(180deg);
+}
+.card-front, .card-back {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    border-radius: var(--radius-md);
+    backface-visibility: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+}
+.card-back {
+    background: var(--surface);
+    border: 2px solid var(--accent-subtle);
+}
+.card-back::after {
+    content: '?';
+    color: var(--text-muted);
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+.card-front {
+    background: var(--surface);
+    border: 2px solid var(--accent-subtle);
+    transform: rotateY(180deg);
+}
+.card.matched .card-front {
+    border-color: #4caf50;
+    box-shadow: 0 0 15px rgba(76, 175, 80, 0.2);
+}
+.card.matched { cursor: default; }
+.card.flipped:not(.matched) .card-front {
+    border-color: var(--accent);
+}
+button {
+    background: var(--surface);
+    border: 1px solid var(--accent-subtle);
+    color: var(--text);
+    padding: 8px 24px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-family: var(--font);
+    transition: all 0.2s;
+}
+button:hover {
+    background: var(--accent-glow);
+    border-color: var(--accent);
+}
+#high-score {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+#high-score span { color: var(--accent); }
+#completion {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(10, 10, 20, 0.92);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+#completion.show { display: flex; }
+#comp-box {
+    background: var(--surface);
+    border: 1px solid var(--accent-subtle);
+    border-radius: var(--radius-lg);
+    padding: 40px;
+    text-align: center;
+    max-width: 380px;
+    width: 90%;
+}
+#comp-box h2 {
+    font-weight: 200;
+    letter-spacing: 0.2em;
+    margin-bottom: 8px;
+    color: var(--accent);
+}
+.stars { font-size: 2rem; margin-bottom: 16px; }
+#comp-box .r { display: flex; justify-content: space-between; padding: 6px 0; font-size: 0.9rem; }
+#comp-box .r .v { font-family: var(--mono); color: var(--accent); }
+#comp-box .r .l { color: var(--text-dim); }
+#comp-box button { margin-top: 20px; }
+footer {
+    margin-top: 20px;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+}
+footer a { color: var(--text-muted); text-decoration: none; }
+footer a:hover { color: var(--accent); }
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<div id="app">
+<h1>Matching Game</h1>
+<div class="tagline">Flip cards and find matching pairs</div>
+<div id="stats">
+<div class="stat"><div class="stat-val" id="timer">0:00</div><div class="stat-lbl">Time</div></div>
+<div class="stat"><div class="stat-val" id="moves">0</div><div class="stat-lbl">Flips</div></div>
+</div>
+<div id="grid"></div>
+<div id="high-score">Best: <span id="best-time">--</span> / <span id="best-flips">--</span> flips</div>
+<button id="new-game-btn">New Game</button>
+</div>
+<div id="completion">
+<div id="comp-box">
+<h2>You Win!</h2>
+<div class="stars" id="stars"></div>
+<div class="r"><span class="l">Time</span><span class="v" id="c-time">0:00</span></div>
+<div class="r"><span class="l">Moves</span><span class="v" id="c-moves">0</span></div>
+<div class="r"><span class="l">Stars</span><span class="v" id="c-stars">0</span></div>
+<button id="comp-new-btn">New Game</button>
+</div>
+</div>
+
+<script>
+const emojis = ['😀','😂','😍','🤔','😎','🙄','😴','🤩'];
+const grid = document.getElementById('grid');
+const timerEl = document.getElementById('timer');
+const movesEl = document.getElementById('moves');
+const bestTimeEl = document.getElementById('best-time');
+const bestFlipsEl = document.getElementById('best-flips');
+const completion = document.getElementById('completion');
+const cTime = document.getElementById('c-time');
+const cMoves = document.getElementById('c-moves');
+const cStars = document.getElementById('c-stars');
+const starsEl = document.getElementById('stars');
+
+let cards = [];
+let flippedCards = [];
+let matchedCount = 0;
+let moves = 0;
+let timerInterval = null;
+let startTime = null;
+let elapsed = 0;
+let gameActive = false;
+let lockBoard = false;
+
+function loadBest() {
+    const t = localStorage.getItem('matching_best_time');
+    if (t) {
+        const mins = Math.floor(Number(t) / 60);
+        const secs = Math.floor(Number(t) % 60);
+        bestTimeEl.textContent = mins + ':' + String(secs).padStart(2, '0');
+    } else {
+        bestTimeEl.textContent = '--';
+    }
+    const f = localStorage.getItem('matching_best_flips');
+    bestFlipsEl.textContent = f || '--';
+}
+
+function saveBest(t, flips) {
+    const prev = localStorage.getItem('matching_best_time');
+    if (!prev || t < Number(prev)) {
+        localStorage.setItem('matching_best_time', String(t));
+    }
+    const prevFlips = localStorage.getItem('matching_best_flips');
+    if (!prevFlips || flips < Number(prevFlips)) {
+        localStorage.setItem('matching_best_flips', String(flips));
+    }
+}
+
+function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
+function initGame() {
+    completion.classList.remove('show');
+    grid.innerHTML = '';
+    cards = [];
+    flippedCards = [];
+    matchedCount = 0;
+    moves = 0;
+    elapsed = 0;
+    gameActive = true;
+    lockBoard = false;
+    clearInterval(timerInterval);
+    startTime = null;
+    timerEl.textContent = '0:00';
+    movesEl.textContent = '0';
+    loadBest();
+
+    let values = [];
+    emojis.forEach(e => { values.push(e, e); });
+    shuffle(values);
+
+    values.forEach((val, idx) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.dataset.index = idx;
+        card.dataset.value = val;
+        card.innerHTML = `<div class="card-inner"><div class="card-front">${val}</div><div class="card-back"></div></div>`;
+        card.addEventListener('click', () => flipCard(idx));
+        grid.appendChild(card);
+        cards.push(card);
+    });
+}
+
+function flipCard(idx) {
+    if (lockBoard) return;
+    const card = cards[idx];
+    if (card.classList.contains('flipped') || card.classList.contains('matched')) return;
+
+    // Start timer on first flip
+    if (!startTime && gameActive) {
+        startTime = Date.now();
+        timerInterval = setInterval(() => {
+            elapsed = (Date.now() - startTime) / 1000;
+            const mins = Math.floor(elapsed / 60);
+            const secs = Math.floor(elapsed % 60);
+            timerEl.textContent = mins + ':' + String(secs).padStart(2, '0');
+        }, 100);
+    }
+
+    card.classList.add('flipped');
+    flippedCards.push(idx);
+
+    if (flippedCards.length === 2) {
+        moves++;
+        movesEl.textContent = moves;
+        const [i1, i2] = flippedCards;
+        const v1 = cards[i1].dataset.value;
+        const v2 = cards[i2].dataset.value;
+
+        if (v1 === v2) {
+            cards[i1].classList.add('matched');
+            cards[i2].classList.add('matched');
+            matchedCount++;
+            flippedCards = [];
+            if (matchedCount === emojis.length) {
+                finishGame();
+            }
+        } else {
+            lockBoard = true;
+            setTimeout(() => {
+                cards[i1].classList.remove('flipped');
+                cards[i2].classList.remove('flipped');
+                flippedCards = [];
+                lockBoard = false;
+            }, 800);
+        }
+    }
+}
+
+function finishGame() {
+    gameActive = false;
+    clearInterval(timerInterval);
+    const t = (Date.now() - startTime) / 1000;
+    elapsed = t;
+    saveBest(t, moves);
+
+    const stars = moves <= 10 ? 3 : moves <= 16 ? 2 : 1;
+    const mins = Math.floor(t / 60);
+    const secs = Math.floor(t % 60);
+    cTime.textContent = mins + ':' + String(secs).padStart(2, '0');
+    cMoves.textContent = moves;
+    cStars.textContent = stars + '/3';
+    starsEl.textContent = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
+    setTimeout(() => completion.classList.add('show'), 400);
+}
+
+document.getElementById('new-game-btn').addEventListener('click', initGame);
+document.getElementById('comp-new-btn').addEventListener('click', initGame);
+
+initGame();
+</script>
+</body>
+</html>

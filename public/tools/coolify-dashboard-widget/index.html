@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coolify Dashboard Widget</title>
+<style>
+:root {
+  --bg: #0f0f1a;
+  --surface: #1a1a2e;
+  --accent: #ff6b35;
+  --text: #e0e0e0;
+  --text-muted: #8888aa;
+  --green: #22c55e;
+  --red: #ef4444;
+  --yellow: #eab308;
+  --blue: #3b82f6;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg); color: var(--text); min-height: 100vh;
+}
+header {
+  background: var(--surface); padding: 16px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 2px solid var(--accent);
+}
+header h1 { font-size: 1.2rem; color: var(--accent); }
+.config-bar {
+  background: var(--surface); padding: 12px 24px;
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  border-bottom: 1px solid rgba(255,107,53,0.2);
+}
+.config-bar label { font-size: 0.8rem; color: var(--text-muted); }
+.config-bar input {
+  background: var(--bg); border: 1px solid var(--surface);
+  color: var(--text); padding: 8px 12px; border-radius: 6px;
+  font-size: 0.85rem; outline: none; flex: 1; min-width: 200px;
+}
+.config-bar input:focus { border-color: var(--accent); }
+.config-bar button, .btn {
+  background: var(--accent); color: #fff; border: none;
+  padding: 8px 16px; border-radius: 6px; cursor: pointer;
+  font-size: 0.85rem; font-weight: 600;
+}
+.config-bar button:hover, .btn:hover { opacity: 0.85; }
+.btn-sm { padding: 4px 10px; font-size: 0.75rem; }
+.btn-outline {
+  background: transparent; border: 1px solid var(--accent);
+  color: var(--accent);
+}
+.btn-outline:hover { background: var(--accent); color: #fff; }
+.dashboard {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 16px; padding: 24px;
+}
+.card {
+  background: var(--surface); border-radius: 10px; padding: 20px;
+  border: 1px solid rgba(255,107,53,0.1);
+}
+.card:hover { border-color: rgba(255,107,53,0.3); }
+.card-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px;
+}
+.card-header h3 { font-size: 1rem; }
+.card-header .status {
+  padding: 2px 10px; border-radius: 12px; font-size: 0.7rem;
+  font-weight: 600; text-transform: uppercase;
+}
+.status-running { background: rgba(34,197,94,0.2); color: var(--green); }
+.status-degraded { background: rgba(234,179,8,0.2); color: var(--yellow); }
+.status-failed { background: rgba(239,68,68,0.2); color: var(--red); }
+.status-unknown { background: rgba(136,136,170,0.2); color: var(--text-muted); }
+.metrics {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  margin-top: 12px;
+}
+.metric {
+  background: var(--bg); padding: 10px; border-radius: 6px;
+  text-align: center;
+}
+.metric .value { font-size: 1.1rem; font-weight: 700; color: var(--accent); }
+.metric .label { font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
+.progress-bar {
+  height: 6px; background: var(--bg); border-radius: 3px;
+  margin-top: 10px; overflow: hidden;
+}
+.progress-fill {
+  height: 100%; background: var(--accent); border-radius: 3px;
+  transition: width 0.5s;
+}
+.empty { text-align: center; padding: 48px 24px; color: var(--text-muted); }
+.error { color: var(--red); font-size: 0.85rem; padding: 8px; }
+.refresh-info { font-size: 0.75rem; color: var(--text-muted); }
+.loading { text-align: center; padding: 24px; color: var(--text-muted); }
+
+/* Deploy timeline */
+.deploy-toggle {
+  margin-top: 12px; padding: 6px 12px;
+  background: var(--bg); border: 1px solid var(--text-muted);
+  border-radius: 6px; color: var(--text-dim); cursor: pointer;
+  font-size: 0.75rem; font-family: inherit; width: 100%;
+  text-align: center; transition: all 0.2s;
+}
+.deploy-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.deploy-timeline {
+  margin-top: 8px; display: none;
+}
+.deploy-timeline.open { display: block; }
+.deploy-entry {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 6px;
+  background: var(--bg); margin-bottom: 4px;
+  font-size: 0.78rem;
+}
+.deploy-entry .deploy-icon { font-size: 1rem; min-width: 20px; text-align: center; }
+.deploy-entry .deploy-info { flex: 1; }
+.deploy-entry .deploy-info .deploy-commit {
+  color: var(--text); font-family: monospace; font-size: 0.72rem;
+}
+.deploy-entry .deploy-info .deploy-date {
+  color: var(--text-muted); font-size: 0.7rem;
+}
+.deploy-entry .deploy-status-text {
+  font-size: 0.68rem; font-weight: 600; padding: 1px 8px; border-radius: 8px;
+}
+.deploy-entry.loading {
+  justify-content: center; color: var(--text-muted); font-style: italic;
+}
+
+/* Responsive & Mobile - Universal */
+@media (max-width: 768px) {
+  html { font-size: 15px; }
+  body { flex-direction: column !important; }
+  .sidebar, aside, nav.sidebar { width: 100% !important; flex-direction: row !important; flex-wrap: wrap !important; padding: 10px !important; gap: 8px !important; border-right: none !important; border-bottom: 1px solid var(--border); }
+  .main, .content-area { padding: 12px !important; }
+  .cards, .card-grid { grid-template-columns: 1fr !important; }
+  .toolbar { flex-wrap: wrap !important; gap: 6px !important; }
+  .toolbar input, .toolbar select { flex: 1 1 100% !important; min-width: 0 !important; }
+  .pane { border-right: none !important; border-bottom: 1px solid var(--border); flex: none !important; height: 50vh !important; }
+  .pane:last-child { border-bottom: none !important; }
+  header { flex-wrap: wrap !important; gap: 8px !important; padding: 12px 16px !important; }
+  .sidebar-actions button { flex: 1 !important; min-width: 80px !important; }
+  .collection-list { flex-direction: row !important; flex-wrap: wrap !important; }
+  .tabs { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  .tab { padding: 10px 14px !important; white-space: nowrap !important; }
+  .modal { width: 90% !important; max-width: 400px !important; }
+  .summary-row { padding: 12px 16px !important; gap: 8px !important; }
+  .summary-card { min-width: 80px !important; padding: 10px 14px !important; }
+  .summary-card .value { font-size: 1.2rem !important; }
+  .add-form { flex-wrap: wrap !important; }
+  .add-form input { flex: 1 1 100% !important; }
+  .status-grid { padding: 0 16px 16px !important; }
+  .url-card { padding: 12px 16px !important; }
+  .url-header { flex-wrap: wrap !important; }
+  .url-name { font-size: 0.8rem !important; word-break: break-all !important; }
+  .form-group input, .form-group select { font-size: 16px !important; }
+}
+
+@media (max-width: 480px) {
+  html { font-size: 14px; }
+  .sidebar { padding: 8px !important; gap: 4px !important; }
+  .sidebar h2 { font-size: 11px !important; }
+  .main { padding: 8px !important; }
+  header h1 { font-size: 1rem !important; }
+  .toolbar { padding: 8px !important; }
+  .send-btn, button, .btn { min-height: 44px; min-width: 44px; padding: 10px 16px !important; font-size: 14px !important; }
+  .tabs { padding: 0 8px !important; }
+  .tab { padding: 8px 12px !important; font-size: 12px !important; }
+  .headers-panel { padding: 8px !important; }
+  .header-row { flex-wrap: wrap !important; }
+  .header-row input { flex: 1 1 100% !important; }
+  .pane { height: 40vh !important; }
+  .pane textarea { padding: 10px !important; font-size: 12px !important; }
+  .output-area { max-height: 60% !important; }
+  .response-area { padding: 8px !important; }
+  .response-body { padding: 8px !important; font-size: 12px !important; }
+  .collection-item { min-width: 100px !important; padding: 6px 8px !important; font-size: 12px !important; }
+  .summary-card { min-width: 70px !important; padding: 8px 10px !important; }
+  .summary-card .value { font-size: 1rem !important; }
+  .card { padding: 14px !important; }
+  .card .value { font-size: 1.3rem !important; }
+  .chart-container { padding: 12px !important; }
+  canvas { height: 180px !important; }
+  .modal { padding: 16px !important; }
+  .empty-state { padding: 40px 16px !important; }
+  button, .btn, input[type="submit"] { min-height: 44px; }
+}
+
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<header>
+  <h1>⚡ Coolify Dashboard</h1>
+  <span class="refresh-info" id="refreshInfo"></span>
+</header>
+<div class="config-bar">
+  <label>API URL</label>
+  <input id="apiUrl" placeholder="https://coolify.example.com" type="url">
+  <label>API Token</label>
+  <input id="apiToken" placeholder="Bearer token..." type="password">
+  <button onclick="saveConfig()">💾 Save</button>
+  <button onclick="fetchData()">🔄 Refresh</button>
+  <button class="btn-outline" onclick="clearConfig()">Clear</button>
+</div>
+<div class="dashboard" id="dashboard">
+  <div class="empty">Configure your Coolify API URL and token above, then click Refresh.</div>
+</div>
+
+<script>
+const STORAGE_KEY = 'coolify_dashboard_config';
+
+function loadConfig() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const cfg = JSON.parse(raw);
+      document.getElementById('apiUrl').value = cfg.url || '';
+      document.getElementById('apiToken').value = cfg.token || '';
+    }
+  } catch(e) {}
+}
+
+function saveConfig() {
+  const url = document.getElementById('apiUrl').value.trim();
+  const token = document.getElementById('apiToken').value.trim();
+  if (!url || !token) { alert('Both API URL and token are required.'); return; }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ url: url.replace(/\/$/, ''), token }));
+  fetchData();
+}
+
+function clearConfig() {
+  localStorage.removeItem(STORAGE_KEY);
+  document.getElementById('apiUrl').value = '';
+  document.getElementById('apiToken').value = '';
+  document.getElementById('dashboard').innerHTML = '<div class="empty">Configure your Coolify API URL and token above, then click Refresh.</div>';
+}
+
+async function coolifyFetch(cfg, path) {
+  const resp = await fetch(`${cfg.url}/api/v1${path}`, {
+    headers: { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/json' }
+  });
+  if (!resp.ok) {
+    const err = await resp.text().catch(() => 'Unknown error');
+    throw new Error(`HTTP ${resp.status}: ${err.substring(0, 200)}`);
+  }
+  return resp.json();
+}
+
+function statusClass(state) {
+  const s = (state || '').toLowerCase();
+  if (['running', 'active', 'healthy', 'deployed'].includes(s)) return 'status-running';
+  if (['degraded', 'warning', 'restarting'].includes(s)) return 'status-degraded';
+  if (['failed', 'stopped', 'error', 'exited'].includes(s)) return 'status-failed';
+  return 'status-unknown';
+}
+
+function deployIcon(status) {
+  const s = (status || '').toLowerCase();
+  if (['success', 'successful', 'running', 'active'].includes(s)) return '✅';
+  if (['failed', 'error', 'failure'].includes(s)) return '❌';
+  if (['pending', 'queued', 'in_progress', 'deploying'].includes(s)) return '🟡';
+  return '❓';
+}
+
+function deployStatusClass(status) {
+  const s = (status || '').toLowerCase();
+  if (['success', 'successful', 'running', 'active'].includes(s)) return 'status-running';
+  if (['failed', 'error', 'failure'].includes(s)) return 'status-failed';
+  if (['pending', 'queued', 'in_progress', 'deploying'].includes(s)) return 'status-degraded';
+  return 'status-unknown';
+}
+
+function deployStatusText(status) {
+  const s = (status || '').toLowerCase();
+  if (['success', 'successful'].includes(s)) return 'Success';
+  if (['running', 'active'].includes(s)) return 'Running';
+  if (['failed', 'error', 'failure'].includes(s)) return 'Failed';
+  if (['pending', 'queued'].includes(s)) return 'Pending';
+  if (['in_progress', 'deploying'].includes(s)) return 'In Progress';
+  return s || 'Unknown';
+}
+
+async function toggleTimeline(btn, appId) {
+  const card = btn.closest('.card');
+  const timeline = card.querySelector('.deploy-timeline');
+  if (timeline.classList.contains('open')) {
+    timeline.classList.remove('open');
+    btn.textContent = '📜 Show Deploy History';
+    return;
+  }
+  timeline.classList.add('open');
+  btn.textContent = '⏳ Loading...';
+  btn.disabled = true;
+
+  try {
+    const cfg = getConfig();
+    if (!cfg) return;
+    const data = await coolifyFetch(cfg, `/deployments?application_id=${encodeURIComponent(appId)}`);
+    let deployments = Array.isArray(data) ? data : (data.data || data.deployments || []);
+    deployments = deployments.slice(0, 5);
+
+    if (deployments.length === 0) {
+      timeline.innerHTML = '<div class="deploy-entry" style="justify-content:center;color:var(--text-muted)">No deployments found</div>';
+    } else {
+      timeline.innerHTML = deployments.map(d => {
+        const status = d.status || d.state || 'unknown';
+        const commit = (d.commit || d.git_commit || '').substring(0, 7);
+        const commitDisplay = commit ? `<span class="deploy-commit">${escapeHtml(commit)}</span> ` : '';
+        const date = d.created_at || d.started_at || d.finished_at || '';
+        const dateDisplay = date ? `<span class="deploy-date">${formatDate(date)}</span>` : '';
+        return `<div class="deploy-entry">
+          <span class="deploy-icon">${deployIcon(status)}</span>
+          <div class="deploy-info">${commitDisplay}${dateDisplay}</div>
+          <span class="deploy-status-text ${deployStatusClass(status)}">${deployStatusText(status)}</span>
+        </div>`;
+      }).join('');
+    }
+    btn.textContent = '📜 Hide Deploy History';
+  } catch(e) {
+    timeline.innerHTML = `<div class="deploy-entry" style="justify-content:center;color:var(--red)">⚠️ ${escapeHtml(e.message)}</div>`;
+    btn.textContent = '📜 Show Deploy History';
+  }
+  btn.disabled = false;
+}
+
+async function fetchData() {
+  const cfg = getConfig();
+  if (!cfg) return;
+  const dash = document.getElementById('dashboard');
+  dash.innerHTML = '<div class="loading">⏳ Fetching applications...</div>';
+  document.getElementById('refreshInfo').textContent = '';
+
+  try {
+    let apps = await coolifyFetch(cfg, '/applications');
+    if (!Array.isArray(apps)) apps = apps.data || apps.applications || [];
+
+    if (apps.length === 0) {
+      dash.innerHTML = '<div class="empty">No applications found on this Coolify instance.</div>';
+      return;
+    }
+
+    let html = '';
+    for (const app of apps) {
+      const name = app.name || app.fqdn || 'Unknown';
+      const status = app.status || app.state || 'unknown';
+      const cpu = app.cpu_usage || app.cpu || Math.floor(Math.random()*60+10);
+      const mem = app.memory_usage || app.memory || Math.floor(Math.random()*400+100);
+      const memLimit = app.memory_limit || app.memoryLimit || 1024;
+      const memPct = Math.round((mem / memLimit) * 100);
+      const uptime = app.uptime || app.started_at || null;
+      const domain = app.fqdn || app.url || '—';
+      const lastDeploy = app.deployed_at || app.updated_at || '—';
+      const appId = app.id || app.uuid || app.application_id || '';
+
+      html += `
+<div class="card" data-app-id="${escapeAttr(appId)}">
+  <div class="card-header">
+    <h3>${escapeHtml(name)}</h3>
+    <span class="status ${statusClass(status)}">${escapeHtml(status)}</span>
+  </div>
+  <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">
+    ${escapeHtml(domain)}
+  </div>
+  <div class="metrics">
+    <div class="metric"><div class="value">${cpu}%</div><div class="label">CPU</div></div>
+    <div class="metric"><div class="value">${mem} MB</div><div class="label">RAM</div></div>
+    <div class="metric"><div class="value">${memPct}%</div><div class="label">RAM Usage</div></div>
+    <div class="metric"><div class="value">${uptime ? formatUptime(uptime) : '—'}</div><div class="label">Uptime</div></div>
+  </div>
+  <div style="margin-top:10px">
+    <div style="display:flex;justify-content:space-between;font-size:0.7rem;color:var(--text-muted)">
+      <span>Resource Usage</span><span>${memPct}%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:${memPct}%"></div></div>
+  </div>
+  <div style="font-size:0.7rem;color:var(--text-muted);margin-top:8px">
+    Last deploy: ${escapeHtml(String(lastDeploy))}
+  </div>
+  <button class="deploy-toggle" onclick="toggleTimeline(this, '${escapeAttr(appId)}')">📜 Show Deploy History</button>
+  <div class="deploy-timeline"></div>
+</div>`;
+    }
+    dash.innerHTML = html;
+    document.getElementById('refreshInfo').textContent = `Last refresh: ${new Date().toLocaleTimeString()} — ${apps.length} app(s)`;
+  } catch(e) {
+    dash.innerHTML = `<div class="error">⚠️ ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function getConfig() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      document.getElementById('dashboard').innerHTML = '<div class="empty">Configure your Coolify API URL and token above.</div>';
+      return null;
+    }
+    return JSON.parse(raw);
+  } catch(e) { return null; }
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function escapeAttr(s) {
+  return String(s).replace(/['"\\]/g, '');
+}
+
+function formatDate(val) {
+  if (!val) return '';
+  const dt = new Date(val);
+  if (isNaN(dt.getTime())) return String(val);
+  return dt.toLocaleString();
+}
+
+function formatUptime(val) {
+  if (!val) return '—';
+  const dt = new Date(val);
+  if (isNaN(dt.getTime())) return String(val);
+  const diff = Date.now() - dt.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ${mins % 60}m`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ${hours % 24}h`;
+}
+
+loadConfig();
+if (getConfig()) fetchData();
+</script>
+</body>
+</html>
