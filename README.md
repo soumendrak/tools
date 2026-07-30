@@ -1,140 +1,87 @@
-<p align="center">
-  <img src="public/logo.svg" width="88" height="88" alt="Tools by Soumendra logo">
-</p>
+<div align="center">
 
-<h1 align="center">Tools by Soumendra</h1>
+<img src="public/logo.svg" width="96" height="96" alt="Tools by Soumendra logo">
 
-Single point of entry for all my [mini projects](https://www.soumendrak.com/projects/foss/#mini-projects) — 44 zero-dependency browser tools you can browse, search, and use in place. Most are single-file; the Fasting Tracker is an offline-first multi-file PWA.
+# Tools by Soumendra
 
-Built with Next.js + Tailwind. **Statically exported** (`output: "export"` →
-`out/`) and hosted on **Cloudflare Pages** at
-[tools.soumendrak.com](https://tools.soumendrak.com). No server runtime, no
-client-side data fetching, no tracking.
+**44 free, zero-dependency browser tools — one searchable home.**
 
-## Develop
+[![Live site](https://img.shields.io/badge/live-tools.soumendrak.com-b4522e?style=flat-square&logo=cloudflare&logoColor=white)](https://tools.soumendrak.com)
+&nbsp;
+![Tools](https://img.shields.io/badge/tools-44-b4522e?style=flat-square)
+![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=nextdotjs&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-38bdf8?style=flat-square&logo=tailwindcss&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?style=flat-square&logo=typescript&logoColor=white)
+![Cloudflare Pages](https://img.shields.io/badge/Cloudflare_Pages-deployed-f38020?style=flat-square&logo=cloudflarepages&logoColor=white)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-2ea043?style=flat-square)](https://github.com/soumendrak/tools/pulls)
+
+### [🔗 tools.soumendrak.com](https://tools.soumendrak.com)
+
+</div>
+
+---
+
+A single point of entry for all my [mini projects](https://www.soumendrak.com/projects/foss/#mini-projects) — tiny, self-contained browser tools you can **browse, search, and use right in place**. Everything runs locally in your browser; no sign-up, no accounts.
+
+## ✨ Features
+
+- **44 tools, one origin** — most are single-file pages; the Fasting Tracker is an offline-first multi-file PWA. Every tool is vendored under `public/tools/` and embedded on its own page at `/t/<slug>` with one-click full screen.
+- **Instant search & filter** — fuzzy search plus 7 category filters.
+- **Recently added / updated** — surfaced on the landing page and kept fresh automatically from git history.
+- **Light & dark** — a terracotta theme (matching [soumendrak.com](https://www.soumendrak.com)) shared across the site *and* every tool, with a persistent top-right toggle.
+- **Built for discovery** — `sitemap.xml`, `robots.txt`, JSON-LD, Open Graph cards, per-tool canonical URLs, and machine-readable LLM indexes.
+- **Fast & private** — statically exported, edge-hosted on Cloudflare Pages, tools compute entirely client-side.
+
+## 🗂️ Categories
+
+| Category | Tools | Examples |
+| --- | :---: | --- |
+| ⏳ Time & Life | 9 | Fasting Tracker, Pomodoro, Life Calendar |
+| 🛠️ Developer Tools | 9 | JSON Pretty, Diff Checker, Base64 |
+| 🎨 Fun & Visual | 11 | Mandelbrot, Conway's Game of Life, Odia 2048 |
+| 📡 DevOps & Monitoring | 8 | API Playground, Webhook Inspector, Uptime Radar |
+| 💰 Finance | 2 | SIP Calculator, Portfolio Tracker |
+| ☎️ Telephony | 2 | Call Log Explorer, IVR Flow Builder |
+| ✍️ Writing & Content | 3 | RSS → Substack, Citation Manager |
+
+## 🧰 Tech stack
+
+Next.js (App Router, static export) · Tailwind CSS v4 · TypeScript · Cloudflare Pages · [Rybbit](https://rybbit.io) analytics.
+
+## 🚀 Local development
 
 ```bash
-pnpm dev       # local dev server (rewrites serve /tools/<slug>/ here)
+pnpm install
+pnpm dev       # dev server — serves /tools/<slug>/ via rewrites
 pnpm build     # static export → ./out
-pnpm preview   # serve ./out locally like Cloudflare Pages (clean URLs + dir index)
+pnpm preview   # serve ./out like Cloudflare Pages (clean URLs + directory index)
 ```
 
-The landing page also shows **Recently added / Recently updated** lists and a
-per-category filter (7 categories: Time & Life, Developer Tools, Fun & Visual,
-DevOps & Monitoring, Finance, Telephony, Writing & Content).
+## 🔎 Search and machine-readable discovery
 
-## Search and machine-readable discovery
+The static export includes `/sitemap.xml` and `/robots.txt` for conventional crawling, `/llms.txt` for a concise categorized Markdown index, and `/llms-full.txt` for expanded entries with canonical, direct-use, and source URLs.
 
-The static export includes the same catalog in formats intended for crawlers,
-answer engines, and agents:
+Both LLM indexes are generated from `src/data/tools.ts` during the Next.js build. Raw `/tools/<slug>/` pages canonicalize to their descriptive `/t/<slug>` pages via the head block injected by `scripts/skin-tools.py`.
 
-- `/sitemap.xml` and `/robots.txt` for conventional crawling.
-- `/llms.txt` for a concise, categorized Markdown index.
-- `/llms-full.txt` for expanded entries with canonical, direct-use, and source
-  URLs.
+The recency lists are automatic: `scripts/tool-dates.py` runs before every build and derives each tool's `updated` date from git history. A new tool's `added` date is seeded from its origin repository.
 
-Both LLM indexes are generated directly from `src/data/tools.ts` during the
-Next.js build, so adding a catalog entry updates them automatically. Raw
-`/tools/<slug>/` pages canonicalize to their descriptive `/t/<slug>` pages via
-the head block injected by `scripts/skin-tools.py`.
+## ➕ Add a tool
 
-The recency lists are **automatic**: `scripts/tool-dates.py` runs before every
-build (via `prebuild`) and derives each tool's `updated` date from the vendored
-file's last git commit, so committing an edit refreshes the list on the next
-build — no manual date entry. `added` is seeded from the origin repo's creation
-date.
+Full steps live in the `tools-catalog` skill (`.claude/skills/tools-catalog/`). Short version:
 
-## Add a tool
+1. Vendor the tool into `public/tools/<slug>/index.html`. If it uses relative JavaScript, manifest, service-worker, or icon assets, vendor the complete deployable directory.
+2. `python3 scripts/skin-tools.py` — apply the shared theme skin and canonical URL.
+3. Add one entry to `src/data/tools.ts` — the card, `/t/<slug>` page, sitemap, structured data, and LLM indexes all derive from it.
+4. `python3 scripts/check-tools.py && pnpm build` — validate the catalog and refresh the *Recently added/updated* dates.
 
-Full steps live in the `tools-catalog` skill (`.claude/skills/tools-catalog/`).
-Short version:
+## 🎨 Theming
 
-1. Vendor the tool's page into `public/tools/<slug>/index.html`. If it has
-   relative assets, vendor the complete deployable directory.
-2. `python3 scripts/skin-tools.py` — apply the theme skin.
-3. Add one line to `src/data/tools.ts` (card, `/t/<slug>` page, sitemap, and
-   structured data all derive from it).
-4. `python3 scripts/check-tools.py` and `pnpm build` — the build auto-refreshes
-   the recency dates. (Run `pnpm run tool-dates` manually only to seed a brand-new
-   tool's creation date from its origin repo.)
+The site owns `<html data-theme>` and persists to `localStorage`; because the tools are served same-origin, they pick up the theme and live toggles automatically. `scripts/skin-tools.py` injects one stylesheet per tool that remaps its CSS variables to the shared terracotta palette for both modes — recolor everything by editing the palette in `src/app/globals.css` (site) and `scripts/skin-tools.py` (tools), plus `public/logo.svg` / `src/app/icon.svg` for the mark.
 
-## Theming
+---
 
-Site and tools support light + dark mode with a toggle (top-right). The site
-owns `<html data-theme>` and persists to `localStorage`; the tools are
-same-origin, so they pick up the theme and live toggles automatically.
+<div align="center">
 
-The tools originally shipped a dark orange theme. `scripts/skin-tools.py`
-injects one stylesheet into each vendored tool that remaps its CSS variables
-(`--bg`, `--accent`, `--orange`, …) to the shared terracotta palette (matching
-[soumendrak.com](https://www.soumendrak.com)) for both modes. It's idempotent —
-re-run it after re-syncing from upstream.
+Built by [Soumendra Kumar Sahoo](https://www.soumendrak.com) · Contributions welcome — open an [issue](https://github.com/soumendrak/tools/issues) or [PR](https://github.com/soumendrak/tools/pulls).
 
-## Branding
-
-`public/logo.svg` is the terracotta wrench mark (also the favicon via
-`src/app/icon.svg`). To recolor everything, edit the palette in two places —
-`src/app/globals.css` (site) and `scripts/skin-tools.py` (tools, then re-run
-it) — plus `public/logo.svg` / `src/app/icon.svg` for the mark.
-
-## Sync vendored tools
-
-The tools under `public/tools/` are copies of the published single-file pages,
-**with local modifications** (theme skin, removed credit footers, and the
-rewritten typing test). Re-downloading from upstream overwrites those, so
-re-apply the skin afterwards:
-
-```bash
-python3 -c "
-import re
-print('\n'.join(re.findall(r'^\s*t\(\s*\"([^\"]+)\"', open('src/data/tools.ts').read(), re.M)))
-" | while read s; do
-  mkdir -p "public/tools/$s"
-  curl -sL "https://soumendrak.github.io/$s/" -o "public/tools/$s/index.html"
-done
-python3 scripts/skin-tools.py   # re-apply the theme skin
-```
-
-The loop above is only for single-file tools. For a multi-file tool such as
-`fasting-tracker`, copy every deployable asset from its repository
-(`index.html`, JavaScript, manifest, service worker, and icons) before
-re-applying the skin.
-
-## Deploy (Cloudflare Pages → tools.soumendrak.com)
-
-The site is a static export, so Cloudflare Pages serves `out/` straight from the
-edge — no Workers/runtime.
-
-### One-time setup — Git-connected (recommended, auto-deploys on push)
-
-1. **Cloudflare dashboard → Workers & Pages → Create → Pages → Connect to Git**,
-   pick the `soumendrak/tools` repo.
-2. Build settings:
-   - **Framework preset:** Next.js (Static HTML Export) — or set manually:
-   - **Build command:** `pnpm build`
-   - **Build output directory:** `out`
-3. **Environment variables** (Production):
-   - `NEXT_PUBLIC_SITE_URL = https://tools.soumendrak.com` (canonical URLs,
-     sitemap, Open Graph)
-   - `NODE_VERSION = 20` (or newer)
-4. Save & deploy. You get a `*.pages.dev` URL first.
-5. **Custom domain:** project → **Custom domains → Set up a custom domain →**
-   `tools.soumendrak.com`. Since `soumendrak.com` is already on Cloudflare DNS,
-   this auto-creates the `CNAME tools → <project>.pages.dev` record and issues
-   the TLS cert. (If DNS is elsewhere, add that CNAME manually.)
-
-Every push to the default branch now rebuilds and redeploys.
-
-### Or deploy directly from the CLI
-
-```bash
-pnpm run deploy:cf   # = pnpm build && wrangler pages deploy out --project-name tools
-```
-
-First run prompts a Cloudflare login and creates the `tools` Pages project;
-attach the custom domain once via step 5 above.
-
-> The `prebuild` step (`tool-dates.py`) shells out to `python3` + `git`; it's
-> guarded with `|| true`, so if either is unavailable in the build image the
-> recency dates simply fall back to the committed seed and the build still
-> succeeds.
+</div>
