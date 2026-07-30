@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IVR Flow Builder</title>
+<style>
+:root {
+  --bg: #0f0f1a;
+  --surface: #1a1a2e;
+  --accent: #ff6b35;
+  --text: #e0e0e0;
+  --text-muted: #8888a0;
+  --border: #2a2a3e;
+  --danger: #e74c3c;
+  --success: #2ecc71;
+  --warning: #f39c12;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI',system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--text); display:flex; height:100vh; overflow:hidden; }
+.sidebar { width:200px; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; }
+.sidebar h2 { font-size:0.95rem; padding:16px; color:var(--accent); border-bottom:1px solid var(--border); }
+.palette { padding:10px; flex:1; }
+.palette-item { padding:10px 12px; margin-bottom:8px; background:var(--bg); border:1px solid var(--border); border-radius:8px; cursor:grab; font-size:0.8rem; color:var(--text-muted); transition:all 0.2s; }
+.palette-item:hover { border-color:var(--accent); color:var(--text); }
+.palette-item .icon { font-size:1.2rem; margin-right:6px; }
+.export-btns { padding:12px; border-top:1px solid var(--border); }
+.export-btns button { width:100%; margin-bottom:6px; }
+.main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+.toolbar { padding:10px 16px; background:var(--surface); border-bottom:1px solid var(--border); display:flex; gap:10px; align-items:center; font-size:0.8rem; }
+.toolbar span { color:var(--text-muted); }
+.canvas-wrap { flex:1; overflow:auto; position:relative; }
+canvas.svg-overlay { position:absolute; top:0; left:0; pointer-events:none; z-index:1; }
+.canvas { position:relative; min-width:3000px; min-height:2000px; }
+.node { position:absolute; min-width:180px; background:var(--surface); border:2px solid var(--border); border-radius:12px; padding:0; cursor:move; z-index:2; transition:border-color 0.2s, box-shadow 0.2s; }
+.node:hover, .node.selected { border-color:var(--accent); box-shadow:0 0 16px rgba(255,107,53,0.2); }
+.node-header { padding:10px 14px; border-radius:10px 10px 0 0; font-size:0.8rem; font-weight:700; display:flex; align-items:center; gap:6px; }
+.node-header.speak { background:rgba(255,107,53,0.2); color:var(--accent); }
+.node-header.menu { background:rgba(255,107,53,0.2); color:var(--accent); }
+.node-header.play { background:rgba(46,204,113,0.2); color:var(--success); }
+.node-header.hangup { background:rgba(231,76,60,0.2); color:var(--danger); }
+.node-header.transfer { background:rgba(52,152,219,0.2); color:#3498db; }
+.node-header.connect { background:rgba(155,89,182,0.2); color:#9b59b6; }
+.node-body { padding:8px 14px 14px; font-size:0.75rem; color:var(--text-muted); }
+.node-body .option { display:flex; align-items:center; gap:6px; padding:4px 0; }
+.node-body .digit { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; background:var(--accent); color:#fff; font-weight:700; font-size:0.7rem; }
+.node-actions { display:flex; gap:4px; padding:0 14px 10px; }
+.node-actions button { padding:4px 8px; font-size:0.65rem; background:transparent; border:1px solid var(--border); border-radius:4px; color:var(--text-muted); cursor:pointer; }
+.node-actions button:hover { border-color:var(--accent); color:var(--accent); }
+.node-actions button.danger:hover { border-color:var(--danger); color:var(--danger); }
+.props-panel { width:280px; background:var(--surface); border-left:1px solid var(--border); padding:16px; overflow-y:auto; }
+.props-panel h3 { font-size:0.9rem; color:var(--accent); margin-bottom:16px; }
+.props-panel label { display:block; font-size:0.75rem; color:var(--text-muted); margin-bottom:4px; margin-top:12px; }
+.props-panel input, .props-panel select, .props-panel textarea { width:100%; padding:8px 10px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:0.8rem; outline:none; }
+.props-panel input:focus, .props-panel select:focus, .props-panel textarea:focus { border-color:var(--accent); }
+.props-panel .option-row { display:flex; gap:6px; margin-bottom:6px; align-items:center; }
+.props-panel .option-row input { flex:1; }
+.props-panel .option-row .digit-input { width:40px; flex:none; text-align:center; }
+.btn { padding:8px 16px; background:var(--accent); color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight:600; }
+.btn:hover { opacity:0.9; }
+.btn-sm { padding:4px 10px; font-size:0.7rem; border-radius:6px; }
+.btn-outline { background:transparent; border:1px solid var(--border); color:var(--text); }
+.btn-outline:hover { border-color:var(--accent); color:var(--accent); }
+.btn-danger { background:var(--danger); }
+.empty-state { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; color:var(--text-muted); }
+.empty-state .icon { font-size:48px; margin-bottom:12px; }
+.modal-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:100; display:flex; align-items:center; justify-content:center; }
+.modal { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:24px; max-width:500px; width:90%; max-height:80vh; overflow-y:auto; }
+.modal h3 { color:var(--accent); margin-bottom:12px; }
+.modal pre { background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:12px; font-size:0.75rem; overflow-x:auto; color:var(--text); max-height:40vh; overflow-y:auto; }
+.modal .btn-row { display:flex; gap:8px; margin-top:16px; justify-content:flex-end; }
+
+/* Responsive & Mobile - Universal */
+@media (max-width: 768px) {
+  html { font-size: 15px; }
+  body { flex-direction: column !important; }
+  .sidebar, aside, nav.sidebar { width: 100% !important; flex-direction: row !important; flex-wrap: wrap !important; padding: 10px !important; gap: 8px !important; border-right: none !important; border-bottom: 1px solid var(--border); }
+  .main, .content-area { padding: 12px !important; }
+  .cards, .card-grid { grid-template-columns: 1fr !important; }
+  .toolbar { flex-wrap: wrap !important; gap: 6px !important; }
+  .toolbar input, .toolbar select { flex: 1 1 100% !important; min-width: 0 !important; }
+  .pane { border-right: none !important; border-bottom: 1px solid var(--border); flex: none !important; height: 50vh !important; }
+  .pane:last-child { border-bottom: none !important; }
+  header { flex-wrap: wrap !important; gap: 8px !important; padding: 12px 16px !important; }
+  .sidebar-actions button { flex: 1 !important; min-width: 80px !important; }
+  .collection-list { flex-direction: row !important; flex-wrap: wrap !important; }
+  .tabs { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  .tab { padding: 10px 14px !important; white-space: nowrap !important; }
+  .modal { width: 90% !important; max-width: 400px !important; }
+  .summary-row { padding: 12px 16px !important; gap: 8px !important; }
+  .summary-card { min-width: 80px !important; padding: 10px 14px !important; }
+  .summary-card .value { font-size: 1.2rem !important; }
+  .add-form { flex-wrap: wrap !important; }
+  .add-form input { flex: 1 1 100% !important; }
+  .status-grid { padding: 0 16px 16px !important; }
+  .url-card { padding: 12px 16px !important; }
+  .url-header { flex-wrap: wrap !important; }
+  .url-name { font-size: 0.8rem !important; word-break: break-all !important; }
+  .form-group input, .form-group select { font-size: 16px !important; }
+}
+
+@media (max-width: 480px) {
+  html { font-size: 14px; }
+  .sidebar { padding: 8px !important; gap: 4px !important; }
+  .sidebar h2 { font-size: 11px !important; }
+  .main { padding: 8px !important; }
+  header h1 { font-size: 1rem !important; }
+  .toolbar { padding: 8px !important; }
+  .send-btn, button, .btn { min-height: 44px; min-width: 44px; padding: 10px 16px !important; font-size: 14px !important; }
+  .tabs { padding: 0 8px !important; }
+  .tab { padding: 8px 12px !important; font-size: 12px !important; }
+  .headers-panel { padding: 8px !important; }
+  .header-row { flex-wrap: wrap !important; }
+  .header-row input { flex: 1 1 100% !important; }
+  .pane { height: 40vh !important; }
+  .pane textarea { padding: 10px !important; font-size: 12px !important; }
+  .output-area { max-height: 60% !important; }
+  .response-area { padding: 8px !important; }
+  .response-body { padding: 8px !important; font-size: 12px !important; }
+  .collection-item { min-width: 100px !important; padding: 6px 8px !important; font-size: 12px !important; }
+  .summary-card { min-width: 70px !important; padding: 8px 10px !important; }
+  .summary-card .value { font-size: 1rem !important; }
+  .card { padding: 14px !important; }
+  .card .value { font-size: 1.3rem !important; }
+  .chart-container { padding: 12px !important; }
+  canvas { height: 180px !important; }
+  .modal { padding: 16px !important; }
+  .empty-state { padding: 40px 16px !important; }
+  button, .btn, input[type="submit"] { min-height: 44px; }
+}
+
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<div class="sidebar">
+  <h2>📞 IVR Builder</h2>
+  <div class="palette">
+    <div class="palette-item" draggable="true" data-type="speak" ondragstart="dragStart(event)"><span class="icon">🗣️</span> Speak/Say</div>
+    <div class="palette-item" draggable="true" data-type="menu" ondragstart="dragStart(event)"><span class="icon">🔢</span> Menu</div>
+    <div class="palette-item" draggable="true" data-type="play" ondragstart="dragStart(event)"><span class="icon">🔊</span> Play Audio</div>
+    <div class="palette-item" draggable="true" data-type="transfer" ondragstart="dragStart(event)"><span class="icon">📞</span> Transfer</div>
+    <div class="palette-item" draggable="true" data-type="connect" ondragstart="dragStart(event)"><span class="icon">🔗</span> Connect</div>
+    <div class="palette-item" draggable="true" data-type="hangup" ondragstart="dragStart(event)"><span class="icon">📴</span> Hangup</div>
+  </div>
+  <div class="export-btns">
+    <button class="btn btn-sm" onclick="exportXML()">📄 Export XML</button>
+    <button class="btn btn-sm btn-outline" onclick="exportJSON()">📋 Export JSON</button>
+    <button class="btn btn-sm btn-outline" onclick="resetFlow()">🔄 Reset</button>
+  </div>
+</div>
+<div class="main">
+  <div class="toolbar">
+    <span>Flow: <strong id="flowName">untitled</strong></span>
+    <span style="margin-left:auto;">Nodes: <strong id="nodeCount">0</strong></span>
+    <span>Click node to edit • Drag from palette to add • Drag nodes to reposition</span>
+  </div>
+  <div class="canvas-wrap" id="canvasWrap">
+    <div class="canvas" id="canvas"
+      ondragover="e=>e.preventDefault()"
+      ondrop="dropNode(event)">
+      <div class="empty-state" id="emptyState">
+        <div class="icon">📞</div>
+        <div>Drag a node from the left panel to start</div>
+        <div style="font-size:0.75rem;margin-top:6px;">Start with a <strong>Menu</strong> node</div>
+      </div>
+    </div>
+    <svg class="svg-overlay" id="svgOverlay"></svg>
+  </div>
+</div>
+<div class="props-panel" id="propsPanel">
+  <h3>📝 Properties</h3>
+  <p style="color:var(--text-muted);font-size:0.8rem;" id="propsHint">Select a node to edit its properties</p>
+  <div id="propsContent"></div>
+</div>
+
+<!-- Export Modal -->
+<div class="modal-overlay" id="exportModal" style="display:none;">
+  <div class="modal">
+    <h3 id="exportTitle">Export</h3>
+    <pre id="exportContent"></pre>
+    <div class="btn-row">
+      <button class="btn btn-sm btn-outline" onclick="copyExport()">📋 Copy</button>
+      <button class="btn btn-sm" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- State ----
+let nodes = [];
+let selectedId = null;
+let nextId = 1;
+let dragOffX = 0, dragOffY = 0;
+
+function uid() { return 'n' + (nextId++); }
+
+const TYPE_INFO = {
+  speak:   { icon:'🗣️', label:'Speak/Say', headerClass:'speak', color:'#ff6b35' },
+  menu:    { icon:'🔢', label:'Menu', headerClass:'menu', color:'#ff6b35' },
+  play:    { icon:'🔊', label:'Play Audio', headerClass:'play', color:'#2ecc71' },
+  transfer:{ icon:'📞', label:'Transfer', headerClass:'transfer', color:'#3498db' },
+  connect: { icon:'🔗', label:'Connect', headerClass:'connect', color:'#9b59b6' },
+  hangup:  { icon:'📴', label:'Hangup', headerClass:'hangup', color:'#e74c3c' },
+};
+
+function defaultConfig(type) {
+  switch(type) {
+    case 'speak': return { text: 'Welcome to our IVR system.', language: 'en-IN' };
+    case 'menu': return { options: [{digit:'1',label:'Sales',targetId:''},{digit:'2',label:'Support',targetId:''}] };
+    case 'play': return { url: 'https://example.com/audio.mp3', loop: 1 };
+    case 'transfer': return { number: '+1234567890' };
+    case 'connect': return { number: '+1234567890', callerId: '' };
+    case 'hangup': return {};
+  }
+}
+
+function createNode(type, x, y) {
+  return {
+    id: uid(),
+    type,
+    label: TYPE_INFO[type].label,
+    x: Math.max(20, x - 90),
+    y: Math.max(20, y - 30),
+    config: defaultConfig(type)
+  };
+}
+
+// ---- Drag & Drop ----
+let dragType = null;
+function dragStart(e) {
+  dragType = e.target.dataset.type;
+  e.dataTransfer.setData('text/plain', dragType);
+}
+
+function dropNode(e) {
+  e.preventDefault();
+  const type = e.dataTransfer.getData('text/plain') || dragType;
+  if (!type || !TYPE_INFO[type]) return;
+  const rect = document.getElementById('canvas').getBoundingClientRect();
+  const wrap = document.getElementById('canvasWrap');
+  const x = e.clientX - rect.left + wrap.scrollLeft;
+  const y = e.clientY - rect.top + wrap.scrollTop;
+  const node = createNode(type, x, y);
+  nodes.push(node);
+  selectNode(node.id);
+  render();
+}
+
+// ---- Node Dragging ----
+function nodeMouseDown(e, id) {
+  if (e.button !== 0) return;
+  e.stopPropagation();
+  selectNode(id);
+  const nodeEl = document.getElementById('node-' + id);
+  const node = nodes.find(n => n.id === id);
+  if (!nodeEl || !node) return;
+  dragOffX = e.clientX - node.x;
+  dragOffY = e.clientY - node.y;
+  document.addEventListener('mousemove', onDrag);
+  document.addEventListener('mouseup', onDragEnd);
+}
+
+function onDrag(e) {
+  if (!selectedId) return;
+  const node = nodes.find(n => n.id === selectedId);
+  if (!node) return;
+  const wrap = document.getElementById('canvasWrap');
+  node.x = e.clientX - dragOffX + wrap.scrollLeft;
+  node.y = e.clientY - dragOffY + wrap.scrollTop;
+  updateNodePosition(node);
+  drawConnections();
+}
+
+function onDragEnd() {
+  document.removeEventListener('mousemove', onDrag);
+  document.removeEventListener('mouseup', onDragEnd);
+}
+
+// ---- Selection ----
+function selectNode(id) {
+  selectedId = id;
+  renderProps();
+  document.querySelectorAll('.node').forEach(el => el.classList.remove('selected'));
+  const el = document.getElementById('node-' + id);
+  if (el) el.classList.add('selected');
+}
+
+function canvasClick(e) {
+  if (e.target === document.getElementById('canvas') || e.target.id === 'canvasWrap') {
+    selectedId = null;
+    renderProps();
+    document.querySelectorAll('.node').forEach(el => el.classList.remove('selected'));
+  }
+}
+
+// ---- Rendering ----
+function render() {
+  const canvas = document.getElementById('canvas');
+  canvas.innerHTML = '';
+  document.getElementById('emptyState').style.display = nodes.length ? 'none' : 'block';
+  document.getElementById('nodeCount').textContent = nodes.length;
+  nodes.forEach(node => {
+    const el = document.createElement('div');
+    el.className = `node${selectedId === node.id ? ' selected' : ''}`;
+    el.id = 'node-' + node.id;
+    el.style.left = node.x + 'px';
+    el.style.top = node.y + 'px';
+    el.addEventListener('mousedown', e => nodeMouseDown(e, node.id));
+    // Prevent click from deselecting
+    el.addEventListener('click', e => { e.stopPropagation(); selectNode(node.id); });
+
+    const info = TYPE_INFO[node.type];
+    let bodyHTML = '';
+    if (node.type === 'menu') {
+      bodyHTML = (node.config.options || []).map(o =>
+        `<div class="option"><span class="digit">${o.digit}</span> ${o.label || '—'}</div>`
+      ).join('');
+    } else if (node.type === 'speak') {
+      bodyHTML = `<div style="font-size:0.7rem;">🗣️ ${(node.config.text || '').slice(0,40)}${(node.config.text||'').length > 40 ? '...' : ''}</div>`;
+    } else if (node.type === 'play') {
+      bodyHTML = `<div style="font-size:0.7rem;">🔗 ${(node.config.url || '').slice(0,30)}${(node.config.url||'').length > 30 ? '...' : ''}</div>`;
+    } else if (node.type === 'transfer' || node.type === 'connect') {
+      bodyHTML = `<div style="font-size:0.7rem;">📞 ${node.config.number || '—'}</div>`;
+    } else if (node.type === 'hangup') {
+      bodyHTML = `<div style="font-size:0.7rem;color:var(--danger);">✕ End call</div>`;
+    }
+
+    el.innerHTML = `
+      <div class="node-header ${info.headerClass}">${info.icon} ${node.label}</div>
+      <div class="node-body">${bodyHTML}</div>
+      <div class="node-actions">
+        ${node.type === 'menu' ? '<button onclick="addOption(\''+node.id+'\')">+ Option</button>' : ''}
+        <button class="danger" onclick="deleteNode(\''+node.id+'\')">✕ Delete</button>
+      </div>
+    `;
+    canvas.appendChild(el);
+  });
+  drawConnections();
+  renderProps();
+}
+
+function updateNodePosition(node) {
+  const el = document.getElementById('node-' + node.id);
+  if (el) { el.style.left = node.x + 'px'; el.style.top = node.y + 'px'; }
+}
+
+function drawConnections() {
+  const svg = document.getElementById('svgOverlay');
+  const canvas = document.getElementById('canvas');
+  const wrap = document.getElementById('canvasWrap');
+  const scale = 1;
+
+  svg.setAttribute('width', canvas.scrollWidth);
+  svg.setAttribute('height', canvas.scrollHeight);
+  svg.style.width = canvas.scrollWidth + 'px';
+  svg.style.height = canvas.scrollHeight + 'px';
+
+  let lines = '';
+  nodes.forEach(node => {
+    if (node.type !== 'menu') return;
+    (node.config.options || []).forEach(opt => {
+      if (!opt.targetId) return;
+      const target = nodes.find(n => n.id === opt.targetId);
+      if (!target) return;
+      const srcEl = document.getElementById('node-' + node.id);
+      const tgtEl = document.getElementById('node-' + target.id);
+      if (!srcEl || !tgtEl) return;
+
+      const sx = node.x + srcEl.offsetWidth;
+      const sy = node.y + srcEl.offsetHeight / 2;
+      const tx = target.x;
+      const ty = target.y + tgtEl.offsetHeight / 2;
+      const mx = (sx + tx) / 2;
+
+      lines += `<path d="M${sx},${sy} C${mx},${sy} ${mx},${ty} ${tx},${ty}"
+        stroke="#ff6b35" stroke-width="2" fill="none" marker-end="url(#arrow)" opacity="0.5"/>`;
+
+      // Label on the line
+      const lx = mx, ly = (sy + ty) / 2 - 8;
+      lines += `<text x="${lx}" y="${ly}" fill="#ff6b35" font-size="11" text-anchor="middle" font-weight="bold">${opt.digit}</text>`;
+    });
+  });
+
+  svg.innerHTML = `
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M0,0 L10,5 L0,10 z" fill="#ff6b35"/>
+      </marker>
+    </defs>
+    ${lines}
+  `;
+}
+
+// ---- Properties Panel ----
+function renderProps() {
+  const hint = document.getElementById('propsHint');
+  const content = document.getElementById('propsContent');
+  if (!selectedId) {
+    hint.style.display = 'block';
+    content.innerHTML = '';
+    return;
+  }
+  hint.style.display = 'none';
+  const node = nodes.find(n => n.id === selectedId);
+  if (!node) return;
+
+  let html = `
+    <label>Name</label>
+    <input value="${node.label}" onchange="updateProp('label',this.value)" placeholder="Node name">
+    <label>Type</label>
+    <select onchange="changeType(this.value)">
+      ${Object.entries(TYPE_INFO).map(([k,v]) => `<option value="${k}" ${node.type===k?'selected':''}>${v.icon} ${v.label}</option>`).join('')}
+    </select>
+  `;
+
+  if (node.type === 'menu') {
+    html += `<label>Menu Options</label>`;
+    (node.config.options || []).forEach((opt, i) => {
+      const targets = nodes.filter(n => n.id !== node.id);
+      html += `
+        <div class="option-row">
+          <input class="digit-input" value="${opt.digit}" onchange="updateOption(${i},'digit',this.value)" placeholder="Key">
+          <input value="${opt.label}" onchange="updateOption(${i},'label',this.value)" placeholder="Label">
+          <select onchange="updateOption(${i},'targetId',this.value)" style="width:120px;font-size:0.7rem;padding:4px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+            <option value="">— target —</option>
+            ${targets.map(t => `<option value="${t.id}" ${opt.targetId===t.id?'selected':''}>${t.label} (${t.type})</option>`).join('')}
+          </select>
+          <button class="btn-sm btn-outline" onclick="removeOption(${i})" style="padding:2px 6px;font-size:0.65rem;">✕</button>
+        </div>
+      `;
+    });
+    html += `<button class="btn btn-sm btn-outline" onclick="addOption('${node.id}')" style="margin-top:6px;">+ Add Option</button>`;
+  } else if (node.type === 'speak') {
+    html += `
+      <label>Speak Text</label>
+      <textarea rows="3" onchange="updateConfig('text',this.value)" placeholder="Text to speak...">${node.config.text || ''}</textarea>
+      <label>Language</label>
+      <select onchange="updateConfig('language',this.value)" style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.8rem;outline:none;">
+        <option value="en-IN" ${node.config.language==='en-IN'?'selected':''}>English (India) — en-IN</option>
+        <option value="en-US" ${node.config.language==='en-US'?'selected':''}>English (US) — en-US</option>
+        <option value="es" ${node.config.language==='es'?'selected':''}>Spanish — es</option>
+        <option value="fr-FR" ${node.config.language==='fr-FR'?'selected':''}>French — fr-FR</option>
+        <option value="de-DE" ${node.config.language==='de-DE'?'selected':''}>German — de-DE</option>
+        <option value="ja-JP" ${node.config.language==='ja-JP'?'selected':''}>Japanese — ja-JP</option>
+      </select>
+    `;
+  } else if (node.type === 'play') {
+    html += `
+      <label>Audio URL</label>
+      <input value="${node.config.url || ''}" onchange="updateConfig('url',this.value)" placeholder="https://...">
+      <label>Loop count</label>
+      <input type="number" value="${node.config.loop || 1}" onchange="updateConfig('loop',parseInt(this.value)||1)" min="1">
+    `;
+  } else if (node.type === 'transfer' || node.type === 'connect') {
+    html += `
+      <label>Phone Number</label>
+      <input value="${node.config.number || ''}" onchange="updateConfig('number',this.value)" placeholder="+1234567890">
+    `;
+    if (node.type === 'connect') {
+      html += `
+        <label>Caller ID (optional)</label>
+        <input value="${node.config.callerId || ''}" onchange="updateConfig('callerId',this.value)" placeholder="+1234567890">
+      `;
+    }
+  }
+
+  html += `<div class="btn-row" style="margin-top:16px;"><button class="btn btn-sm btn-danger" onclick="deleteNode('${node.id}')">🗑 Delete Node</button></div>`;
+  content.innerHTML = html;
+}
+
+function updateProp(key, val) {
+  const node = nodes.find(n => n.id === selectedId);
+  if (node) { node[key] = val; render(); }
+}
+function updateConfig(key, val) {
+  const node = nodes.find(n => n.id === selectedId);
+  if (node) { node.config[key] = val; render(); }
+}
+function updateOption(idx, key, val) {
+  const node = nodes.find(n => n.id === selectedId);
+  if (node && node.config.options) { node.config.options[idx][key] = val; render(); }
+}
+function removeOption(idx) {
+  const node = nodes.find(n => n.id === selectedId);
+  if (node && node.config.options) { node.config.options.splice(idx, 1); render(); }
+}
+function addOption(nodeId) {
+  const node = nodes.find(n => n.id === nodeId);
+  if (node) {
+    if (!node.config.options) node.config.options = [];
+    node.config.options.push({digit: String(node.config.options.length + 1), label: '', targetId: ''});
+    selectNode(nodeId);
+    render();
+  }
+}
+function changeType(newType) {
+  const node = nodes.find(n => n.id === selectedId);
+  if (node) {
+    node.type = newType;
+    node.config = defaultConfig(newType);
+    if (newType !== 'menu') node.config.options = undefined;
+    render();
+  }
+}
+function deleteNode(id) {
+  // Remove references to this node
+  nodes.forEach(n => {
+    if (n.config.options) {
+      n.config.options.forEach(o => { if (o.targetId === id) o.targetId = ''; });
+    }
+  });
+  nodes = nodes.filter(n => n.id !== id);
+  if (selectedId === id) selectedId = null;
+  render();
+}
+
+// ---- Export ----
+function exportJSON() {
+  const data = { name: 'IVR Flow', nodes };
+  showModal('JSON Export', JSON.stringify(data, null, 2));
+}
+function exportXML() {
+  // Generate Plivo-compatible XML
+  // Find root menu node (one with no incoming connections)
+  const targetIds = new Set();
+  nodes.forEach(n => {
+    if (n.config.options) n.config.options.forEach(o => { if (o.targetId) targetIds.add(o.targetId); });
+  });
+  const roots = nodes.filter(n => n.type === 'menu' && !targetIds.has(n.id));
+  if (!roots.length && nodes.length) roots.push(nodes[0]);
+
+  const nodeMap = {};
+  nodes.forEach(n => nodeMap[n.id] = n);
+
+  function genXML(nodeId, visited = new Set()) {
+    if (visited.has(nodeId)) return `<!-- loop: ${nodeId} -->`;
+    visited.add(nodeId);
+    const node = nodeMap[nodeId];
+    if (!node) return '';
+
+    switch(node.type) {
+      case 'speak':
+        return `<Speak language="${node.config.language || 'en-IN'}">${node.config.text || ''}</Speak>\n`;
+      case 'menu':
+        let xml = '<GetDigits action="' + (node.config.options?.[0]?.digit ? node.config.options[0].digit : '1') + '"';
+        if (node.config.options) {
+          const digits = node.config.options.map(o => o.digit).filter(Boolean).join(',');
+          xml += ' numDigits="1"';
+        }
+        xml += '>\n';
+        if (node.config.playUrl) xml += `  <Play>${node.config.playUrl}</Play>\n`;
+        xml += '</GetDigits>\n';
+        // Responses
+        if (node.config.options) {
+          node.config.options.forEach(opt => {
+            if (opt.digit && opt.targetId) {
+              xml += `<Speak>${opt.label || ''}</Speak>\n`;
+              xml += genXML(opt.targetId, new Set(visited));
+            }
+          });
+        }
+        return xml;
+      case 'play':
+        return `<Play loop="${node.config.loop || 1}">${node.config.url || ''}</Play>\n`;
+      case 'transfer':
+        return `<Dial><Number>${node.config.number || ''}</Number></Dial>\n`;
+      case 'connect':
+        const callerXml = node.config.callerId ? ` callerId="${node.config.callerId}"` : '';
+        return `<Dial${callerXml}><Number>${node.config.number || ''}</Number></Dial>\n`;
+      case 'hangup':
+        return '<Hangup reason="rejected"/>\n';
+      default:
+        return '';
+    }
+  }
+
+  let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n';
+  if (roots.length) {
+    xml += '  <!-- Main IVR Flow -->\n';
+    roots.forEach(r => { xml += '  ' + genXML(r.id).replace(/\n/g, '\n  '); });
+  } else if (nodes.length) {
+    xml += '  ' + genXML(nodes[0].id).replace(/\n/g, '\n  ');
+  }
+  xml += '</Response>';
+  showModal('Plivo XML Export', xml);
+}
+
+function showModal(title, content) {
+  document.getElementById('exportTitle').textContent = title;
+  document.getElementById('exportContent').textContent = content;
+  document.getElementById('exportModal').style.display = 'flex';
+}
+function closeModal() {
+  document.getElementById('exportModal').style.display = 'none';
+}
+function copyExport() {
+  const text = document.getElementById('exportContent').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    closeModal();
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    closeModal();
+  });
+}
+function resetFlow() {
+  if (confirm('Clear the entire flow?')) { nodes = []; selectedId = null; nextId = 1; render(); }
+}
+
+// ---- Init ----
+document.getElementById('canvasWrap').addEventListener('click', canvasClick);
+document.getElementById('canvas').addEventListener('click', canvasClick);
+
+// Add sample flow for demo
+nodes = [
+  createNode('speak', 100, 100),
+  createNode('menu', 250, 100),
+  createNode('play', 100, 300),
+  createNode('transfer', 250, 300),
+  createNode('connect', 400, 300),
+  createNode('hangup', 550, 300),
+];
+nodes[0].label = 'Welcome Message';
+nodes[0].config.text = 'Thank you for calling. Press 1 for hours, 2 for sales, 3 for support, or 4 to leave a message.';
+nodes[0].config.language = 'en-IN';
+nodes[1].label = 'Main Menu';
+nodes[1].config.options = [
+  {digit:'1',label:'Hours & Info',targetId:nodes[2].id},
+  {digit:'2',label:'Sales Team',targetId:nodes[3].id},
+  {digit:'3',label:'Support',targetId:nodes[4].id},
+  {digit:'4',label:'Voicemail',targetId:nodes[5].id},
+];
+nodes[2].label = 'Hours Message';
+nodes[2].config.url = 'https://audio.example.com/hours.mp3';
+nodes[3].label = 'Sales Dept';
+nodes[3].config.number = '+1234567890';
+nodes[4].label = 'Support Line';
+nodes[4].config.number = '+1987654321';
+nodes[4].config.callerId = '+1555000001';
+selectNode(nodes[0].id);
+render();
+
+window.addEventListener('resize', () => { render(); });
+</script>
+</body>
+</html>

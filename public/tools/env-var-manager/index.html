@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Env Variable Manager</title>
+<style>
+:root {
+  --bg: #0f0f1a; --surface: #1a1a2e; --accent: #ff6b35;
+  --text: #e0e0e0; --text-muted: #8888aa; --green: #22c55e;
+  --red: #ef4444; --yellow: #eab308; --blue: #3b82f6;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg); color: var(--text); min-height: 100vh;
+}
+header {
+  background: var(--surface); padding: 16px 24px; display: flex;
+  align-items: center; justify-content: space-between;
+  border-bottom: 2px solid var(--accent);
+}
+header h1 { font-size: 1.2rem; color: var(--accent); }
+.lock-screen {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; min-height: 80vh; gap: 20px;
+}
+.lock-screen h2 { color: var(--text-muted); font-size: 1rem; }
+.lock-screen input {
+  background: var(--bg); border: 1px solid var(--surface);
+  color: var(--text); padding: 12px 20px; border-radius: 8px;
+  font-size: 1rem; width: 320px; outline: none; text-align: center;
+}
+.lock-screen input:focus { border-color: var(--accent); }
+.lock-screen button {
+  background: var(--accent); color: #fff; border: none;
+  padding: 12px 32px; border-radius: 8px; cursor: pointer;
+  font-size: 1rem; font-weight: 600;
+}
+.lock-screen .error { color: var(--red); font-size: 0.85rem; }
+.toolbar {
+  background: var(--surface); padding: 12px 24px; display: flex;
+  gap: 12px; align-items: center; flex-wrap: wrap;
+  border-bottom: 1px solid rgba(255,107,53,0.2);
+}
+.toolbar select, .toolbar button {
+  background: var(--bg); border: 1px solid var(--surface);
+  color: var(--text); padding: 8px 14px; border-radius: 6px;
+  cursor: pointer; font-size: 0.85rem;
+}
+.toolbar select:focus { border-color: var(--accent); }
+.toolbar button { background: var(--accent); border: none; color: #fff; font-weight: 600; }
+.toolbar button.outline { background: transparent; border: 1px solid var(--accent); color: var(--accent); }
+.env-table {
+  width: 100%; border-collapse: collapse; margin: 16px 0;
+}
+.env-table th, .env-table td {
+  text-align: left; padding: 10px 16px; border-bottom: 1px solid rgba(255,107,53,0.1);
+  font-size: 0.85rem;
+}
+.env-table th { color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; }
+.env-table .key { color: var(--accent); font-family: monospace; font-weight: 600; }
+.env-table .value { font-family: monospace; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.env-table .masked { color: var(--text-muted); font-style: italic; }
+.env-table .actions { display: flex; gap: 6px; }
+.env-table .actions button {
+  background: transparent; border: 1px solid var(--surface);
+  color: var(--text-muted); padding: 4px 8px; border-radius: 4px;
+  font-size: 0.7rem; cursor: pointer;
+}
+.env-table .actions button:hover { border-color: var(--accent); color: var(--accent); }
+.add-form {
+  display: flex; gap: 10px; padding: 16px 24px; align-items: center;
+}
+.add-form input {
+  background: var(--bg); border: 1px solid var(--surface);
+  color: var(--text); padding: 8px 12px; border-radius: 6px;
+  font-size: 0.85rem; outline: none;
+}
+.add-form input:focus { border-color: var(--accent); }
+.add-form .key-input { flex: 1; }
+.add-form .val-input { flex: 2; }
+.main-content { padding: 24px; max-width: 900px; margin: 0 auto; }
+.diff-panel {
+  position: fixed; top: 0; right: 0; bottom: 0; width: 480px;
+  background: var(--surface); border-left: 2px solid var(--accent);
+  z-index: 10; padding: 24px; overflow-y: auto; display: none;
+  box-shadow: -4px 0 20px rgba(0,0,0,0.5);
+}
+.diff-panel.active { display: block; }
+.diff-panel h3 { color: var(--accent); margin-bottom: 16px; }
+.diff-panel .close {
+  position: absolute; top: 12px; right: 16px; background: none;
+  border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer;
+}
+.diff-entry { padding: 8px 0; border-bottom: 1px solid rgba(255,107,53,0.1); font-size: 0.8rem; }
+.diff-entry .key { color: var(--accent); font-family: monospace; }
+.diff-entry .added { color: var(--green); }
+.diff-entry .removed { color: var(--red); }
+.diff-entry .changed { color: var(--yellow); }
+.unlock-notice {
+  background: rgba(255,107,53,0.1); padding: 8px 16px;
+  font-size: 0.75rem; color: var(--accent);
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+/* Responsive & Mobile - Universal */
+@media (max-width: 768px) {
+  html { font-size: 15px; }
+  body { flex-direction: column !important; }
+  .sidebar, aside, nav.sidebar { width: 100% !important; flex-direction: row !important; flex-wrap: wrap !important; padding: 10px !important; gap: 8px !important; border-right: none !important; border-bottom: 1px solid var(--border); }
+  .main, .content-area { padding: 12px !important; }
+  .cards, .card-grid { grid-template-columns: 1fr !important; }
+  .toolbar { flex-wrap: wrap !important; gap: 6px !important; }
+  .toolbar input, .toolbar select { flex: 1 1 100% !important; min-width: 0 !important; }
+  .pane { border-right: none !important; border-bottom: 1px solid var(--border); flex: none !important; height: 50vh !important; }
+  .pane:last-child { border-bottom: none !important; }
+  header { flex-wrap: wrap !important; gap: 8px !important; padding: 12px 16px !important; }
+  .sidebar-actions button { flex: 1 !important; min-width: 80px !important; }
+  .collection-list { flex-direction: row !important; flex-wrap: wrap !important; }
+  .tabs { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  .tab { padding: 10px 14px !important; white-space: nowrap !important; }
+  .modal { width: 90% !important; max-width: 400px !important; }
+  .summary-row { padding: 12px 16px !important; gap: 8px !important; }
+  .summary-card { min-width: 80px !important; padding: 10px 14px !important; }
+  .summary-card .value { font-size: 1.2rem !important; }
+  .add-form { flex-wrap: wrap !important; }
+  .add-form input { flex: 1 1 100% !important; }
+  .status-grid { padding: 0 16px 16px !important; }
+  .url-card { padding: 12px 16px !important; }
+  .url-header { flex-wrap: wrap !important; }
+  .url-name { font-size: 0.8rem !important; word-break: break-all !important; }
+  .form-group input, .form-group select { font-size: 16px !important; }
+}
+
+@media (max-width: 480px) {
+  html { font-size: 14px; }
+  .sidebar { padding: 8px !important; gap: 4px !important; }
+  .sidebar h2 { font-size: 11px !important; }
+  .main { padding: 8px !important; }
+  header h1 { font-size: 1rem !important; }
+  .toolbar { padding: 8px !important; }
+  .send-btn, button, .btn { min-height: 44px; min-width: 44px; padding: 10px 16px !important; font-size: 14px !important; }
+  .tabs { padding: 0 8px !important; }
+  .tab { padding: 8px 12px !important; font-size: 12px !important; }
+  .headers-panel { padding: 8px !important; }
+  .header-row { flex-wrap: wrap !important; }
+  .header-row input { flex: 1 1 100% !important; }
+  .pane { height: 40vh !important; }
+  .pane textarea { padding: 10px !important; font-size: 12px !important; }
+  .output-area { max-height: 60% !important; }
+  .response-area { padding: 8px !important; }
+  .response-body { padding: 8px !important; font-size: 12px !important; }
+  .collection-item { min-width: 100px !important; padding: 6px 8px !important; font-size: 12px !important; }
+  .summary-card { min-width: 70px !important; padding: 8px 10px !important; }
+  .summary-card .value { font-size: 1rem !important; }
+  .card { padding: 14px !important; }
+  .card .value { font-size: 1.3rem !important; }
+  .chart-container { padding: 12px !important; }
+  canvas { height: 180px !important; }
+  .modal { padding: 16px !important; }
+  .empty-state { padding: 40px 16px !important; }
+  button, .btn, input[type="submit"] { min-height: 44px; }
+}
+
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<header>
+  <h1>🔐 Env Variable Manager</h1>
+  <button onclick="lock()" style="background:transparent;border:1px solid var(--red);color:var(--red);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.8rem">Lock</button>
+</header>
+
+<div id="lockScreen" class="lock-screen">
+  <div>🔒</div>
+  <h2>Enter passphrase to unlock</h2>
+  <input id="passphrase" type="password" placeholder="Your encryption passphrase" onkeydown="if(event.key==='Enter')unlock()">
+  <button onclick="unlock()">Unlock</button>
+  <div class="error" id="lockError"></div>
+</div>
+
+<div id="appContent" style="display:none;">
+  <div class="toolbar">
+    <select id="envSelect" onchange="switchEnv()">
+      <option value="dev">🛠 Development</option>
+      <option value="staging">🧪 Staging</option>
+      <option value="prod">🚀 Production</option>
+    </select>
+    <button onclick="addVar()">+ Add Variable</button>
+    <button class="outline" onclick="importEnv()" title="Import .env file">📥 Import .env</button>
+    <button class="outline" onclick="exportEnv()" title="Export .env file">📤 Export .env</button>
+    <button class="outline" onclick="showDiff()">📊 Diff</button>
+    <span style="flex:1"></span>
+    <span style="font-size:0.75rem;color:var(--text-muted)" id="varCount"></span>
+    <input type="file" id="envFileInput" accept=".env,.txt" style="display:none" onchange="handleEnvImport(event)">
+  </div>
+  <div class="main-content">
+    <div class="add-form" id="addForm" style="display:none;">
+      <input class="key-input" id="newKey" placeholder="KEY_NAME" onkeydown="if(event.key==='Enter')addVar()">
+      <input class="val-input" id="newVal" placeholder="value" onkeydown="if(event.key==='Enter')addVar()">
+      <button onclick="addVar()">Save</button>
+      <button class="outline" onclick="document.getElementById('addForm').style.display='none'">Cancel</button>
+    </div>
+    <div id="tableContainer">
+      <table class="env-table">
+        <thead><tr><th>Key</th><th>Value</th><th width="120">Actions</th></tr></thead>
+        <tbody id="envBody"><tr><td colspan="3" style="color:var(--text-muted);text-align:center">No variables yet. Add one above.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="diff-panel" id="diffPanel">
+  <button class="close" onclick="document.getElementById('diffPanel').classList.remove('active')">&times;</button>
+  <h3>📊 Environment Diff</h3>
+  <div style="display:flex;gap:10px;margin-bottom:16px">
+    <select id="diffEnvA" style="flex:1;background:var(--bg);border:1px solid var(--surface);color:var(--text);padding:6px;border-radius:4px">
+      <option value="dev">Development</option>
+      <option value="staging">Staging</option>
+      <option value="prod">Production</option>
+    </select>
+    <span style="color:var(--text-muted);align-self:center">vs</span>
+    <select id="diffEnvB" style="flex:1;background:var(--bg);border:1px solid var(--surface);color:var(--text);padding:6px;border-radius:4px">
+      <option value="staging">Staging</option>
+      <option value="prod" selected>Production</option>
+      <option value="dev">Development</option>
+    </select>
+    <button onclick="runDiff()" style="background:var(--accent);border:none;color:#fff;padding:6px 12px;border-radius:4px;cursor:pointer">Compare</button>
+  </div>
+  <div id="diffResult"></div>
+</div>
+
+<script>
+const SALT = 'env-manager-salt-v1';
+let cryptoKey = null;
+let currentEnv = 'dev';
+let envData = { dev: {}, staging: {}, prod: {} };
+
+async function deriveKey(passphrase) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: enc.encode(SALT), iterations: 200000, hash: 'SHA-256' },
+    keyMaterial, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+  );
+}
+
+async function encrypt(plaintext) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const enc = new TextEncoder();
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, enc.encode(plaintext));
+  const combined = new Uint8Array(iv.length + ciphertext.byteLength);
+  combined.set(iv);
+  combined.set(new Uint8Array(ciphertext), iv.length);
+  return btoa(String.fromCharCode(...combined));
+}
+
+async function decrypt(encoded) {
+  const combined = Uint8Array.from(atob(encoded), c => c.charCodeAt(0));
+  const iv = combined.slice(0, 12);
+  const ciphertext = combined.slice(12);
+  const dec = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, ciphertext);
+  return new TextDecoder().decode(dec);
+}
+
+function storageKey(env) { return `envmgr_${env}_enc`; }
+
+async function loadEnvData() {
+  for (const env of ['dev', 'staging', 'prod']) {
+    const enc = localStorage.getItem(storageKey(env));
+    if (enc) {
+      try { envData[env] = JSON.parse(await decrypt(enc)); }
+      catch(e) { envData[env] = {}; }
+    }
+  }
+}
+
+async function saveEnvData(env) {
+  const enc = await encrypt(JSON.stringify(envData[env]));
+  localStorage.setItem(storageKey(env), enc);
+}
+
+async function unlock() {
+  const pass = document.getElementById('passphrase').value;
+  if (!pass) return;
+  try {
+    cryptoKey = await deriveKey(pass);
+    await loadEnvData();
+    document.getElementById('lockScreen').style.display = 'none';
+    document.getElementById('appContent').style.display = 'block';
+    switchEnv();
+  } catch(e) {
+    document.getElementById('lockError').textContent = 'Wrong passphrase or corrupted data.';
+  }
+}
+
+function lock() {
+  cryptoKey = null;
+  envData = { dev: {}, staging: {}, prod: {} };
+  document.getElementById('lockScreen').style.display = 'flex';
+  document.getElementById('appContent').style.display = 'none';
+  document.getElementById('passphrase').value = '';
+  document.getElementById('lockError').textContent = '';
+}
+
+function switchEnv() {
+  currentEnv = document.getElementById('envSelect').value;
+  renderTable();
+}
+
+function renderTable() {
+  const vars = envData[currentEnv] || {};
+  const entries = Object.entries(vars).sort(([a],[b]) => a.localeCompare(b));
+  const tbody = document.getElementById('envBody');
+  document.getElementById('varCount').textContent = `${entries.length} variable(s)`;
+
+  if (entries.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text-muted);text-align:center">No variables yet.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = entries.map(([key, val]) => `
+<tr>
+  <td class="key">${escapeHtml(key)}</td>
+  <td class="value masked" id="val-${escapeAttr(key)}" title="Click to reveal" onclick="revealValue('${escapeAttr(key)}')">••••••••</td>
+  <td class="actions">
+    <button onclick="copyValue('${escapeAttr(key)}')" title="Copy">📋</button>
+    <button onclick="editVar('${escapeAttr(key)}')" title="Edit">✏️</button>
+    <button onclick="deleteVar('${escapeAttr(key)}')" title="Delete" style="color:var(--red)">🗑</button>
+  </td>
+</tr>`).join('');
+}
+
+function revealValue(key) {
+  const td = document.getElementById('val-' + key);
+  if (td.classList.contains('masked')) {
+    td.textContent = envData[currentEnv][decodeURIComponent(key)] || '';
+    td.classList.remove('masked');
+  } else {
+    td.textContent = '••••••••';
+    td.classList.add('masked');
+    td.title = 'Click to reveal';
+  }
+}
+
+async function copyValue(key) {
+  const val = envData[currentEnv][decodeURIComponent(key)] || '';
+  await navigator.clipboard.writeText(val);
+  const btn = event.target;
+  const orig = btn.textContent;
+  btn.textContent = '✓';
+  setTimeout(() => btn.textContent = orig, 1000);
+}
+
+function editVar(key) {
+  const decoded = decodeURIComponent(key);
+  document.getElementById('newKey').value = decoded;
+  document.getElementById('newVal').value = envData[currentEnv][decoded] || '';
+  document.getElementById('addForm').style.display = 'flex';
+  document.getElementById('addForm').dataset.editKey = decoded;
+}
+
+async function addVar() {
+  const key = document.getElementById('newKey').value.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+  const val = document.getElementById('newVal').value;
+  if (!key) return;
+
+  const editKey = document.getElementById('addForm').dataset.editKey;
+  if (editKey && editKey !== key) {
+    delete envData[currentEnv][editKey];
+    document.getElementById('addForm').dataset.editKey = '';
+  }
+
+  envData[currentEnv][key] = val;
+  await saveEnvData(currentEnv);
+  document.getElementById('addForm').style.display = 'none';
+  document.getElementById('newKey').value = '';
+  document.getElementById('newVal').value = '';
+  renderTable();
+}
+
+async function deleteVar(key) {
+  if (!confirm(`Delete ${decodeURIComponent(key)}?`)) return;
+  delete envData[currentEnv][decodeURIComponent(key)];
+  await saveEnvData(currentEnv);
+  renderTable();
+}
+
+function showDiff() {
+  document.getElementById('diffPanel').classList.add('active');
+  runDiff();
+}
+
+function runDiff() {
+  const envA = document.getElementById('diffEnvA').value;
+  const envB = document.getElementById('diffEnvB').value;
+  const a = envData[envA] || {};
+  const b = envData[envB] || {};
+  const allKeys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  const result = document.getElementById('diffResult');
+
+  if (allKeys.size === 0) {
+    result.innerHTML = '<div style="color:var(--text-muted)">Both environments are empty.</div>';
+    return;
+  }
+
+  let html = `<div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">${envA} → ${envB}</div>`;
+  const sortedKeys = [...allKeys].sort();
+  for (const key of sortedKeys) {
+    const inA = key in a;
+    const inB = key in b;
+    if (!inA) {
+      html += `<div class="diff-entry"><span class="key">${escapeHtml(key)}</span> <span class="added">+ added in ${envB}</span></div>`;
+    } else if (!inB) {
+      html += `<div class="diff-entry"><span class="key">${escapeHtml(key)}</span> <span class="removed">− removed (only in ${envA})</span></div>`;
+    } else if (a[key] !== b[key]) {
+      html += `<div class="diff-entry"><span class="key">${escapeHtml(key)}</span> <span class="changed">changed</span></div>`;
+    } else {
+      html += `<div class="diff-entry"><span class="key">${escapeHtml(key)}</span> <span style="color:var(--text-muted)">unchanged</span></div>`;
+    }
+  }
+  result.innerHTML = html;
+}
+
+function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function escapeAttr(s) { return encodeURIComponent(s); }
+
+// Import .env file
+function importEnv() {
+  document.getElementById('envFileInput').click();
+}
+
+function handleEnvImport(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const content = e.target.result;
+    const lines = content.split('\n');
+    let imported = 0;
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line || line.startsWith('#')) continue;
+      const eqIdx = line.indexOf('=');
+      if (eqIdx === -1) continue;
+      const key = line.substring(0, eqIdx).trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+      const val = line.substring(eqIdx + 1).trim();
+      // Remove surrounding quotes if present
+      const cleaned = val.replace(/^['"]|['"]$/g, '');
+      if (key) {
+        envData[currentEnv][key] = cleaned;
+        imported++;
+      }
+    }
+    if (imported > 0) {
+      saveEnvData(currentEnv);
+      renderTable();
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+// Export .env file
+function exportEnv() {
+  const vars = envData[currentEnv] || {};
+  const entries = Object.entries(vars).sort(([a],[b]) => a.localeCompare(b));
+  if (entries.length === 0) {
+    alert('No variables to export.');
+    return;
+  }
+  const lines = entries.map(([key, val]) => `${key}=${val}`);
+  const content = '# Generated by Env Variable Manager\n' + lines.join('\n') + '\n';
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `.env.${currentEnv}`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+</script>
+</body>
+</html>

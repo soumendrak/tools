@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Config Diff + Validator</title>
+<style>
+:root {
+  --bg: #0f0f1a;
+  --surface: #1a1a2e;
+  --surface2: #222240;
+  --accent: #ff6b35;
+  --accent-dim: #cc5520;
+  --text: #e0e0e0;
+  --text-dim: #a0a0b0;
+  --border: #2a2a45;
+  --success: #2ecc71;
+  --error: #e74c3c;
+  --warning: #f39c12;
+  --info: #3498db;
+  --radius: 6px;
+  --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+  --diff-add: #2ecc7133;
+  --diff-del: #e74c3c33;
+  --diff-mod: #f39c1233;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+
+.header { display: flex; align-items: center; gap: 16px; padding: 16px 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.header h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+.header h1 span { color: var(--accent); }
+.format-select { padding: 8px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 13px; cursor: pointer; margin-left: auto; }
+.format-select:focus { outline: none; border-color: var(--accent); }
+.header button { padding: 8px 20px; background: var(--accent); border: none; border-radius: var(--radius); color: white; font-size: 13px; font-weight: 600; cursor: pointer; }
+.header button:hover { background: var(--accent-dim); }
+.header .clear-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text); }
+.header .clear-btn:hover { border-color: var(--accent); }
+
+.main-area { flex: 1; display: flex; overflow: hidden; }
+.pane { flex: 1; display: flex; flex-direction: column; border-right: 1px solid var(--border); }
+.pane:last-child { border-right: none; }
+.pane-header { padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text-dim); }
+.pane-header .dot { width: 8px; height: 8px; border-radius: 50%; }
+.pane-header .dot.left { background: var(--info); }
+.pane-header .dot.right { background: var(--accent); }
+.pane-header .status { margin-left: auto; font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+.pane-header .status.ok { background: #2ecc7122; color: #2ecc71; }
+.pane-header .status.err { background: #e74c3c22; color: #e74c3c; }
+.pane textarea { flex: 1; padding: 16px; background: var(--bg); border: none; color: var(--text); font-family: var(--mono); font-size: 13px; line-height: 1.6; resize: none; }
+.pane textarea:focus { outline: none; background: #0f0f1f; }
+
+.output-area { display: none; flex-direction: column; border-top: 1px solid var(--border); max-height: 45%; overflow: hidden; }
+.output-area.show { display: flex; }
+.output-tabs { display: flex; gap: 0; padding: 0 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.output-tab { padding: 10px 18px; font-size: 12px; cursor: pointer; color: var(--text-dim); border-bottom: 2px solid transparent; }
+.output-tab:hover { color: var(--text); }
+.output-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.output-content { flex: 1; overflow-y: auto; padding: 16px; font-family: var(--mono); font-size: 12px; display: none; }
+.output-content.active { display: block; }
+.diff-line { padding: 2px 12px; line-height: 1.6; border-left: 3px solid transparent; }
+.diff-line.added { background: var(--diff-add); border-left-color: #2ecc71; }
+.diff-line.removed { background: var(--diff-del); border-left-color: #e74c3c; }
+.diff-line.modified { background: var(--diff-mod); border-left-color: #f39c12; }
+.diff-line.modified-word { background: var(--diff-mod); border-left-color: #f39c12; padding: 4px 12px; }
+.diff-prefix { color: var(--text-dim); margin-right: 8px; }
+.diff-word-removed { background: #e74c3c55; border-radius: 3px; padding: 0 2px; border-bottom: 2px solid #e74c3c; }
+.diff-word-added { background: #2ecc7155; border-radius: 3px; padding: 0 2px; border-bottom: 2px solid #2ecc71; }
+.diff-word-marker { display: inline-block; width: 14px; text-align: center; color: var(--text-dim); font-size: 11px; user-select: none; }
+.validation-msg { padding: 4px 0; display: flex; gap: 8px; align-items: baseline; }
+.validation-msg .icon { width: 16px; }
+.validation-msg.warn { color: #f39c12; }
+.validation-msg.error { color: #e74c3c; }
+.validation-msg.info { color: var(--text-dim); }
+.no-diff { color: var(--text-dim); text-align: center; padding: 40px 0; }
+
+@media (max-width: 768px) {
+  .main-area { flex-direction: column; }
+  .pane { border-right: none; border-bottom: 1px solid var(--border); flex: none; height: 50%; }
+}
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+
+<div class="header">
+  <h1>Config <span>Diff</span> + Validator</h1>
+  <select class="format-select" id="formatSelect" onchange="onFormatChange()">
+    <option value="auto">Auto Detect</option>
+    <option value="json">JSON</option>
+    <option value="yaml">YAML</option>
+    <option value="toml">TOML</option>
+  </select>
+  <button class="clear-btn" onclick="clearAll()">Clear</button>
+  <button onclick="compare()">Compare & Validate</button>
+</div>
+
+<div class="main-area">
+  <div class="pane" id="leftPane">
+    <div class="pane-header">
+      <span class="dot left"></span> Original / Left
+      <span class="status ok" id="leftStatus">ready</span>
+    </div>
+    <textarea id="leftEditor" placeholder="Paste or type config here..." spellcheck="false"></textarea>
+  </div>
+  <div class="pane" id="rightPane">
+    <div class="pane-header">
+      <span class="dot right"></span> Modified / Right
+      <span class="status ok" id="rightStatus">ready</span>
+    </div>
+    <textarea id="rightEditor" placeholder="Paste or type config here..." spellcheck="false"></textarea>
+  </div>
+</div>
+
+<div class="output-area show" id="outputArea">
+  <div class="output-tabs">
+    <div class="output-tab active" data-out="diff" onclick="switchOutput('diff')">Diff View</div>
+    <div class="output-tab" data-out="leftValid" onclick="switchOutput('leftValid')">Left Validation</div>
+    <div class="output-tab" data-out="rightValid" onclick="switchOutput('rightValid')">Right Validation</div>
+  </div>
+  <div class="output-content active" id="out-diff"></div>
+  <div class="output-content" id="out-leftValid"></div>
+  <div class="output-content" id="out-rightValid"></div>
+</div>
+
+<script>
+let currentOut = 'diff';
+
+function switchOutput(tab) {
+  currentOut = tab;
+  document.querySelectorAll('.output-tab').forEach(t => t.classList.toggle('active', t.dataset.out === tab));
+  document.querySelectorAll('.output-content').forEach(c => c.classList.toggle('active', c.id === 'out-' + tab));
+}
+
+function clearAll() {
+  document.getElementById('leftEditor').value = '';
+  document.getElementById('rightEditor').value = '';
+  document.getElementById('out-diff').innerHTML = '';
+  document.getElementById('out-leftValid').innerHTML = '';
+  document.getElementById('out-rightValid').innerHTML = '';
+  document.getElementById('leftStatus').textContent = 'ready';
+  document.getElementById('leftStatus').className = 'status ok';
+  document.getElementById('rightStatus').textContent = 'ready';
+  document.getElementById('rightStatus').className = 'status ok';
+}
+
+function onFormatChange() {
+  compare();
+}
+
+function detectFormat(text) {
+  const t = text.trim();
+  if (!t) return 'json';
+  if (t.startsWith('{') || t.startsWith('[')) return 'json';
+  if (t.includes('+++') || t.includes('---') || t.includes('[[')) return 'toml';
+  return 'yaml';
+}
+
+function validateJSON(text) {
+  try { JSON.parse(text); return { valid: true, hints: [] }; }
+  catch(e) { return { valid: false, hints: [{ type: 'error', msg: e.message }] }; }
+}
+
+function validateYAML(text) {
+  const hints = [];
+  const lines = text.split('\n');
+  let valid = true;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line.trim() || line.trim().startsWith('#')) continue;
+    
+    // Check for tabs
+    if (line.match(/^\t/)) {
+      hints.push({ type: 'error', msg: `Line ${i+1}: Tabs are not allowed in YAML — use spaces` });
+      valid = false;
+    }
+    
+    // Check for suspicious patterns
+    if (line.match(/^\s*:\s/)) {
+      hints.push({ type: 'warn', msg: `Line ${i+1}: Key starts with colon — may be invalid` });
+    }
+    
+    // Check for missing space after colon
+    if (line.match(/^\s*\w+:\S/) && !line.match(/^\s*\w+:\s/)) {
+      hints.push({ type: 'warn', msg: `Line ${i+1}: Missing space after colon in key-value pair` });
+    }
+    
+    // Check for duplicate keys
+    const keyMatch = line.match(/^\s*([\w-]+)\s*:/);
+    if (keyMatch) {
+      const key = keyMatch[1];
+      for (let j = 0; j < i; j++) {
+        const prevMatch = lines[j].match(/^\s*([\w-]+)\s*:/);
+        if (prevMatch && prevMatch[1] === key) {
+          hints.push({ type: 'warn', msg: `Line ${i+1}: Duplicate key "${key}" (also on line ${j+1})` });
+        }
+      }
+    }
+  }
+  
+  if (text.trim() && !lines.some(l => l.match(/^\s*[\w-]+\s*:/) || l.match(/^\s*-\s/) || l.match(/^\s*#/))) {
+    hints.push({ type: 'warn', msg: 'No valid YAML key-value pairs or list items detected' });
+  }
+  
+  return { valid, hints };
+}
+
+function validateTOML(text) {
+  const hints = [];
+  const lines = text.split('\n');
+  let valid = true;
+  let inArray = false;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line.trim() || line.trim().startsWith('#')) continue;
+    
+    // Check for tabs
+    if (line.match(/^\t/)) {
+      hints.push({ type: 'warn', msg: `Line ${i+1}: Tabs found — TOML prefers spaces` });
+    }
+    
+    // Track array sections
+    if (line.includes('[[') && !line.includes(']]')) {
+      hints.push({ type: 'warn', msg: `Line ${i+1}: Unclosed [[ double bracket` });
+      valid = false;
+    }
+    
+    // Key = value check
+    if (line.match(/=/) && !line.match(/^\[/) && !line.match(/^\s*#/)) {
+      if (!line.match(/^\s*[\w."-]+\s*=\s*/)) {
+        hints.push({ type: 'warn', msg: `Line ${i+1}: Unusual key=value format` });
+      }
+    }
+  }
+  
+  if (text.trim() && !lines.some(l => l.match(/^\s*[\w."-]+\s*=\s*/) || l.match(/^\s*\[/) || l.match(/^\s*#/))) {
+    hints.push({ type: 'warn', msg: 'No valid TOML key-value pairs or [sections] detected' });
+  }
+  
+  return { valid, hints };
+}
+
+function validate(text, format) {
+  if (!text.trim()) return { valid: true, hints: [{ type: 'info', msg: '(empty — nothing to validate)' }] };
+  switch (format) {
+    case 'json': return validateJSON(text);
+    case 'yaml': return validateYAML(text);
+    case 'toml': return validateTOML(text);
+    default: return { valid: true, hints: [{ type: 'info', msg: 'Unknown format' }] };
+  }
+}
+
+// Simple line-based diff (Myers-style LCS)
+function computeDiff(left, right) {
+  const leftLines = left.split('\n');
+  const rightLines = right.split('\n');
+  
+  const lcs = buildLCS(leftLines, rightLines);
+  
+  const diff = [];
+  let li = 0, ri = 0, lci = 0;
+  
+  while (li < leftLines.length || ri < rightLines.length) {
+    if (lci < lcs.length && li < leftLines.length && ri < rightLines.length && leftLines[li] === lcs[lci] && rightLines[ri] === lcs[lci]) {
+      diff.push({ type: 'same', left: leftLines[li], right: rightLines[ri] });
+      li++; ri++; lci++;
+    } else if (li < leftLines.length && (lci >= lcs.length || leftLines[li] !== lcs[lci])) {
+      const nextRi = rightLines.indexOf(leftLines[li], ri);
+      if (nextRi !== -1 && nextRi > ri) {
+        // Extra lines in right first
+        for (let k = ri; k < nextRi; k++) {
+          diff.push({ type: 'added', left: '', right: rightLines[k] });
+        }
+        ri = nextRi;
+      } else {
+        diff.push({ type: 'removed', left: leftLines[li], right: '' });
+        li++;
+      }
+    } else if (ri < rightLines.length) {
+      diff.push({ type: 'added', left: '', right: rightLines[ri] });
+      ri++;
+    } else {
+      break;
+    }
+  }
+  
+  return diff;
+}
+
+function buildLCS(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array(m+1).fill(null).map(() => Array(n+1).fill(0));
+  for (let i = m-1; i >= 0; i--)
+    for (let j = n-1; j >= 0; j--)
+      dp[i][j] = a[i] === b[j] ? 1 + dp[i+1][j+1] : Math.max(dp[i+1][j], dp[i][j+1]);
+  
+  const result = [];
+  let i = 0, j = 0;
+  while (i < m && j < n) {
+    if (a[i] === b[j]) { result.push(a[i]); i++; j++; }
+    else if (dp[i+1][j] >= dp[i][j+1]) i++;
+    else j++;
+  }
+  return result;
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// Word-level diff (LCS on whitespace tokens)
+function wordDiffWords(oldLine, newLine) {
+  const oldWords = oldLine.split(/(\s+)/);
+  const newWords = newLine.split(/(\s+)/);
+  const m = oldWords.length, n = newWords.length;
+  const dp = Array(m+1).fill(null).map(() => Array(n+1).fill(0));
+  for (let i = m-1; i >= 0; i--)
+    for (let j = n-1; j >= 0; j--)
+      dp[i][j] = oldWords[i] === newWords[j] ? 1 + dp[i+1][j+1] : Math.max(dp[i+1][j], dp[i][j+1]);
+  const lcs = [];
+  let i = 0, j = 0;
+  const oldStatus = Array(m).fill(false);
+  const newStatus = Array(n).fill(false);
+  while (i < m && j < n) {
+    if (oldWords[i] === newWords[j]) { lcs.push(oldWords[i]); oldStatus[i]=true; newStatus[j]=true; i++; j++; }
+    else if (dp[i+1][j] >= dp[i][j+1]) i++;
+    else j++;
+  }
+  return {
+    oldWords: oldWords.map((w, idx) => ({ word: w, matched: oldStatus[idx] })),
+    newWords: newWords.map((w, idx) => ({ word: w, matched: newStatus[idx] }))
+  };
+}
+
+function renderWordDiffLine(oldLine, newLine) {
+  const { oldWords, newWords } = wordDiffWords(oldLine, newLine);
+  const oldHtml = oldWords.map(w => w.matched ? esc(w.word) : `<span class="diff-word-removed">${esc(w.word)}</span>`).join('');
+  const newHtml = newWords.map(w => w.matched ? esc(w.word) : `<span class="diff-word-added">${esc(w.word)}</span>`).join('');
+  return `<div class="diff-line modified-word"><span class="diff-word-marker">−</span> ${oldHtml}</div>
+<div class="diff-line modified-word"><span class="diff-word-marker">+</span> ${newHtml}</div>`;
+}
+
+function compare() {
+  const leftText = document.getElementById('leftEditor').value;
+  const rightText = document.getElementById('rightEditor').value;
+  const fmtSelect = document.getElementById('formatSelect').value;
+  
+  // Detect format
+  const fmt = fmtSelect === 'auto' ? detectFormat(leftText || rightText) : fmtSelect;
+  
+  // Validate both
+  const leftVal = validate(leftText, fmt);
+  const rightVal = validate(rightText, fmt);
+  
+  // Update status badges
+  const leftStatus = document.getElementById('leftStatus');
+  const rightStatus = document.getElementById('rightStatus');
+  leftStatus.textContent = leftVal.valid ? 'valid' : 'errors';
+  leftStatus.className = 'status ' + (leftVal.valid ? 'ok' : 'err');
+  rightStatus.textContent = rightVal.valid ? 'valid' : 'errors';
+  rightStatus.className = 'status ' + (rightVal.valid ? 'ok' : 'err');
+  
+  // Render diff
+  const diffDiv = document.getElementById('out-diff');
+  if (!leftText.trim() && !rightText.trim()) {
+    diffDiv.innerHTML = '<div class="no-diff">Enter config in both panes above, then click Compare</div>';
+  } else if (leftText === rightText) {
+    diffDiv.innerHTML = '<div class="no-diff" style="color:#2ecc71">Files are identical — no differences found</div>';
+  } else {
+    const diff = computeDiff(leftText, rightText);
+    let rendered = '';
+    for (let di = 0; di < diff.length; di++) {
+      const d = diff[di];
+      // Check if this is a removed line followed by an added line (modification pair)
+      if (d.type === 'removed' && di + 1 < diff.length && diff[di+1].type === 'added') {
+        const next = diff[di+1];
+        // Check if lines share common words (ratio test)
+        const oldWords = d.left.split(/\s+/).filter(Boolean);
+        const newWords = next.right.split(/\s+/).filter(Boolean);
+        const common = oldWords.filter(w => newWords.includes(w)).length;
+        const maxLen = Math.max(oldWords.length, newWords.length);
+        const similarityRatio = maxLen > 0 ? common / maxLen : 0;
+        if (similarityRatio > 0.2 || oldWords.length === newWords.length) {
+          rendered += renderWordDiffLine(d.left, next.right);
+          di++; // skip the next added line
+          continue;
+        }
+      }
+      let cls = '', prefix = '';
+      if (d.type === 'removed') { cls = 'removed'; prefix = '- '; }
+      else if (d.type === 'added') { cls = 'added'; prefix = '+ '; }
+      else { prefix = '  '; }
+      const text = d.type === 'removed' ? d.left : d.right;
+      rendered += `<div class="diff-line ${cls}"><span class="diff-prefix">${prefix}</span>${esc(text || '')}</div>`;
+    }
+    diffDiv.innerHTML = rendered;
+  }
+  
+  // Render validation
+  function renderHints(hints, divId) {
+    const div = document.getElementById(divId);
+    div.innerHTML = hints.length === 0
+      ? '<div style="color:#2ecc71;padding:4px 0">No issues found</div>'
+      : hints.map(h => `<div class="validation-msg ${h.type}"><span class="icon">${h.type === 'error' ? '✕' : h.type === 'warn' ? '⚠' : 'ℹ'}</span>${esc(h.msg)}</div>`).join('');
+  }
+  renderHints(leftVal.hints, 'out-leftValid');
+  renderHints(rightVal.hints, 'out-rightValid');
+}
+
+// Run compare on input
+let debounceTimer;
+document.getElementById('leftEditor').addEventListener('input', () => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(compare, 300);
+});
+document.getElementById('rightEditor').addEventListener('input', () => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(compare, 300);
+});
+
+// Initial compare
+compare();
+</script>
+</body>
+</html>

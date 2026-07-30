@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Call Log Explorer</title>
+<style>
+:root {
+  --bg: #0f0f1a;
+  --surface: #1a1a2e;
+  --accent: #ff6b35;
+  --text: #e0e0e0;
+  --text-muted: #8888a0;
+  --border: #2a2a3e;
+  --danger: #e74c3c;
+  --success: #2ecc71;
+  --warning: #f39c12;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); display: flex; min-height: 100vh; }
+.sidebar { width: 240px; background: var(--surface); border-right: 1px solid var(--border); padding: 20px 0; display: flex; flex-direction: column; }
+.sidebar h1 { font-size: 1.1rem; padding: 0 20px 20px; color: var(--accent); border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+.sidebar a { display: block; padding: 10px 20px; color: var(--text-muted); text-decoration: none; font-size: 0.9rem; border-left: 3px solid transparent; transition: all 0.2s; cursor: pointer; }
+.sidebar a:hover, .sidebar a.active { color: var(--accent); background: rgba(255,107,53,0.08); border-left-color: var(--accent); }
+.main { flex: 1; padding: 30px; overflow-y: auto; }
+.page { display: none; }
+.page.active { display: block; }
+h2 { font-size: 1.3rem; margin-bottom: 20px; color: var(--text); }
+.dropzone { border: 2px dashed var(--border); border-radius: 16px; padding: 60px 20px; text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 20px; }
+.dropzone:hover, .dropzone.drag { border-color: var(--accent); background: rgba(255,107,53,0.05); }
+.dropzone .icon { font-size: 48px; margin-bottom: 12px; }
+.dropzone .desc { color: var(--text-muted); font-size: 0.9rem; }
+.dropzone .formats { color: var(--text-muted); font-size: 0.75rem; margin-top: 8px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 24px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+.card .label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.card .value { font-size: 1.4rem; font-weight: 700; color: var(--accent); }
+.flex { display: flex; gap: 10px; align-items: center; }
+.mb-16 { margin-bottom: 16px; }
+.mt-16 { margin-top: 16px; }
+input.search { width: 100%; padding: 10px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.9rem; outline: none; }
+input.search:focus { border-color: var(--accent); }
+.btn { padding: 10px 20px; background: var(--accent); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 600; transition: opacity 0.2s; }
+.btn:hover { opacity: 0.9; }
+.btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+.btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+.table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: auto; max-height: 60vh; }
+table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+th { position: sticky; top: 0; background: var(--surface); padding: 12px 14px; text-align: left; color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.5px; border-bottom: 2px solid var(--accent); z-index: 1; }
+td { padding: 10px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+tr:hover td { background: rgba(255,107,53,0.04); }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+.chart-container h3 { font-size: 0.95rem; color: var(--text-muted); margin-bottom: 12px; }
+canvas { width: 100%; height: 250px; }
+.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+.badge-answered { background: rgba(46,204,113,0.2); color: var(--success); }
+.badge-busy { background: rgba(243,156,18,0.2); color: var(--warning); }
+.badge-noanswer { background: rgba(231,76,60,0.2); color: var(--danger); }
+.badge-failed { background: rgba(231,76,60,0.3); color: var(--danger); }
+.badge-outbound { background: rgba(52,152,219,0.2); color: #3498db; }
+.badge-inbound { background: rgba(155,89,182,0.2); color: #9b59b6; }
+
+/* Responsive & Mobile - Universal */
+@media (max-width: 768px) {
+  html { font-size: 15px; }
+  body { flex-direction: column !important; }
+  .sidebar, aside, nav.sidebar { width: 100% !important; flex-direction: row !important; flex-wrap: wrap !important; padding: 10px !important; gap: 8px !important; border-right: none !important; border-bottom: 1px solid var(--border); }
+  .main, .content-area { padding: 12px !important; }
+  .cards, .card-grid { grid-template-columns: 1fr !important; }
+  .toolbar { flex-wrap: wrap !important; gap: 6px !important; }
+  .toolbar input, .toolbar select { flex: 1 1 100% !important; min-width: 0 !important; }
+  .pane { border-right: none !important; border-bottom: 1px solid var(--border); flex: none !important; height: 50vh !important; }
+  .pane:last-child { border-bottom: none !important; }
+  header { flex-wrap: wrap !important; gap: 8px !important; padding: 12px 16px !important; }
+  .sidebar-actions button { flex: 1 !important; min-width: 80px !important; }
+  .collection-list { flex-direction: row !important; flex-wrap: wrap !important; }
+  .tabs { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  .tab { padding: 10px 14px !important; white-space: nowrap !important; }
+  .modal { width: 90% !important; max-width: 400px !important; }
+  .summary-row { padding: 12px 16px !important; gap: 8px !important; }
+  .summary-card { min-width: 80px !important; padding: 10px 14px !important; }
+  .summary-card .value { font-size: 1.2rem !important; }
+  .add-form { flex-wrap: wrap !important; }
+  .add-form input { flex: 1 1 100% !important; }
+  .status-grid { padding: 0 16px 16px !important; }
+  .url-card { padding: 12px 16px !important; }
+  .url-header { flex-wrap: wrap !important; }
+  .url-name { font-size: 0.8rem !important; word-break: break-all !important; }
+  .form-group input, .form-group select { font-size: 16px !important; }
+}
+
+@media (max-width: 480px) {
+  html { font-size: 14px; }
+  .sidebar { padding: 8px !important; gap: 4px !important; }
+  .sidebar h2 { font-size: 11px !important; }
+  .main { padding: 8px !important; }
+  header h1 { font-size: 1rem !important; }
+  .toolbar { padding: 8px !important; }
+  .send-btn, button, .btn { min-height: 44px; min-width: 44px; padding: 10px 16px !important; font-size: 14px !important; }
+  .tabs { padding: 0 8px !important; }
+  .tab { padding: 8px 12px !important; font-size: 12px !important; }
+  .headers-panel { padding: 8px !important; }
+  .header-row { flex-wrap: wrap !important; }
+  .header-row input { flex: 1 1 100% !important; }
+  .pane { height: 40vh !important; }
+  .pane textarea { padding: 10px !important; font-size: 12px !important; }
+  .output-area { max-height: 60% !important; }
+  .response-area { padding: 8px !important; }
+  .response-body { padding: 8px !important; font-size: 12px !important; }
+  .collection-item { min-width: 100px !important; padding: 6px 8px !important; font-size: 12px !important; }
+  .summary-card { min-width: 70px !important; padding: 8px 10px !important; }
+  .summary-card .value { font-size: 1rem !important; }
+  .card { padding: 14px !important; }
+  .card .value { font-size: 1.3rem !important; }
+  .chart-container { padding: 12px !important; }
+  canvas { height: 180px !important; }
+  .modal { padding: 16px !important; }
+  .empty-state { padding: 40px 16px !important; }
+  button, .btn, input[type="submit"] { min-height: 44px; }
+}
+
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<div class="sidebar">
+  <h1>📞 Call Explorer</h1>
+  <a class="active" data-page="upload">📤 Upload</a>
+  <a data-page="table">📋 Table</a>
+  <a data-page="charts">📊 Charts</a>
+</div>
+<div class="main">
+  <div id="upload" class="page active">
+    <h2>Upload Plivo CDR Data</h2>
+    <div class="dropzone" id="dropzone">
+      <div class="icon">📁</div>
+      <div class="desc">Drag & drop a Plivo CDR JSON or CSV file here</div>
+      <div class="formats">Accepted: .json, .csv</div>
+    </div>
+    <input type="file" id="fileInput" accept=".json,.csv" style="display:none;">
+    <div class="cards" id="uploadStats"></div>
+    <div id="uploadPreview" class="table-wrap" style="max-height:300px;"></div>
+  </div>
+  <div id="table" class="page">
+    <h2>Call Records</h2>
+    <div class="flex mb-16">
+      <input type="text" class="search" id="searchInput" placeholder="🔍 Search all fields..." oninput="renderTable()">
+      <button class="btn btn-sm btn-outline" onclick="exportFilteredCSV()">📥 Export</button>
+    </div>
+    <div style="color:var(--text-muted);font-size:0.8rem;margin-bottom:8px;" id="recordCount"></div>
+    <div class="table-wrap" id="tableContainer"></div>
+  </div>
+  <div id="charts" class="page">
+    <h2>Call Analytics</h2>
+    <div class="chart-container">
+      <h3>Daily Call Volume Trend</h3>
+      <div class="flex mb-16">
+        <select id="trendDirectionFilter" onchange="renderTrendChart()" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 12px;font-size:0.85rem;outline:none;">
+          <option value="all">All Calls</option>
+          <option value="inbound">Inbound Only</option>
+          <option value="outbound">Outbound Only</option>
+        </select>
+      </div>
+      <canvas id="trendChart"></canvas>
+    </div>
+    <div class="chart-container">
+      <h3>Call Outcomes</h3>
+      <canvas id="outcomeChart"></canvas>
+    </div>
+    <div class="chart-container">
+      <h3>Call Direction</h3>
+      <canvas id="directionChart"></canvas>
+    </div>
+    <div class="chart-container">
+      <h3>Duration Distribution</h3>
+      <canvas id="durationChart"></canvas>
+    </div>
+  </div>
+</div>
+<script>
+let records = [];
+let columns = [];
+
+// Escape imported CSV/CDR values before interpolating into innerHTML — a crafted
+// file (e.g. a cell containing <img src=x onerror=...>) must not execute here.
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// ---- Navigation ----
+document.querySelectorAll('.sidebar a').forEach(a => {
+  a.addEventListener('click', () => {
+    document.querySelectorAll('.sidebar a').forEach(x => x.classList.remove('active'));
+    a.classList.add('active');
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById(a.dataset.page).classList.add('active');
+    if (a.dataset.page === 'upload') renderUpload();
+    if (a.dataset.page === 'table') renderTable();
+    if (a.dataset.page === 'charts') renderCharts();
+  });
+});
+
+// ---- Drag & Drop ----
+const dropzone = document.getElementById('dropzone');
+dropzone.addEventListener('click', () => document.getElementById('fileInput').click());
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) processFile(file);
+});
+document.getElementById('fileInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (file) processFile(file);
+});
+
+// ---- File Processing ----
+async function processFile(file) {
+  const text = await file.text();
+  if (file.name.endsWith('.json')) {
+    try {
+      let data = JSON.parse(text);
+      if (!Array.isArray(data)) data = data.data || data.records || data.calls || data.cdr || [data];
+      if (!Array.isArray(data)) throw new Error('Could not extract array from JSON');
+      records = data;
+      columns = records.length ? Object.keys(records[0]) : [];
+    } catch(e) {
+      alert('Invalid JSON: ' + e.message);
+      return;
+    }
+  } else if (file.name.endsWith('.csv')) {
+    const lines = text.trim().split('\n');
+    if (lines.length < 2) { alert('CSV must have header + data'); return; }
+    // Parse CSV (handle quoted fields)
+    const parseCSVLine = (line) => {
+      const result = [];
+      let current = '', inQuotes = false;
+      for (const ch of line) {
+        if (ch === '"') { inQuotes = !inQuotes; }
+        else if (ch === ',' && !inQuotes) { result.push(current.trim()); current = ''; }
+        else { current += ch; }
+      }
+      result.push(current.trim());
+      return result;
+    };
+    columns = parseCSVLine(lines[0]).map(c => c.replace(/^"|"$/g,'').trim());
+    records = lines.slice(1).filter(l => l.trim()).map(line => {
+      const vals = parseCSVLine(line);
+      const obj = {};
+      columns.forEach((c, i) => obj[c] = vals[i] || '');
+      return obj;
+    });
+  }
+  renderUpload();
+  renderTable();
+}
+
+// ---- Field detection helpers ----
+function findField(names) {
+  for (const n of names) {
+    const found = columns.find(c => c.toLowerCase() === n.toLowerCase());
+    if (found) return found;
+  }
+  for (const n of names) {
+    const found = columns.find(c => c.toLowerCase().includes(n.toLowerCase()));
+    if (found) return found;
+  }
+  return null;
+}
+
+function getNum(r, field) { const v = r[field]; return v !== undefined ? (parseFloat(v) || 0) : 0; }
+function getStr(r, field) { return (r[field] || '').toString().toLowerCase(); }
+
+// ---- Upload view ----
+function renderUpload() {
+  const stats = document.getElementById('uploadStats');
+  const preview = document.getElementById('uploadPreview');
+  if (!records.length) {
+    stats.innerHTML = '<div class="card"><div class="label">Status</div><div class="value" style="color:var(--text-muted);">No data</div></div>';
+    preview.innerHTML = '';
+    return;
+  }
+  const costField = findField(['total_amount','totalamount','cost','amount','billed_amount']);
+  const durField = findField(['bill_duration','billduration','call_duration','callduration','duration']);
+  const dirField = findField(['call_direction','calldirection','direction']);
+  const outcomeField = findField(['hangup_cause','hangupcause','call_status','callstatus','status']);
+
+  const totalCost = records.reduce((s, r) => s + getNum(r, costField), 0);
+  const totalDur = records.reduce((s, r) => s + getNum(r, durField), 0);
+  const totalCalls = records.length;
+  const outbound = records.filter(r => getStr(r, dirField) === 'outbound').length;
+  const inbound = records.filter(r => getStr(r, dirField) === 'inbound').length;
+
+  stats.innerHTML = `
+    <div class="card"><div class="label">Total Calls</div><div class="value">${totalCalls.toLocaleString()}</div></div>
+    <div class="card"><div class="label">Total Cost</div><div class="value">$${totalCost.toFixed(2)}</div></div>
+    <div class="card"><div class="label">Total Duration</div><div class="value">${Math.round(totalDur/60)} min</div></div>
+    <div class="card"><div class="label">Out / In</div><div class="value">${outbound} / ${inbound}</div></div>
+    <div class="card"><div class="label">Columns</div><div class="value">${columns.length}</div></div>
+  `;
+
+  preview.innerHTML = `<table><thead><tr>${columns.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${
+    records.slice(0, 10).map(r => `<tr>${columns.map(c => `<td>${esc(r[c] || '')}</td>`).join('')}</tr>`).join('')
+  }${records.length > 10 ? `<tr><td colspan="${columns.length}" style="color:var(--text-muted);text-align:center;">... +${records.length - 10} more rows</td></tr>` : ''}</tbody></table>`;
+}
+
+// ---- Table view ----
+function renderTable() {
+  const search = (document.getElementById('searchInput')?.value || '').toLowerCase();
+  let filtered = records;
+  if (search) {
+    filtered = records.filter(r =>
+      columns.some(c => (r[c] || '').toString().toLowerCase().includes(search))
+    );
+  }
+  document.getElementById('recordCount').textContent = `Showing ${filtered.length} of ${records.length} records`;
+
+  const costField = findField(['total_amount','totalamount','cost','amount']);
+  const durField = findField(['bill_duration','billduration','call_duration','callduration','duration']);
+  const outcomeField = findField(['hangup_cause','hangupcause','call_status','callstatus','status']);
+  const dirField = findField(['call_direction','calldirection','direction']);
+
+  // Determine which columns to show (prioritize useful ones)
+  let showCols = columns;
+  const priority = ['from_number','to_number','call_direction','total_amount','bill_duration','hangup_cause','start_time','end_time','call_uuid'];
+  const ordered = [...new Set([...priority.filter(c => columns.includes(c)), ...columns])];
+  showCols = ordered;
+
+  const formatVal = (r, col) => {
+    const v = r[col] || '';
+    if (col === costField) return `<span style="color:var(--accent);font-weight:600;">$${parseFloat(v).toFixed(4)}</span>`;
+    if (col === durField) return `${Math.round(parseFloat(v) || 0)}s`;
+    if (col === dirField) {
+      const cls = (v+'').toLowerCase().includes('out') ? 'badge-outbound' : 'badge-inbound';
+      return `<span class="badge ${cls}">${esc(v)}</span>`;
+    }
+    if (col === outcomeField) {
+      const lc = (v+'').toLowerCase();
+      let cls = 'badge-answered';
+      if (lc.includes('busy')) cls = 'badge-busy';
+      else if (lc.includes('no_answer') || lc.includes('no answer')) cls = 'badge-noanswer';
+      else if (lc.includes('failed') || lc.includes('error')) cls = 'badge-failed';
+      return `<span class="badge ${cls}">${esc(v)}</span>`;
+    }
+    return esc(v);
+  };
+
+  document.getElementById('tableContainer').innerHTML = `
+    <table><thead><tr>${showCols.map(c => `<th>${esc(c.replace(/_/g,' '))}</th>`).join('')}</tr></thead>
+    <tbody>${filtered.map(r => `<tr>${showCols.map(c => `<td>${formatVal(r, c)}</td>`).join('')}</tr>`).join('')}</tbody></table>
+  `;
+}
+
+function exportFilteredCSV() {
+  const search = (document.getElementById('searchInput')?.value || '').toLowerCase();
+  let filtered = records;
+  if (search) filtered = records.filter(r => columns.some(c => (r[c]||'').toString().toLowerCase().includes(search)));
+  const csv = columns.join(',') + '\n' + filtered.map(r => columns.map(c => {
+    const v = (r[c]||'').toString();
+    return v.includes(',') || v.includes('"') ? `"${v.replace(/"/g,'""')}"` : v;
+  }).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'cdr-export.csv'; a.click();
+}
+
+// ---- Charts ----
+function drawPie(canvasId, labels, values) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 250 * dpr;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = '250px';
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = 250;
+  const cx = W * 0.35, cy = H/2, r = Math.min(cx - 20, cy - 20);
+  const colors = ['#2ecc71','#e74c3c','#f39c12','#ff6b35','#3498db','#9b59b6','#1abc9c','#e67e22'];
+  const total = values.reduce((a,b)=>a+b,0);
+  ctx.clearRect(0,0,W,H);
+  if (!total) { ctx.fillStyle='#8888a0'; ctx.font='14px sans-serif'; ctx.fillText('No data',cx-30,cy); return; }
+  let angle = -Math.PI/2;
+  values.forEach((v,i) => {
+    const slice = (v/total)*Math.PI*2;
+    ctx.fillStyle = colors[i%colors.length];
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,r,angle,angle+slice); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#0f0f1a'; ctx.lineWidth=2; ctx.stroke();
+    angle += slice;
+  });
+  let ly = 20;
+  values.forEach((v,i) => {
+    if (!v) return;
+    ctx.fillStyle = colors[i%colors.length];
+    ctx.fillRect(W*0.65,ly,12,12);
+    ctx.fillStyle='#e0e0e0'; ctx.font='12px sans-serif';
+    ctx.fillText(`${labels[i]}: ${v} (${((v/total)*100).toFixed(1)}%)`, W*0.65+20, ly+11);
+    ly += 24;
+  });
+}
+
+function drawHistogram(canvasId, data, bins, label) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 250 * dpr;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = '250px';
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = 250;
+  const pad = {top:20,right:20,bottom:40,left:60};
+  const cw = W-pad.left-pad.right, ch = H-pad.top-pad.bottom;
+  ctx.clearRect(0,0,W,H);
+  if (!data.length) { ctx.fillStyle='#8888a0'; ctx.font='14px sans-serif'; ctx.fillText('No data',pad.left,H/2); return; }
+  const max = Math.max(...bins, 1);
+  const barW = cw / bins.length - 2;
+  bins.forEach((v,i) => {
+    const x = pad.left + i * (cw/bins.length) + 1;
+    const h = (v/max)*ch;
+    ctx.fillStyle = '#ff6b35';
+    ctx.beginPath(); ctx.roundRect(x, pad.top+ch-h, barW, h, 3); ctx.fill();
+    if (i % Math.max(1, Math.floor(bins.length/6)) === 0) {
+      ctx.fillStyle='#8888a0'; ctx.font='10px sans-serif'; ctx.textAlign='center';
+      ctx.fillText(label[i] || '', x+barW/2, H-10);
+    }
+  });
+}
+
+function renderTrendChart() {
+  const canvas = document.getElementById('trendChart');
+  if (!canvas || !records.length) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 250 * dpr;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = '250px';
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = 250;
+  const pad = {top:20,right:20,bottom:50,left:60};
+  const cw = W-pad.left-pad.right, ch = H-pad.top-pad.bottom;
+  ctx.clearRect(0,0,W,H);
+
+  const dirField = findField(['call_direction','calldirection','direction']);
+  const startField = findField(['start_time','starttime','call_time','calltime']);
+  const endField = findField(['end_time','endtime']);
+  const filter = document.getElementById('trendDirectionFilter')?.value || 'all';
+
+  // Filter by direction
+  let filtered = records;
+  if (filter !== 'all') {
+    filtered = records.filter(r => getStr(r, dirField) === filter);
+  }
+
+  // Parse dates and count per day
+  const dayCounts = {};
+  filtered.forEach(r => {
+    let dateStr = '';
+    const st = r[startField];
+    if (st) {
+      const d = new Date(st);
+      if (!isNaN(d.getTime())) {
+        dateStr = d.toISOString().split('T')[0];
+      } else if (typeof st === 'string' && st.length >= 10) {
+        dateStr = st.substring(0, 10);
+      }
+    }
+    if (!dateStr && r[endField]) {
+      const d = new Date(r[endField]);
+      if (!isNaN(d.getTime())) dateStr = d.toISOString().split('T')[0];
+    }
+    if (dateStr) {
+      dayCounts[dateStr] = (dayCounts[dateStr] || 0) + 1;
+    }
+  });
+
+  const dates = Object.keys(dayCounts).sort();
+  if (!dates.length) {
+    ctx.fillStyle='#8888a0'; ctx.font='14px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('No date data available', W/2, H/2);
+    return;
+  }
+
+  const values = dates.map(d => dayCounts[d]);
+  const maxVal = Math.max(...values);
+
+  // Axes
+  ctx.strokeStyle = '#2a2a3e'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.left, pad.top); ctx.lineTo(pad.left, pad.top+ch); ctx.lineTo(pad.left+cw, pad.top+ch); ctx.stroke();
+
+  // Y-axis labels
+  ctx.fillStyle='#8888a0'; ctx.font='10px sans-serif'; ctx.textAlign='right';
+  const ySteps = Math.min(5, Math.max(2, Math.floor(maxVal/3)));
+  const yStepVal = Math.ceil(maxVal / ySteps / 5) * 5 || 1;
+  for (let v = 0; v <= maxVal; v += yStepVal) {
+    const y = pad.top + ch - (v/maxVal)*ch;
+    ctx.fillText(String(v), pad.left-6, y+3);
+    ctx.strokeStyle='#1a1a2e'; ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left+cw, y); ctx.stroke();
+  }
+
+  // X-axis labels
+  ctx.textAlign = 'center';
+  const maxLabels = Math.min(dates.length, Math.floor(cw / 70));
+  const labelStep = Math.max(1, Math.floor(dates.length / maxLabels));
+  dates.forEach((d, i) => {
+    if (i % labelStep === 0 || i === dates.length-1) {
+      const x = pad.left + (i/dates.length)*cw;
+      ctx.fillStyle='#8888a0'; ctx.font='10px sans-serif';
+      ctx.fillText(d.substring(5), x, H - 8);
+    }
+  });
+
+  // Grid lines
+  ctx.strokeStyle='#1a1a2e'; ctx.lineWidth=1;
+  for (let v = yStepVal; v < maxVal; v += yStepVal) {
+    const y = pad.top + ch - (v/maxVal)*ch;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left+cw, y); ctx.stroke();
+  }
+
+  // Draw line chart
+  if (values.length === 1) {
+    // Single point
+    const x = pad.left + cw/2;
+    const y = pad.top + ch - (values[0]/maxVal)*ch;
+    ctx.fillStyle = '#ff6b35';
+    ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle='#ff6b35'; ctx.font='11px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(String(values[0]), x, y-10);
+  } else {
+    // Fill area
+    ctx.beginPath();
+    ctx.moveTo(pad.left, pad.top+ch);
+    values.forEach((v, i) => {
+      const x = pad.left + (i/(dates.length-1))*cw;
+      const y = pad.top + ch - (v/maxVal)*ch;
+      ctx.lineTo(x, y);
+    });
+    ctx.lineTo(pad.left+cw, pad.top+ch);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,107,53,0.15)';
+    ctx.fill();
+
+    // Draw line
+    ctx.beginPath();
+    values.forEach((v, i) => {
+      const x = pad.left + (i/(dates.length-1))*cw;
+      const y = pad.top + ch - (v/maxVal)*ch;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = '#ff6b35'; ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // Draw points
+    values.forEach((v, i) => {
+      const x = pad.left + (i/(dates.length-1))*cw;
+      const y = pad.top + ch - (v/maxVal)*ch;
+      ctx.fillStyle = '#ff6b35';
+      ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI*2); ctx.fill();
+    });
+  }
+
+  // Title
+  ctx.fillStyle='#8888a0'; ctx.font='11px sans-serif'; ctx.textAlign='right';
+  ctx.fillText('Calls per day', pad.left+cw, pad.top-5);
+}
+
+function renderCharts() {
+  if (!records.length) return;
+  renderTrendChart();
+  const outcomeField = findField(['hangup_cause','hangupcause','call_status','callstatus','status']);
+  const dirField = findField(['call_direction','calldirection','direction']);
+  const durField = findField(['bill_duration','billduration','call_duration','callduration','duration']);
+
+  // Outcomes
+  const outcomes = {};
+  records.forEach(r => {
+    let v = (r[outcomeField] || 'UNKNOWN').toString();
+    v = v.replace(/_/g,' ').toUpperCase();
+    if (v.length > 20) v = v.slice(0,20);
+    outcomes[v] = (outcomes[v]||0) + 1;
+  });
+  const oLabels = Object.keys(outcomes).sort((a,b) => outcomes[b]-outcomes[a]).slice(0,8);
+  const oVals = oLabels.map(l => outcomes[l]);
+  drawPie('outcomeChart', oLabels, oVals);
+
+  // Direction
+  const dirs = {};
+  records.forEach(r => {
+    const v = (r[dirField] || 'UNKNOWN').toString().toUpperCase();
+    dirs[v] = (dirs[v]||0) + 1;
+  });
+  const dLabels = Object.keys(dirs);
+  const dVals = dLabels.map(l => dirs[l]);
+  drawPie('directionChart', dLabels, dVals);
+
+  // Duration histogram
+  const durs = records.map(r => getNum(r, durField)).filter(d => d > 0);
+  if (durs.length) {
+    const maxDur = Math.max(...durs);
+    const steps = maxDur <= 60 ? [0,10,20,30,40,50,60] :
+                  maxDur <= 300 ? [0,30,60,120,180,240,300] :
+                  [0,60,120,300,600,900,Math.ceil(maxDur/60)*60];
+    const bins = new Array(steps.length-1).fill(0);
+    const labels = [];
+    for (let i = 0; i < steps.length-1; i++) {
+      labels.push(`${steps[i]}-${steps[i+1]}s`);
+      durs.forEach(d => { if (d >= steps[i] && d < steps[i+1]) bins[i]++; });
+    }
+    drawHistogram('durationChart', durs, bins, labels);
+  }
+}
+
+window.addEventListener('resize', () => { renderTrendChart(); renderCharts(); });
+</script>
+</body>
+</html>

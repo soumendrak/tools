@@ -1,0 +1,53 @@
+#!/bin/sh
+# Repo-standard guard for the tools catalog. Enabled via:
+#   git config core.hooksPath .githooks
+#
+# 1. Enforces the tool standard (the tools-catalog skill is actually applied).
+# 2. Reminds you to review that skill when standard-defining files change but
+#    the skill doesn't — a cheap "is the skill stale?" signal.
+
+root=$(git rev-parse --show-toplevel)
+cd "$root" || exit 1
+
+# 1) Is the standard applied? Validate the STAGED snapshot (what will actually
+#    be committed), not the working tree — so a fixed-but-unstaged file can't let
+#    an invalid staged version slip through. Export the index to a temp dir and
+#    check that; fall back to the working tree if the export isn't possible.
+snapshot=$(mktemp -d 2>/dev/null)
+if [ -n "$snapshot" ] && git checkout-index -a -f --prefix="$snapshot/" 2>/dev/null &&
+   [ -f "$snapshot/src/data/tools.ts" ]; then
+  # Complete staged snapshot — validate exactly what's being committed.
+  TOOLS_ROOT="$snapshot" python3 scripts/check-tools.py; rc=$?
+else
+  # Snapshot unavailable/incomplete (e.g. files not tracked yet) → working tree.
+  python3 scripts/check-tools.py; rc=$?
+fi
+[ -n "$snapshot" ] && rm -rf "$snapshot"
+if [ "$rc" -ne 0 ]; then
+  echo
+  echo "commit blocked: fix the issues above (or 'git commit --no-verify' to bypass)."
+  exit 1
+fi
+
+# 2) Might the skill be stale?
+SKILL=".claude/skills/tools-catalog/SKILL.md"
+staged=$(git diff --cached --name-only)
+# NB: src/data/tools.ts is intentionally excluded — it holds catalog DATA, so
+# routine tool additions must not nag. Only mechanism files signal a possible
+# standard change.
+standard_changed=$(printf '%s\n' "$staged" | grep -E \
+  '^(scripts/skin-tools\.py|scripts/check-tools\.py|scripts/tool-dates\.py|src/components/ToolFrame\.tsx|src/app/t/\[slug\]/page\.tsx)$')
+
+if [ -n "$standard_changed" ]; then
+  if ! printf '%s\n' "$staged" | grep -qx "$SKILL"; then
+    echo
+    echo "⚠ tools-catalog skill reminder:"
+    echo "  You changed files that define the tool standard:"
+    printf '%s\n' "$standard_changed" | sed 's/^/    - /'
+    echo "  but did not touch $SKILL."
+    echo "  If the standard changed, update the skill so it stays accurate."
+    echo "  (This is only a reminder — the commit will proceed.)"
+  fi
+fi
+
+exit 0

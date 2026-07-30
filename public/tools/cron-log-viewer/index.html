@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cron Log Viewer</title>
+<style>
+:root {
+  --bg: #0f0f1a;
+  --surface: #1a1a2e;
+  --accent: #ff6b35;
+  --text: #e0e0e0;
+  --text-muted: #8888aa;
+  --success: #22c55e;
+  --error: #ef4444;
+  --running: #eab308;
+  --border: #2a2a40;
+  --row-hover: #222240;
+  --card-bg: #1e1e34;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Header */
+header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+
+header .logo {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+
+header .import-group {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+header .import-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 16px;
+  color: var(--text);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+header .import-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+header .import-info {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+header h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.5px;
+}
+
+header h1 small {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  display: block;
+  margin-top: 2px;
+  letter-spacing: 1px;
+}
+
+/* Stats bar */
+.stats {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 22px;
+  flex: 1;
+  min-width: 100px;
+  text-align: center;
+}
+
+.stat-card .stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.stat-card .stat-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 4px;
+}
+
+.stat-card.success .stat-value { color: var(--success); }
+.stat-card.error .stat-value { color: var(--error); }
+.stat-card.accent .stat-value { color: var(--accent); }
+
+/* Filters */
+.filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.filters input,
+.filters select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.filters input::placeholder { color: var(--text-muted); }
+.filters input:focus,
+.filters select:focus { border-color: var(--accent); }
+
+.filters input {
+  flex: 1;
+  min-width: 180px;
+}
+
+.filters select {
+  min-width: 120px;
+  cursor: pointer;
+}
+
+/* Table */
+.table-container {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+thead th {
+  text-align: left;
+  padding: 12px 16px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+}
+
+tbody tr {
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: var(--row-hover); }
+
+tbody td {
+  padding: 12px 16px;
+  font-size: 0.9rem;
+  vertical-align: middle;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-badge.success { background: rgba(34,197,94,0.15); color: var(--success); }
+.status-badge.error   { background: rgba(239,68,68,0.15); color: var(--error); }
+.status-badge.running { background: rgba(234,179,8,0.15); color: var(--running); }
+
+.job-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Expanded row */
+.expanded-row {
+  display: none;
+}
+
+.expanded-row.active {
+  display: table-row;
+}
+
+.expanded-row td {
+  padding: 0;
+}
+
+.log-output {
+  background: #0a0a14;
+  border-top: 1px solid var(--border);
+  padding: 16px 20px;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: #b0b0cc;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.log-output .log-timestamp {
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  display: block;
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--text-muted);
+}
+
+.empty-state p { font-size: 1rem; }
+
+/* Responsive - tablet / small desktop */
+@media (max-width: 768px) {
+  body { padding: 12px; }
+  header h1 { font-size: 1.3rem; }
+  .stat-card { padding: 10px 14px; min-width: 80px; }
+  .stat-card .stat-value { font-size: 1.2rem; }
+  .filters { flex-direction: column; }
+  .filters input { min-width: 100%; }
+  .filters select { min-width: 100%; }
+
+  /* Stacked cards on mobile */
+  .table-container { background: transparent; border: none; }
+  table, thead, tbody, tfoot, tr { display: block; }
+  thead { display: none; }
+
+  .data-row {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 12px;
+    padding: 12px 14px;
+    display: block;
+    cursor: pointer;
+  }
+
+  .data-row td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(42,42,64,0.5);
+    font-size: 0.85rem;
+  }
+
+  .data-row td:last-child { border-bottom: none; }
+
+  .data-row td::before {
+    content: attr(data-label);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    margin-right: 10px;
+  }
+
+  .data-row td .status-badge { font-size: 0.75rem; }
+
+  .expanded-row.active {
+    display: block;
+    margin-top: -1px;
+  }
+
+  .expanded-row td {
+    display: block;
+    padding: 0;
+  }
+
+  .expanded-row.active .log-output {
+    border-radius: 0 0 10px 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  body { padding: 8px; }
+  .stats { gap: 8px; }
+  .stat-card { min-width: calc(50% - 8px); padding: 10px; }
+  .stat-card .stat-value { font-size: 1rem; }
+  .stat-card .stat-label { font-size: 0.65rem; }
+  header h1 { font-size: 1.1rem; }
+  header .logo { width: 34px; height: 34px; }
+  .data-row { padding: 10px 12px; }
+  .data-row td { font-size: 0.8rem; padding: 4px 0; }
+  .log-output { font-size: 0.75rem; padding: 12px 14px; }
+}
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<div class="container">
+  <header>
+    <svg class="logo" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="46" stroke="#ff6b35" stroke-width="4" fill="#1a1a2e"/>
+      <path d="M50 20 L50 50 L70 60" stroke="#ff6b35" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="50" cy="50" r="4" fill="#ff6b35"/>
+      <rect x="28" y="72" width="44" height="4" rx="2" fill="#e0e0e0" opacity="0.3"/>
+      <rect x="28" y="80" width="30" height="4" rx="2" fill="#e0e0e0" opacity="0.2"/>
+    </svg>
+    <div>
+      <h1>Cron Log Viewer<small>job execution dashboard</small></h1>
+    </div>
+    <div class="import-group">
+      <button class="import-btn" id="importBtn" title="Import JSON or CSV">📥 Import</button>
+      <input type="file" id="importFileInput" accept=".json,.csv" style="display:none">
+      <span class="import-info" id="importInfo"></span>
+    </div>
+  </header>
+
+  <div class="stats" id="stats">
+    <div class="stat-card accent"><div class="stat-value" id="stat-total">0</div><div class="stat-label">Total Runs</div></div>
+    <div class="stat-card success"><div class="stat-value" id="stat-success">0</div><div class="stat-label">Success</div></div>
+    <div class="stat-card error"><div class="stat-value" id="stat-error">0</div><div class="stat-label">Failures</div></div>
+    <div class="stat-card accent"><div class="stat-value" id="stat-avg">0s</div><div class="stat-label">Avg Duration</div></div>
+  </div>
+
+  <div class="filters">
+    <input type="text" id="filter-name" placeholder="Search job name..." autocomplete="off">
+    <select id="filter-status">
+      <option value="all">All Status</option>
+      <option value="success">Success</option>
+      <option value="error">Error</option>
+      <option value="running">Running</option>
+    </select>
+  </div>
+
+  <div class="table-container" id="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Job Name</th>
+          <th>Status</th>
+          <th>Exit Code</th>
+          <th>Duration</th>
+          <th>Timestamp</th>
+        </tr>
+      </thead>
+      <tbody id="log-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+// ─── Sample Data ─────────────────────────────────────────────
+const sampleLogs = [
+  {
+    id: 1,
+    jobName: 'nini-daily-backup',
+    status: 'success',
+    exitCode: 0,
+    duration: '12.4s',
+    durationMs: 12400,
+    timestamp: '2026-06-03 02:00:01 UTC',
+    log: `[2026-06-03 02:00:01] Starting nini-daily-backup v2.3
+[2026-06-03 02:00:02] Checking prerequisites... OK
+[2026-06-03 02:00:03] Lock acquired
+[2026-06-03 02:00:03] Backing up /data/nini... 512 MB
+[2026-06-03 02:00:08] Compressing archive... done (23s)
+[2026-06-03 02:00:10] Uploading to S3 nini-backup-bucket... done
+[2026-06-03 02:00:11] Verifying checksum... OK
+[2026-06-03 02:00:11] Cleaning up old backups... 3 removed
+[2026-06-03 02:00:12] Backup completed successfully
+Duration: 12.4s | Exit: 0`
+  },
+  {
+    id: 2,
+    jobName: 'stock-watch',
+    status: 'success',
+    exitCode: 0,
+    duration: '8.1s',
+    durationMs: 8100,
+    timestamp: '2026-06-03 06:30:00 UTC',
+    log: `[2026-06-03 06:30:00] stock-watch daemon polling
+[2026-06-03 06:30:01] Fetching market data... 4 exchanges
+[2026-06-03 06:30:03] NASDAQ: 18,912.45 (+0.32%)
+[2026-06-03 06:30:03] NYSE: 17,234.10 (+0.18%)
+[2026-06-03 06:30:04] LSE: 8,456.20 (-0.09%)
+[2026-06-03 06:30:04] TSE: 32,109.80 (+0.45%)
+[2026-06-03 06:30:05] Evaluating alerts... none triggered
+[2026-06-03 06:30:06] Persisting snapshot... done
+[2026-06-03 06:30:07] Next poll in 5 min
+Duration: 8.1s | Exit: 0`
+  },
+  {
+    id: 3,
+    jobName: 'nini-report-publisher',
+    status: 'error',
+    exitCode: 1,
+    duration: '3.2s',
+    durationMs: 3200,
+    timestamp: '2026-06-03 07:15:00 UTC',
+    log: `[2026-06-03 07:15:00] nini-report-publisher starting
+[2026-06-03 07:15:01] Generating daily report... 14 pages
+[2026-06-03 07:15:02] Rendering charts... done
+[2026-06-03 07:15:02] PDF assembly... done
+[2026-06-03 07:15:03] Publishing to Confluence... ERROR
+[2026-06-03 07:15:03] HTTP 403: Forbidden - token expired
+[2026-06-03 07:15:03] Retry 1/3... still 403
+[2026-06-03 07:15:03] All retries exhausted
+[2026-06-03 07:15:03] FAILURE: publish step failed
+Duration: 3.2s | Exit: 1`
+  },
+  {
+    id: 4,
+    jobName: 'nini-cron-doctor',
+    status: 'success',
+    exitCode: 0,
+    duration: '5.7s',
+    durationMs: 5700,
+    timestamp: '2026-06-03 03:00:00 UTC',
+    log: `[2026-06-03 03:00:00] nini-cron-doctor v1.1
+[2026-06-03 03:00:01] Checking cron definitions... 42 entries
+[2026-06-03 03:00:02] Validating schedule expressions... 42 OK
+[2026-06-03 03:00:03] Checking job overlap... no conflicts
+[2026-06-03 03:00:04] Verifying executable paths... all valid
+[2026-06-03 03:00:05] Testing connectivity for 3 remote jobs... 3/3 OK
+[2026-06-03 03:00:05] All systems healthy
+Duration: 5.7s | Exit: 0`
+  },
+  {
+    id: 5,
+    jobName: 'daily-briefing',
+    status: 'success',
+    exitCode: 0,
+    duration: '15.2s',
+    durationMs: 15200,
+    timestamp: '2026-06-03 08:00:00 UTC',
+    log: `[2026-06-03 08:00:00] daily-briefing generation
+[2026-06-03 08:00:02] Fetching weather... 22°C, sunny
+[2026-06-03 08:00:04] Fetching calendar events... 3 meetings
+[2026-06-03 08:00:06] Fetching news headlines... 12 items
+[2026-06-03 08:00:08] Compiling digest... done
+[2026-06-03 08:00:10] Sending email... delivered to team@nini.io
+[2026-06-03 08:00:12] Posting to Slack... done
+[2026-06-03 08:00:14] Updating dashboard... done
+Duration: 15.2s | Exit: 0`
+  },
+  {
+    id: 6,
+    jobName: 'stock-watch',
+    status: 'error',
+    exitCode: 137,
+    duration: '0.8s',
+    durationMs: 800,
+    timestamp: '2026-06-03 06:25:00 UTC',
+    log: `[2026-06-03 06:25:00] stock-watch daemon polling
+[2026-06-03 06:25:01] Fetching market data...
+[2026-06-03 06:25:01] OOM killer terminated process (signal 9)
+[2026-06-03 06:25:01] CRASH: memory limit exceeded (512 MB)
+Duration: 0.8s | Exit: 137`
+  },
+  {
+    id: 7,
+    jobName: 'nini-daily-backup',
+    status: 'success',
+    exitCode: 0,
+    duration: '11.9s',
+    durationMs: 11900,
+    timestamp: '2026-06-02 02:00:01 UTC',
+    log: `[2026-06-02 02:00:01] Starting nini-daily-backup v2.3
+[2026-06-02 02:00:02] Checking prerequisites... OK
+[2026-06-02 02:00:02] Backing up /data/nini... 498 MB
+[2026-06-02 02:00:07] Compressing archive... done
+[2026-06-02 02:00:09] Uploading to S3... done
+[2026-06-02 02:00:10] Verifying checksum... OK
+[2026-06-02 02:00:11] Cleaning up old backups... 1 removed
+Duration: 11.9s | Exit: 0`
+  },
+  {
+    id: 8,
+    jobName: 'nini-report-publisher',
+    status: 'running',
+    exitCode: '—',
+    duration: '—',
+    durationMs: 0,
+    timestamp: '2026-06-03 07:14:58 UTC',
+    log: `[2026-06-03 07:14:58] nini-report-publisher starting
+[2026-06-03 07:14:59] Generating daily report... 14 pages
+[2026-06-03 07:15:00] Rendering charts... in progress (72%)
+Still running — last checked 5s ago`
+  },
+  {
+    id: 9,
+    jobName: 'nini-cron-doctor',
+    status: 'success',
+    exitCode: 0,
+    duration: '4.9s',
+    durationMs: 4900,
+    timestamp: '2026-06-02 03:00:00 UTC',
+    log: `[2026-06-02 03:00:00] nini-cron-doctor v1.1
+[2026-06-02 03:00:01] Checking cron definitions... 42 entries
+[2026-06-02 03:00:02] Validating schedule expressions... 42 OK
+[2026-06-02 03:00:03] Checking job overlap... no conflicts
+[2026-06-02 03:00:04] All systems healthy
+Duration: 4.9s | Exit: 0`
+  },
+  {
+    id: 10,
+    jobName: 'daily-briefing',
+    status: 'error',
+    exitCode: 2,
+    duration: '1.4s',
+    durationMs: 1400,
+    timestamp: '2026-06-03 08:00:00 UTC',
+    log: `[2026-06-03 08:00:00] daily-briefing generation
+[2026-06-03 08:00:01] Fetching weather... timeout (>30s)
+[2026-06-03 08:00:01] ERROR: weather API unreachable after 3 retries
+[2026-06-03 08:00:01] Aborting — partial digest discarded
+Duration: 1.4s | Exit: 2`
+  }
+];
+
+// ─── State ───────────────────────────────────────────────────
+let logs = [...sampleLogs];
+let expandedId = null;
+
+// ─── DOM refs ────────────────────────────────────────────────
+const tbody = document.getElementById('log-body');
+const filterName = document.getElementById('filter-name');
+const filterStatus = document.getElementById('filter-status');
+const statTotal = document.getElementById('stat-total');
+const statSuccess = document.getElementById('stat-success');
+const statError = document.getElementById('stat-error');
+const statAvg = document.getElementById('stat-avg');
+
+// ─── Render ──────────────────────────────────────────────────
+function render() {
+  const nameFilter = filterName.value.trim().toLowerCase();
+  const statusFilter = filterStatus.value;
+
+  const filtered = logs.filter(log => {
+    if (nameFilter && !log.jobName.toLowerCase().includes(nameFilter)) return false;
+    if (statusFilter !== 'all' && log.status !== statusFilter) return false;
+    return true;
+  });
+
+  // Stats
+  const total = filtered.length;
+  const successes = filtered.filter(l => l.status === 'success').length;
+  const failures = filtered.filter(l => l.status === 'error').length;
+  const durations = filtered.filter(l => l.durationMs > 0).map(l => l.durationMs);
+  const avgMs = durations.length ? Math.round(durations.reduce((a,b) => a+b, 0) / durations.length) : 0;
+  const avgStr = avgMs >= 1000 ? (avgMs / 1000).toFixed(1) + 's' : avgMs + 'ms';
+
+  statTotal.textContent = total;
+  statSuccess.textContent = successes;
+  statError.textContent = failures;
+  statAvg.textContent = avgStr;
+
+  // Rows
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="5"><div class="empty-state"><p>No log entries match your filters.</p></div></td></tr>`;
+    return;
+  }
+
+  let html = '';
+  for (const log of filtered) {
+    const isExpanded = expandedId === log.id;
+    html += `<tr class="data-row" data-id="${log.id}">`;
+    html += `<td data-label="Job Name"><span class="job-name">${escapeHtml(log.jobName)}</span></td>`;
+    html += `<td data-label="Status"><span class="status-badge ${log.status}">${capitalize(log.status)}</span></td>`;
+    html += `<td data-label="Exit Code">${escapeHtml(String(log.exitCode))}</td>`;
+    html += `<td data-label="Duration">${escapeHtml(log.duration)}</td>`;
+    html += `<td data-label="Timestamp">${escapeHtml(log.timestamp)}</td>`;
+    html += `</tr>`;
+    html += `<tr class="expanded-row ${isExpanded ? 'active' : ''}" data-parent="${log.id}">`;
+    html += `<td colspan="5"><div class="log-output"><span class="log-timestamp">Log output for ${escapeHtml(log.jobName)}</span>${escapeHtml(log.log)}</div></td>`;
+    html += `</tr>`;
+  }
+  tbody.innerHTML = html;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function capitalize(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// ─── Event handling (delegated) ──────────────────────────────
+document.querySelector('.table-container').addEventListener('click', e => {
+  const row = e.target.closest('.data-row');
+  if (!row) return;
+  const id = parseInt(row.dataset.id, 10);
+  expandedId = expandedId === id ? null : id;
+  render();
+});
+
+filterName.addEventListener('input', () => { expandedId = null; render(); });
+filterStatus.addEventListener('change', () => { expandedId = null; render(); });
+
+// ─── JSON/CSV Import ─────────────────────────────────────────
+const importBtn = document.getElementById('importBtn');
+const importFileInput = document.getElementById('importFileInput');
+const importInfo = document.getElementById('importInfo');
+
+importBtn.addEventListener('click', () => importFileInput.click());
+
+importFileInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const text = await file.text();
+  let imported = [];
+  try {
+    if (file.name.endsWith('.json')) {
+      let data = JSON.parse(text);
+      if (!Array.isArray(data)) {
+        // Try common wrapper keys
+        data = data.logs || data.entries || data.data || data.records || [data];
+      }
+      if (!Array.isArray(data)) throw new Error('JSON root must be an array');
+      imported = data;
+    } else if (file.name.endsWith('.csv')) {
+      const lines = text.trim().split('\n');
+      if (lines.length < 2) throw new Error('CSV must have header row + data rows');
+      const headers = parseCSVLine(lines[0]).map(h => h.replace(/^"|"$/g, '').trim().toLowerCase());
+      imported = lines.slice(1).filter(l => l.trim()).map((line, idx) => {
+        const vals = parseCSVLine(line);
+        const obj = { id: Date.now() + idx };
+        headers.forEach((h, i) => {
+          const v = vals[i] || '';
+          if (h === 'jobname' || h === 'job_name') obj.jobName = v;
+          else if (h === 'status') obj.status = v.toLowerCase();
+          else if (h === 'exitcode' || h === 'exit_code') {
+            obj.exitCode = v;
+            if (v === '—' || v === '' || v.toLowerCase() === 'running') obj.exitCode = v;
+            else obj.exitCode = parseInt(v) || v;
+          }
+          else if (h === 'duration') obj.duration = v;
+          else if (h === 'durationms' || h === 'duration_ms') obj.durationMs = parseInt(v) || 0;
+          else if (h === 'timestamp') obj.timestamp = v;
+          else if (h === 'log' || h === 'output') obj.log = v;
+        });
+        // Validate/fix fields
+        if (!obj.jobName) obj.jobName = 'unknown';
+        if (!obj.status) obj.status = 'success';
+        if (obj.exitCode === undefined || obj.exitCode === null) obj.exitCode = '—';
+        if (!obj.duration) obj.duration = '0s';
+        if (!obj.durationMs) obj.durationMs = 0;
+        if (!obj.timestamp) obj.timestamp = new Date().toISOString();
+        if (!obj.log) obj.log = 'No log output';
+        return obj;
+      });
+    } else {
+      throw new Error('Unsupported file type (use .json or .csv)');
+    }
+  } catch(err) {
+    alert('Import error: ' + err.message);
+    importFileInput.value = '';
+    return;
+  }
+
+  // Normalize imported entries to match our schema
+  logs = imported.map((entry, idx) => ({
+    id: entry.id || Date.now() + idx,
+    jobName: entry.jobName || entry.job_name || entry.name || 'unknown',
+    status: (entry.status || 'success').toLowerCase(),
+    exitCode: entry.exitCode !== undefined ? entry.exitCode : (entry.exit_code !== undefined ? entry.exit_code : '—'),
+    duration: entry.duration || '—',
+    durationMs: entry.durationMs || entry.duration_ms || 0,
+    timestamp: entry.timestamp || entry.date || new Date().toISOString(),
+    log: entry.log || entry.output || 'No log output'
+  }));
+
+  expandedId = null;
+  importInfo.textContent = `📄 ${logs.length} entries loaded from ${file.name}`;
+  importFileInput.value = '';
+  render();
+});
+
+function parseCSVLine(line) {
+  const result = [];
+  let current = '', inQuotes = false;
+  for (const ch of line) {
+    if (ch === '"') { inQuotes = !inQuotes; }
+    else if (ch === ',' && !inQuotes) { result.push(current.trim()); current = ''; }
+    else { current += ch; }
+  }
+  result.push(current.trim());
+  return result;
+}
+
+// ─── Init ────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>

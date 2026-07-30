@@ -1,65 +1,155 @@
-import Image from "next/image";
+import Link from "next/link";
+import ToolsExplorer from "@/components/ToolsExplorer";
+import { CATEGORIES, recentTools, SITE_URL, TOOLS, type Tool } from "@/data/tools";
+
+const fmtDate = (iso: string) =>
+  new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+
+function RecentList({
+  title,
+  tools,
+  field,
+}: {
+  title: string;
+  tools: Tool[];
+  field: "added" | "updated";
+}) {
+  return (
+    <div>
+      <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-muted">
+        {title}
+      </h2>
+      <ul className="space-y-2 text-sm">
+        {tools.map((tool) => (
+          <li key={tool.slug} className="flex flex-wrap items-baseline gap-x-2">
+            <Link
+              href={`/t/${tool.slug}`}
+              className="font-medium text-accent-soft hover:text-accent hover:underline"
+            >
+              {tool.name}
+            </Link>
+            <span className="text-muted">— {fmtDate(tool[field]!)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 export default function Home() {
+  const recentlyAdded = recentTools("added", 8);
+  const recentlyUpdated = recentTools("updated", 8);
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: "Tools by Soumendra",
+    description:
+      "A collection of free, single-file, zero-dependency browser tools.",
+    url: SITE_URL,
+    numberOfItems: TOOLS.length,
+    itemListElement: TOOLS.map((tool, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      url: `${SITE_URL}/t/${tool.slug}`,
+      name: tool.name,
+    })),
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main id="main-content" tabIndex={-1}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
+      {/* Hero */}
+      <header className="relative overflow-hidden px-6 pb-20 pt-28 text-center sm:pt-36">
+        <div
+          aria-hidden="true"
+          className="orb left-1/4 top-0 h-72 w-72 bg-accent"
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+        <div
+          aria-hidden="true"
+          className="orb right-1/4 top-24 h-64 w-64 bg-orange-400"
+          style={{ animationDelay: "-9s" }}
+        />
+
+        <div className="relative mx-auto max-w-3xl">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo.svg"
+            alt="Tools by Soumendra logo"
+            width={72}
+            height={72}
+            className="animate-rise mx-auto mb-6 rounded-[22px] shadow-lg"
+            style={{ height: 72, width: 72 }}
+          />
+          <p
+            className="animate-rise mb-5 inline-block rounded-full border border-border bg-card px-4 py-1.5 text-xs font-medium text-muted"
+            style={{ animationDelay: "0.05s" }}
+          >
+            {TOOLS.length} tools · {CATEGORIES.length} categories · 0 sign-ups
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          <h1
+            className="animate-rise text-balance text-4xl font-bold tracking-tight sm:text-6xl"
+            style={{ animationDelay: "0.1s" }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            Tiny tools that <span className="gradient-text">just work</span>
+          </h1>
+          <p
+            className="animate-rise mx-auto mt-6 max-w-xl text-pretty text-base leading-relaxed text-muted sm:text-lg"
+            style={{ animationDelay: "0.2s" }}
           >
-            Documentation
-          </a>
+            A growing collection of single-file, zero-dependency web tools —
+            timers, dev utilities, visual toys, and DevOps helpers. Free, open
+            source, no sign-up. Everything runs in your browser.
+          </p>
+          <div
+            className="animate-rise mt-8 flex flex-wrap items-center justify-center gap-4"
+            style={{ animationDelay: "0.3s" }}
+          >
+            <a
+              href="#tools"
+              className="rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-white transition-transform hover:scale-105"
+            >
+              Browse the tools
+            </a>
+            <a
+              href="https://github.com/soumendrak"
+              className="rounded-xl border border-border bg-card px-6 py-3 text-sm font-semibold text-foreground transition-colors hover:border-accent/50"
+            >
+              Star on GitHub
+            </a>
+          </div>
         </div>
-      </main>
-    </div>
+      </header>
+
+      {/* Recently added / updated — discoverability */}
+      <section
+        aria-label="Recent tools"
+        className="mx-auto w-full max-w-6xl px-6 pb-16"
+      >
+        <div className="grid gap-8 rounded-2xl border border-border bg-card p-6 sm:grid-cols-2 sm:p-8">
+          <RecentList
+            title="Recently added"
+            tools={recentlyAdded}
+            field="added"
+          />
+          <RecentList
+            title="Recently updated"
+            tools={recentlyUpdated}
+            field="updated"
+          />
+        </div>
+      </section>
+
+      <ToolsExplorer />
+    </main>
   );
 }

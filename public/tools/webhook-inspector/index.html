@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Webhook Inspector</title>
+<style>
+:root {
+  --bg: #0f0f1a;
+  --surface: #1a1a2e;
+  --accent: #ff6b35;
+  --accent-dim: #cc5529;
+  --text: #e0e0e0;
+  --text-dim: #8888aa;
+  --border: #2a2a3e;
+  --success: #2ecc71;
+  --danger: #e74c3c;
+  --radius: 8px;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  --mono: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', 'Consolas', monospace;
+  --shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text-dim)}
+
+/* Header */
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+header .logo {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+header h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.02em;
+}
+
+header .badge {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.75rem;
+}
+
+header .badge .stat {
+  background: var(--border);
+  padding: 4px 10px;
+  border-radius: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+header .badge .stat span { color: var(--accent); font-weight: 600; }
+
+header .clear-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 6px 14px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s;
+}
+
+header .clear-btn:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: rgba(231,76,60,0.1);
+}
+
+/* Main layout */
+.main {
+  display: flex;
+  flex: 1;
+  gap: 0;
+  overflow: hidden;
+}
+
+/* Left panel - Input */
+.input-panel {
+  flex: 0 0 45%;
+  max-width: 45%;
+  padding: 20px;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.panel-title {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-title .icon { font-size: 1rem; }
+
+/* JSON input */
+.json-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.json-section textarea {
+  width: 100%;
+  min-height: 180px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  padding: 12px;
+  resize: vertical;
+  line-height: 1.5;
+  transition: border-color 0.2s;
+}
+
+.json-section textarea:focus { outline: none; border-color: var(--accent); }
+
+.json-section textarea::placeholder { color: var(--text-dim); }
+
+.json-error {
+  display: none;
+  font-size: 0.8rem;
+  color: var(--danger);
+  padding: 6px 10px;
+  background: rgba(231,76,60,0.1);
+  border-radius: var(--radius);
+  border: 1px solid rgba(231,76,60,0.3);
+}
+
+.json-valid {
+  display: none;
+  font-size: 0.8rem;
+  color: var(--success);
+  padding: 6px 10px;
+  background: rgba(46,204,113,0.1);
+  border-radius: var(--radius);
+  border: 1px solid rgba(46,204,113,0.3);
+}
+
+/* Headers editor */
+.headers-section { display: flex; flex-direction: column; gap: 8px; }
+
+.headers-list { display: flex; flex-direction: column; gap: 6px; }
+
+.header-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.header-row input {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  padding: 8px 10px;
+  transition: border-color 0.2s;
+}
+
+.header-row input:focus { outline: none; border-color: var(--accent); }
+.header-row input::placeholder { color: var(--text-dim); }
+
+.header-row .del-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.header-row .del-btn:hover { color: var(--danger); background: rgba(231,76,60,0.15); }
+
+.add-header-btn {
+  align-self: flex-start;
+  background: none;
+  border: 1px dashed var(--border);
+  color: var(--text-dim);
+  padding: 6px 14px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.78rem;
+  transition: all 0.2s;
+}
+
+.add-header-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(255,107,53,0.08);
+}
+
+/* HMAC Verification */
+.hmac-section { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px; }
+.hmac-toggle { background: none; border: 1px dashed var(--border); color: var(--text-dim); padding: 8px 14px; border-radius: var(--radius); cursor: pointer; font-size: 0.78rem; transition: all 0.2s; text-align: center; width: 100%; }
+.hmac-toggle:hover { border-color: var(--accent); color: var(--accent); background: rgba(255,107,53,0.08); }
+.hmac-body { display: none; flex-direction: column; gap: 8px; }
+.hmac-body.open { display: flex; }
+.hmac-row { display: flex; gap: 6px; align-items: center; }
+.hmac-row input { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-family: var(--mono); font-size: 0.8rem; padding: 8px 10px; transition: border-color 0.2s; }
+.hmac-row input:focus { outline: none; border-color: var(--accent); }
+.hmac-row select { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); padding: 8px 10px; font-size: 0.8rem; cursor: pointer; }
+.hmac-row select:focus { outline: none; border-color: var(--accent); }
+.hmac-result { display: none; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; font-family: var(--mono); font-size: 0.75rem; margin-top: 4px; }
+.hmac-result.show { display: block; }
+.hmac-result .sig-label { color: var(--text-dim); }
+.hmac-result .sig-value { color: var(--text); word-break: break-all; }
+.hmac-result .sig-match { color: var(--success); font-weight: 700; }
+.hmac-result .sig-mismatch { color: var(--danger); font-weight: 700; }
+.hmac-compute-btn { align-self: flex-start; background: none; border: 1px solid var(--accent); color: var(--accent); padding: 6px 14px; border-radius: var(--radius); cursor: pointer; font-size: 0.78rem; transition: all 0.2s; }
+.hmac-compute-btn:hover { background: rgba(255,107,53,0.15); }
+
+/* Send button */
+.send-btn {
+  width: 100%;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: 12px 20px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.send-btn:hover { background: var(--accent-dim); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(255,107,53,0.3); }
+.send-btn:active { transform: translateY(0); }
+
+/* Presets */
+.presets {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.presets button {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.72rem;
+  transition: all 0.2s;
+}
+
+.presets button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(255,107,53,0.08);
+}
+
+/* Right panel - History */
+.history-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.history-toolbar {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.search-box {
+  flex: 1;
+  min-width: 140px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  padding: 8px 12px;
+  transition: border-color 0.2s;
+}
+
+.search-box:focus { outline: none; border-color: var(--accent); }
+.search-box::placeholder { color: var(--text-dim); }
+
+.history-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 20px;
+}
+
+.history-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.history-item:hover {
+  border-color: var(--accent);
+  background: rgba(255,107,53,0.04);
+  transform: translateX(2px);
+}
+
+.history-item.active {
+  border-color: var(--accent);
+  background: rgba(255,107,53,0.08);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.history-item .h-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.history-item .h-method {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  background: rgba(255,107,53,0.12);
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+}
+
+.history-item .h-time {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.history-item .h-path {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-item .h-preview {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+.history-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-dim);
+}
+
+.history-empty .empty-icon { font-size: 3rem; margin-bottom: 16px; opacity: 0.5; }
+.history-empty h3 { font-size: 1.1rem; margin-bottom: 6px; color: var(--text); }
+.history-empty p { font-size: 0.85rem; }
+
+/* Detail overlay */
+.detail-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 200;
+  backdrop-filter: blur(2px);
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.detail-overlay.open { display: flex; align-items: flex-start; justify-content: center; padding-top: 40px; }
+
+.detail-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  max-width: 720px;
+  width: 100%;
+  padding: 24px;
+  position: relative;
+  animation: slideUp 0.25s ease;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.detail-card .close-detail {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1.4rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: all 0.2s;
+}
+
+.detail-card .close-detail:hover { color: var(--text); background: var(--border); }
+
+.detail-card h2 {
+  font-size: 1.1rem;
+  margin-bottom: 16px;
+  color: var(--accent);
+  padding-right: 40px;
+}
+
+.detail-card .detail-meta {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.detail-card .detail-meta strong { color: var(--text); }
+
+.detail-card .detail-section {
+  margin-bottom: 16px;
+}
+
+.detail-card .detail-section h3 {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.detail-card .detail-section pre {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  overflow-x: auto;
+  max-height: 300px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+}
+
+.detail-card .detail-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.detail-card .detail-actions button {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s;
+}
+
+.detail-card .detail-actions button:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 20px;
+  color: var(--text);
+  font-size: 0.85rem;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  z-index: 300;
+  animation: slideUp 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toast .t-close {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .main { flex-direction: column; }
+  .input-panel {
+    flex: none;
+    max-width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 16px;
+    max-height: 50vh;
+  }
+  .json-section textarea { min-height: 120px; }
+  header { padding: 12px 16px; }
+  header h1 { font-size: 1.1rem; }
+  .history-toolbar { padding: 12px 16px 8px; }
+  .history-list { padding: 8px 16px; }
+  .detail-overlay { padding: 12px; }
+  .detail-card { padding: 18px; }
+  .detail-card .detail-actions { flex-wrap: wrap; }
+  .detail-card .detail-actions button { flex: 1; text-align: center; }
+  .send-btn { padding: 14px 20px; font-size: 1rem; }
+  .headers-list .header-row input { padding: 10px; font-size: 0.85rem; }
+}
+
+@media (max-width: 480px) {
+  header .badge .stat { font-size: 0.65rem; padding: 3px 8px; }
+  header .badge .stat span { display: inline; }
+  .input-panel { max-height: 45vh; padding: 12px; }
+  .json-section textarea { min-height: 100px; font-size: 0.8rem; }
+  .history-item { padding: 10px 12px; }
+  .history-item .h-method { font-size: 0.65rem; }
+  .history-item .h-time { font-size: 0.65rem; }
+  .detail-card { padding: 14px; }
+  header .clear-btn { padding: 4px 10px; font-size: 0.7rem; }
+  .presets button { font-size: 0.65rem; padding: 3px 8px; }
+  .add-header-btn { font-size: 0.7rem; padding: 5px 10px; }
+}
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <svg class="logo" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" rx="20" fill="#1a1a2e"/>
+    <path d="M25 35 C25 25, 45 20, 50 30 C55 20, 75 25, 75 35" stroke="#ff6b35" stroke-width="5" stroke-linecap="round" fill="none"/>
+    <path d="M30 45 C30 38, 45 35, 50 42 C55 35, 70 38, 70 45" stroke="#ff6b35" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <circle cx="50" cy="60" r="14" stroke="#ff6b35" stroke-width="4" fill="none"/>
+    <circle cx="50" cy="60" r="5" fill="#ff6b35"/>
+    <path d="M50 74 L50 82" stroke="#ff6b35" stroke-width="3" stroke-linecap="round"/>
+    <path d="M40 80 L60 80" stroke="#ff6b35" stroke-width="2" stroke-linecap="round"/>
+  </svg>
+  <h1>Webhook Inspector</h1>
+  <div class="badge">
+    <span class="stat" id="countDisplay">📦 <span id="hookCount">0</span> hooks</span>
+    <button class="clear-btn" id="clearAllBtn" title="Clear all history">🗑️ Clear</button>
+  </div>
+</header>
+
+<!-- MAIN LAYOUT -->
+<div class="main">
+
+  <!-- INPUT PANEL -->
+  <div class="input-panel">
+    <div class="panel-title"><span class="icon">📥</span> New Webhook</div>
+
+    <!-- Presets -->
+    <div class="presets">
+      <button data-preset="github">GitHub push</button>
+      <button data-preset="stripe">Stripe event</button>
+      <button data-preset="slack">Slack message</button>
+      <button data-preset="custom">Custom</button>
+    </div>
+
+    <!-- JSON body -->
+    <div class="json-section">
+      <label class="panel-title" for="payloadInput"><span class="icon">{}</span> Payload (JSON)</label>
+      <textarea id="payloadInput" placeholder='Paste JSON here, e.g.&#10;{&#10;  "event": "push",&#10;  "ref": "refs/heads/main"&#10;}'></textarea>
+      <div class="json-valid" id="jsonValid">✓ Valid JSON</div>
+      <div class="json-error" id="jsonError">✗ Invalid JSON</div>
+    </div>
+
+    <!-- Headers editor -->
+    <div class="headers-section">
+      <label class="panel-title"><span class="icon">📋</span> Headers</label>
+      <div class="headers-list" id="headersList">
+        <div class="header-row">
+          <input class="h-key" placeholder="Header name" value="content-type">
+          <input class="h-val" placeholder="Value" value="application/json">
+          <button class="del-btn" title="Remove header">✕</button>
+        </div>
+        <div class="header-row">
+          <input class="h-key" placeholder="Header name" value="x-github-event">
+          <input class="h-val" placeholder="Value" value="push">
+          <button class="del-btn" title="Remove header">✕</button>
+        </div>
+      </div>
+      <button class="add-header-btn" id="addHeaderBtn">+ Add header</button>
+    </div>
+
+    <!-- HMAC Verification -->
+    <div class="hmac-section">
+      <button class="hmac-toggle" id="hmacToggle">🔐 HMAC Signature Verification ▾</button>
+      <div class="hmac-body" id="hmacBody">
+        <div class="hmac-row">
+          <input type="text" id="hmacSecret" placeholder="Shared secret key" spellcheck="false">
+        </div>
+        <div class="hmac-row">
+          <input type="text" id="hmacSigHeader" placeholder="Signature header name (e.g. x-hub-signature-256)" value="x-hub-signature-256">
+          <select id="hmacAlgo">
+            <option value="SHA-256">SHA-256</option>
+            <option value="SHA-1">SHA-1</option>
+          </select>
+        </div>
+        <div class="hmac-row">
+          <input type="text" id="hmacExpected" placeholder="Expected signature (hex)" spellcheck="false">
+        </div>
+        <button class="hmac-compute-btn" id="hmacComputeBtn">🔐 Compute &amp; Verify</button>
+        <div class="hmac-result" id="hmacResult">
+          <div class="sig-label">Computed Signature</div>
+          <div class="sig-value" id="hmacComputedSig">—</div>
+          <div style="margin-top:6px;"><span class="sig-label">Status: </span><span id="hmacStatus">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Send -->
+    <button class="send-btn" id="sendBtn">
+      <span>📡</span> Simulate Webhook
+    </button>
+  </div>
+
+  <!-- HISTORY PANEL -->
+  <div class="history-panel">
+    <div class="history-toolbar">
+      <input class="search-box" id="searchBox" placeholder="🔍 Search history…">
+    </div>
+    <div class="history-list" id="historyList">
+      <div class="history-empty" id="emptyState">
+        <div class="empty-icon">📡</div>
+        <h3>No webhooks yet</h3>
+        <p>Paste a JSON payload above and click <strong>Simulate Webhook</strong> to get started.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- DETAIL OVERLAY -->
+<div class="detail-overlay" id="detailOverlay">
+  <div class="detail-card">
+    <button class="close-detail" id="closeDetail">✕</button>
+    <h2 id="detailTitle">Webhook Detail</h2>
+    <div class="detail-meta" id="detailMeta"></div>
+    <div class="detail-section">
+      <h3>📋 Headers</h3>
+      <pre id="detailHeaders"></pre>
+    </div>
+    <div class="detail-section">
+      <h3>{ } Payload</h3>
+      <pre id="detailPayload"></pre>
+    </div>
+    <div class="detail-actions">
+      <button id="detailCopyHeaders">📋 Copy Headers</button>
+      <button id="detailCopyPayload">📋 Copy Payload</button>
+      <button id="detailDelete" style="color:var(--danger)">🗑️ Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast" style="display:none">
+  <span id="toastMsg"></span>
+  <button class="t-close" id="toastClose">✕</button>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+const STORAGE_KEY = 'webhook_inspector_history';
+
+// DOM refs
+const payloadInput = document.getElementById('payloadInput');
+const jsonValid = document.getElementById('jsonValid');
+const jsonError = document.getElementById('jsonError');
+const headersList = document.getElementById('headersList');
+const addHeaderBtn = document.getElementById('addHeaderBtn');
+const sendBtn = document.getElementById('sendBtn');
+const searchBox = document.getElementById('searchBox');
+const historyListEl = document.getElementById('historyList');
+const emptyState = document.getElementById('emptyState');
+const hookCount = document.getElementById('hookCount');
+const clearAllBtn = document.getElementById('clearAllBtn');
+const detailOverlay = document.getElementById('detailOverlay');
+const closeDetail = document.getElementById('closeDetail');
+const detailTitle = document.getElementById('detailTitle');
+const detailMeta = document.getElementById('detailMeta');
+const detailHeaders = document.getElementById('detailHeaders');
+const detailPayload = document.getElementById('detailPayload');
+const detailCopyHeaders = document.getElementById('detailCopyHeaders');
+const detailCopyPayload = document.getElementById('detailCopyPayload');
+const detailDelete = document.getElementById('detailDelete');
+const toast = document.getElementById('toast');
+const toastMsg = document.getElementById('toastMsg');
+const toastClose = document.getElementById('toastClose');
+
+// State
+let history = [];
+let selectedId = null;
+let isToastVisible = false;
+let toastTimer = null;
+
+// Load from localStorage
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      history = JSON.parse(raw);
+    }
+  } catch(e) { history = []; }
+}
+
+function saveHistory() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+  } catch(e) {
+    // localStorage full or unavailable
+  }
+}
+
+// UUID
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+}
+
+// Timestamp formatting
+function formatTime(ts) {
+  const d = new Date(ts);
+  const now = new Date();
+  const diff = now - d;
+  if (diff < 60000) return 'Just now';
+  if (diff < 3600000) return Math.floor(diff/60000) + 'm ago';
+  if (diff < 86400000) return Math.floor(diff/3600000) + 'h ago';
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+
+function formatFullTime(ts) {
+  return new Date(ts).toLocaleString([], {
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  });
+}
+
+// JSON validation
+let lastJsonText = '';
+let lastJsonValid = false;
+
+function validateJSON() {
+  const text = payloadInput.value.trim();
+  if (text === '') {
+    jsonValid.style.display = 'none';
+    jsonError.style.display = 'none';
+    lastJsonValid = false;
+    lastJsonText = '';
+    return;
+  }
+  if (text === lastJsonText) return;
+  lastJsonText = text;
+  try {
+    JSON.parse(text);
+    jsonValid.style.display = 'block';
+    jsonError.style.display = 'none';
+    lastJsonValid = true;
+  } catch(e) {
+    jsonValid.style.display = 'none';
+    jsonError.style.display = 'block';
+    jsonError.textContent = '✗ ' + e.message;
+    lastJsonValid = false;
+  }
+}
+
+payloadInput.addEventListener('input', validateJSON);
+
+// Headers management
+function addHeaderRow(key, val) {
+  const row = document.createElement('div');
+  row.className = 'header-row';
+  row.innerHTML = '<input class="h-key" placeholder="Header name" value="' + escHtml(key||'') + '">' +
+    '<input class="h-val" placeholder="Value" value="' + escHtml(val||'') + '">' +
+    '<button class="del-btn" title="Remove header">✕</button>';
+  row.querySelector('.del-btn').addEventListener('click', function(){
+    row.remove();
+  });
+  headersList.appendChild(row);
+}
+
+addHeaderBtn.addEventListener('click', function(){
+  addHeaderRow('', '');
+});
+
+// Delegate delete for existing rows
+headersList.addEventListener('click', function(e){
+  if (e.target.classList.contains('del-btn')) {
+    e.target.closest('.header-row').remove();
+  }
+});
+
+// Presets
+document.querySelectorAll('[data-preset]').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    const preset = this.dataset.preset;
+    switch(preset) {
+      case 'github':
+        payloadInput.value = JSON.stringify({
+          ref: 'refs/heads/main',
+          repository: { full_name: 'soumendrak/webhook-inspector', html_url: 'https://github.com/soumendrak/webhook-inspector' },
+          pusher: { name: 'soumendrak' },
+          commits: [{ id: 'abc123', message: 'Initial commit', author: { name: 'soumendrak' } }]
+        }, null, 2);
+        break;
+      case 'stripe':
+        payloadInput.value = JSON.stringify({
+          id: 'evt_1Qp7s4Gd4eN5fG7k',
+          type: 'charge.succeeded',
+          data: { object: { id: 'ch_3Qp7s4Gd4eN5fG7k', amount: 2000, currency: 'usd', status: 'succeeded' } },
+          created: Math.floor(Date.now()/1000),
+          livemode: false
+        }, null, 2);
+        break;
+      case 'slack':
+        payloadInput.value = JSON.stringify({
+          token: 'T3x4mp1eT0k3n',
+          team_id: 'T12345',
+          api_app_id: 'A12345',
+          event: { type: 'message', channel: 'C12345', user: 'U12345', text: 'Hello from webhook inspector!' },
+          type: 'event_callback',
+          event_id: 'Ev12345',
+          event_time: Math.floor(Date.now()/1000)
+        }, null, 2);
+        break;
+      case 'custom':
+        payloadInput.value = JSON.stringify({ event: 'custom', timestamp: new Date().toISOString(), data: { message: 'Hello, World!' } }, null, 2);
+        break;
+    }
+    lastJsonText = '';
+    validateJSON();
+  });
+});
+
+// Helper
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Collect headers from DOM
+function collectHeaders() {
+  const rows = headersList.querySelectorAll('.header-row');
+  const headers = {};
+  rows.forEach(function(row){
+    const key = row.querySelector('.h-key').value.trim().toLowerCase();
+    const val = row.querySelector('.h-val').value.trim();
+    if (key) {
+      headers[key] = val;
+    }
+  });
+  return headers;
+}
+
+// Send / simulate webhook
+sendBtn.addEventListener('click', function(){
+  const text = payloadInput.value.trim();
+  if (!text) {
+    showToast('⚠️ Please enter a JSON payload');
+    payloadInput.focus();
+    return;
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch(e) {
+    showToast('⚠️ Invalid JSON: ' + e.message);
+    payloadInput.focus();
+    return;
+  }
+
+  const headers = collectHeaders();
+
+  // Get a simulated path from headers or default
+  const path = headers['x-github-event'] ? '/webhook/github' :
+               headers['x-stripe-signature'] ? '/webhook/stripe' :
+               headers['x-slack-signature'] || headers['x-slack-request-timestamp'] ? '/webhook/slack' :
+               '/webhook';
+
+  const entry = {
+    id: uid(),
+    timestamp: Date.now(),
+    method: 'POST',
+    path: path,
+    headers: headers,
+    body: parsed,
+    raw: text
+  };
+
+  history.unshift(entry);
+  saveHistory();
+  render();
+  showToast('✅ Webhook received!');
+});
+
+// Search/filter
+let searchTerm = '';
+
+searchBox.addEventListener('input', function(){
+  searchTerm = this.value.trim().toLowerCase();
+  render();
+});
+
+// Render history
+function render() {
+  const filtered = searchTerm ? history.filter(function(h){
+    const jsonStr = JSON.stringify(h.body).toLowerCase();
+    const headerStr = JSON.stringify(h.headers).toLowerCase();
+    const pathStr = h.path.toLowerCase();
+    return jsonStr.indexOf(searchTerm) !== -1 ||
+           headerStr.indexOf(searchTerm) !== -1 ||
+           pathStr.indexOf(searchTerm) !== -1;
+  }) : history;
+
+  hookCount.textContent = history.length;
+  historyListEl.innerHTML = '';
+
+  if (history.length === 0) {
+    historyListEl.appendChild(emptyState);
+    return;
+  }
+
+  if (filtered.length === 0) {
+    const div = document.createElement('div');
+    div.className = 'history-empty';
+    div.innerHTML = '<div class="empty-icon">🔍</div><h3>No matches</h3><p>Try a different search term.</p>';
+    historyListEl.appendChild(div);
+    return;
+  }
+
+  filtered.forEach(function(h){
+    const item = document.createElement('div');
+    item.className = 'history-item' + (h.id === selectedId ? ' active' : '');
+    item.dataset.id = h.id;
+
+    const preview = typeof h.body === 'object' ? JSON.stringify(h.body).slice(0, 80) : String(h.body).slice(0, 80);
+    const methodLabel = h.headers['x-github-event'] ? h.headers['x-github-event'] :
+                        h.headers['x-stripe-signature'] ? 'stripe' :
+                        h.headers['x-slack-signature'] || h.headers['x-slack-request-timestamp'] ? 'slack' :
+                        'webhook';
+
+    item.innerHTML =
+      '<div class="h-top"><span class="h-method">' + escHtml(methodLabel) + '</span><span class="h-time">' + formatTime(h.timestamp) + '</span></div>' +
+      '<div class="h-path">' + escHtml(h.method) + ' ' + escHtml(h.path) + '</div>' +
+      '<div class="h-preview">' + escHtml(preview) + (preview.length >= 80 ? '…' : '') + '</div>';
+
+    item.addEventListener('click', function(){
+      selectedId = h.id;
+      render();
+      openDetail(h);
+    });
+
+    historyListEl.appendChild(item);
+  });
+}
+
+// Detail overlay
+function openDetail(h) {
+  detailTitle.textContent = h.method + ' ' + h.path;
+  detailMeta.innerHTML =
+    '<span>🕐 <strong>' + formatFullTime(h.timestamp) + '</strong></span>' +
+    '<span>📦 ID: <strong>' + escHtml(h.id) + '</strong></span>';
+
+  // Headers as formatted text
+  const headerLines = Object.keys(h.headers).length > 0
+    ? Object.entries(h.headers).map(function(kv){ return escHtml(kv[0]) + ': ' + escHtml(kv[1]); }).join('\n')
+    : '(no headers)';
+  detailHeaders.textContent = headerLines.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"');
+
+  detailPayload.textContent = JSON.stringify(h.body, null, 2);
+
+  detailOverlay.classList.add('open');
+
+  // Store current id for delete action
+  detailDelete.dataset.id = h.id;
+  detailCopyHeaders.dataset.id = h.id;
+  detailCopyPayload.dataset.id = h.id;
+}
+
+closeDetail.addEventListener('click', function(){
+  detailOverlay.classList.remove('open');
+});
+
+detailOverlay.addEventListener('click', function(e){
+  if (e.target === detailOverlay) {
+    detailOverlay.classList.remove('open');
+  }
+});
+
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape') {
+    detailOverlay.classList.remove('open');
+  }
+});
+
+// Detail actions
+detailCopyHeaders.addEventListener('click', function(){
+  const id = this.dataset.id;
+  const entry = history.find(function(h){ return h.id === id; });
+  if (!entry) return;
+  const text = Object.entries(entry.headers).map(function(kv){ return kv[0] + ': ' + kv[1]; }).join('\n');
+  copyText(text, 'Headers copied to clipboard');
+});
+
+detailCopyPayload.addEventListener('click', function(){
+  const id = this.dataset.id;
+  const entry = history.find(function(h){ return h.id === id; });
+  if (!entry) return;
+  copyText(JSON.stringify(entry.body, null, 2), 'Payload copied to clipboard');
+});
+
+detailDelete.addEventListener('click', function(){
+  const id = this.dataset.id;
+  history = history.filter(function(h){ return h.id !== id; });
+  saveHistory();
+  detailOverlay.classList.remove('open');
+  if (selectedId === id) selectedId = null;
+  render();
+  showToast('🗑️ Webhook deleted');
+});
+
+// Clear all
+clearAllBtn.addEventListener('click', function(){
+  if (history.length === 0) return;
+  if (confirm('Clear all webhook history?')) {
+    history = [];
+    selectedId = null;
+    saveHistory();
+    render();
+    showToast('🗑️ All webhooks cleared');
+  }
+});
+
+// Copy helper
+function copyText(text, msg) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function(){
+      showToast('✅ ' + msg);
+    }).catch(function(){
+      fallbackCopy(text, msg);
+    });
+  } else {
+    fallbackCopy(text, msg);
+  }
+}
+
+function fallbackCopy(text, msg) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+    showToast('✅ ' + msg);
+  } catch(e) {
+    showToast('⚠️ Cannot copy');
+  }
+  document.body.removeChild(ta);
+}
+
+// Toast
+function showToast(msg) {
+  toastMsg.textContent = msg;
+  toast.style.display = 'flex';
+  isToastVisible = true;
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, 3500);
+}
+
+function hideToast() {
+  toast.style.display = 'none';
+  isToastVisible = false;
+}
+
+toastClose.addEventListener('click', hideToast);
+
+// HMAC Verification
+const hmacToggle = document.getElementById('hmacToggle');
+const hmacBody = document.getElementById('hmacBody');
+const hmacSecret = document.getElementById('hmacSecret');
+const hmacSigHeader = document.getElementById('hmacSigHeader');
+const hmacAlgo = document.getElementById('hmacAlgo');
+const hmacExpected = document.getElementById('hmacExpected');
+const hmacComputeBtn = document.getElementById('hmacComputeBtn');
+const hmacComputedSig = document.getElementById('hmacComputedSig');
+const hmacStatus = document.getElementById('hmacStatus');
+const hmacResult = document.getElementById('hmacResult');
+
+hmacToggle.addEventListener('click', function(){
+  hmacBody.classList.toggle('open');
+  hmacToggle.textContent = hmacBody.classList.contains('open')
+    ? '🔐 HMAC Signature Verification ▴' : '🔐 HMAC Signature Verification ▾';
+});
+
+// Convert hex string to ArrayBuffer
+function hexToBuffer(hex) {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2)
+    bytes[i/2] = parseInt(hex.substr(i, 2), 16);
+  return bytes.buffer;
+}
+
+// ArrayBuffer to hex string
+function bufferToHex(buf) {
+  const bytes = new Uint8Array(buf);
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Encode string to ArrayBuffer (UTF-8)
+function strToBuf(str) {
+  return new TextEncoder().encode(str).buffer;
+}
+
+async function computeHMAC(secret, data, algorithm) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    strToBuf(secret),
+    { name: 'HMAC', hash: { name: algorithm } },
+    false,
+    ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, strToBuf(data));
+  return bufferToHex(sig);
+}
+
+hmacComputeBtn.addEventListener('click', async function(){
+  const secret = hmacSecret.value.trim();
+  if (!secret) { showToast('⚠️ Enter a shared secret'); return; }
+
+  const payload = payloadInput.value.trim();
+  if (!payload) { showToast('⚠️ Enter a JSON payload first'); return; }
+
+  const algo = hmacAlgo.value; // 'SHA-256' or 'SHA-1'
+  const dataToSign = payload;
+  const expectedSig = hmacExpected.value.trim().toLowerCase();
+
+  try {
+    const computedSig = await computeHMAC(secret, dataToSign, algo);
+    hmacComputedSig.textContent = (algo === 'SHA-256' ? 'sha256=' : 'sha1=') + computedSig;
+    hmacResult.classList.add('show');
+
+    if (expectedSig) {
+      const cleanExpected = expectedSig.replace(/^sha256=|^sha1=/i, '');
+      if (computedSig === cleanExpected) {
+        hmacStatus.innerHTML = '<span class="sig-match">✅ MATCH — signatures are identical</span>';
+      } else {
+        hmacStatus.innerHTML = '<span class="sig-mismatch">❌ MISMATCH — signatures differ</span>';
+      }
+    } else {
+      hmacStatus.innerHTML = '<span style="color:var(--text-dim);">ℹ No expected signature provided for comparison</span>';
+    }
+  } catch(err) {
+    showToast('⚠️ HMAC error: ' + err.message);
+  }
+});
+
+// Auto-detect expected signature from headers
+function autoDetectExpectedSig() {
+  const headers = collectHeaders();
+  const sigHeader = hmacSigHeader.value.trim().toLowerCase();
+  if (sigHeader && headers[sigHeader]) {
+    hmacExpected.value = headers[sigHeader];
+  }
+}
+
+// Override send to auto-update expected signature
+const origSend = sendBtn.click;
+sendBtn.addEventListener('click', function(){
+  setTimeout(autoDetectExpectedSig, 100);
+});
+
+// Init
+loadHistory();
+render();
+validateJSON();
+
+})();
+</script>
+</body>
+</html>

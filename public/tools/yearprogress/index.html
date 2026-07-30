@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Year Progress 2026</title>
+<!--
+  Year Progress — live year progress bar
+  Dark theme, zero dependencies, single-file HTML
+  Inspired by dayleft (https://github.com/soumendrak/dayleft)
+-->
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0d0d;
+    --surface: #1a1a1a;
+    --accent: #ff6b35;
+    --accent-dim: #cc5529;
+    --text: #e0e0e0;
+    --text-dim: #888;
+    --text-muted: #555;
+    --bar-track: #2a2a2a;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .container {
+    max-width: 420px;
+    width: 100%;
+    background: var(--surface);
+    border-radius: 28px;
+    padding: 36px 32px 32px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* subtle glow accent line at top */
+  .container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20%;
+    right: 20%;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    border-radius: 0 0 3px 3px;
+  }
+
+  .year {
+    font-size: 42px;
+    font-weight: 800;
+    letter-spacing: 4px;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+
+  .year .leap-badge {
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--accent);
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 10px;
+    vertical-align: middle;
+    margin-left: 6px;
+    letter-spacing: 0;
+  }
+
+  .subtitle {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 28px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* --- Ring --- */
+  .ring-wrapper {
+    position: relative;
+    width: 200px;
+    height: 200px;
+    margin: 0 auto 18px;
+  }
+
+  .ring-wrapper svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+
+  .ring-bg {
+    fill: none;
+    stroke: var(--bar-track);
+    stroke-width: 8;
+  }
+
+  .ring-fg {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 8;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .ring-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    width: 100%;
+  }
+
+  .ring-percent {
+    font-size: 42px;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1;
+    transition: opacity 0.4s ease;
+  }
+
+  .ring-percent .pct-sign {
+    font-size: 20px;
+    font-weight: 400;
+    color: var(--text-dim);
+  }
+
+  .ring-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-top: 4px;
+  }
+
+  /* --- Thin progress bar --- */
+  .bar-section {
+    margin: 16px 0 22px;
+  }
+
+  .bar-track {
+    width: 100%;
+    height: 4px;
+    background: var(--bar-track);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+    border-radius: 4px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* --- Stats grid --- */
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-top: 8px;
+  }
+
+  .stat-card {
+    background: rgba(255,255,255,0.04);
+    border-radius: 14px;
+    padding: 14px 6px;
+    transition: background 0.2s;
+  }
+
+  .stat-card:hover {
+    background: rgba(255,255,255,0.07);
+  }
+
+  .stat-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.2;
+  }
+
+  .stat-value.accent { color: var(--accent); }
+  .stat-value.green  { color: #4caf7d; }
+  .stat-value.blue   { color: #5b9bd5; }
+
+  .stat-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  /* --- Custom Range Settings --- */
+  .settings-toggle {
+    margin-top: 16px;
+    font-size: 10px;
+    color: var(--text-muted);
+    cursor: pointer;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    background: none;
+    border: none;
+    font-family: inherit;
+    transition: color 0.2s;
+  }
+  .settings-toggle:hover { color: var(--text-dim); }
+
+  .settings-panel {
+    margin-top: 12px;
+    padding: 14px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 14px;
+    display: none;
+    text-align: left;
+  }
+  .settings-panel.open { display: block; }
+
+  .settings-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .settings-row:last-child { margin-bottom: 0; }
+  .settings-row label {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    min-width: 60px;
+  }
+  .settings-row input {
+    background: var(--bg);
+    border: 1px solid var(--bar-track);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    outline: none;
+    color-scheme: dark;
+  }
+  .settings-row input:focus { border-color: var(--accent); }
+  .settings-row input[type="date"] { flex: 1; min-width: 120px; }
+  .settings-row input[type="text"] { flex: 1; min-width: 80px; }
+  .settings-row input[type="number"] { width: 70px; }
+  .settings-note {
+    font-size: 9px;
+    color: var(--text-muted);
+    margin-top: 6px;
+    text-align: center;
+  }
+
+  .goal-display {
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+  }
+  .goal-display .goal-value {
+    color: var(--accent);
+    font-weight: 600;
+    font-family: var(--mono, monospace);
+  }
+
+  /* --- Footer --- */
+  .footer {
+    margin-top: 20px;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .footer a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .footer a:hover {
+    text-decoration: underline;
+  }
+
+  /* --- Responsive --- */
+  @media (max-width: 460px) {
+    .container { padding: 28px 18px 24px; border-radius: 20px; }
+    .year { font-size: 34px; }
+    .ring-wrapper { width: 160px; height: 160px; }
+    .ring-percent { font-size: 34px; }
+    .ring-percent .pct-sign { font-size: 16px; }
+    .stat-value { font-size: 18px; }
+    .stats { gap: 8px; }
+    .stat-card { padding: 10px 4px; }
+  }
+
+  @media (max-width: 360px) {
+    .ring-wrapper { width: 130px; height: 130px; }
+    .ring-percent { font-size: 28px; }
+    .stat-value { font-size: 15px; }
+    .stats { gap: 5px; }
+    .stat-card { padding: 8px 3px; border-radius: 10px; }
+  }
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+
+<div class="container" id="app">
+  <div class="year">
+    <span id="yearDisplay">2026</span>
+    <span class="leap-badge" id="leapBadge" hidden>LEAP</span>
+  </div>
+  <div class="subtitle">Year Progress</div>
+
+  <!-- Ring -->
+  <div class="ring-wrapper">
+    <svg viewBox="0 0 120 120" aria-label="Year progress ring">
+      <circle class="ring-bg" cx="60" cy="60" r="52"/>
+      <circle class="ring-fg" id="ringFg" cx="60" cy="60" r="52"
+              stroke-dasharray="326.726"
+              stroke-dashoffset="326.726"/>
+    </svg>
+    <div class="ring-center">
+      <div class="ring-percent" id="percentDisplay">0<span class="pct-sign">%</span></div>
+      <div class="ring-label">elapsed</div>
+    </div>
+  </div>
+
+  <!-- Thin bar -->
+  <div class="bar-section">
+    <div class="bar-track">
+      <div class="bar-fill" id="barFill"></div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-value blue" id="dayDisplay">1</div>
+      <div class="stat-label">Day of Year</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="daysLeftDisplay">364</div>
+      <div class="stat-label">Days Left</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value green" id="freeDaysDisplay">0</div>
+      <div class="stat-label">Free Days</div>
+    </div>
+  </div>
+
+  <!-- Custom Goal Display -->
+  <div class="goal-display" id="goalDisplay" style="display:none">
+    <span id="goalText">Progress toward goal</span>: <span class="goal-value" id="goalValue">0%</span>
+  </div>
+
+  <!-- Settings -->
+  <button class="settings-toggle" id="settingsToggle">⚙ Custom Range &amp; Goal</button>
+  <div class="settings-panel" id="settingsPanel">
+    <div class="settings-row">
+      <label>Start</label>
+      <input type="date" id="startDateInput">
+    </div>
+    <div class="settings-row">
+      <label>End</label>
+      <input type="date" id="endDateInput">
+    </div>
+    <div class="settings-row">
+      <label>Goal Name</label>
+      <input type="text" id="goalNameInput" placeholder="e.g. Read 50 books" maxlength="40">
+    </div>
+    <div class="settings-row">
+      <label>Target</label>
+      <input type="number" id="goalTargetInput" min="1" value="100" placeholder="100">
+      <label style="min-width:auto">Current</label>
+      <input type="number" id="goalCurrentInput" min="0" value="0" placeholder="0">
+    </div>
+    <div class="settings-note">Leave start/end empty for the full calendar year.</div>
+  </div>
+
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  const C = 2 * Math.PI * 52; // ~326.726
+  const ringFg  = document.getElementById('ringFg');
+  const barFill = document.getElementById('barFill');
+  const yrEl    = document.getElementById('yearDisplay');
+  const leapEl  = document.getElementById('leapBadge');
+  const pctEl   = document.getElementById('percentDisplay');
+  const dayEl   = document.getElementById('dayDisplay');
+  const leftEl  = document.getElementById('daysLeftDisplay');
+  const freeEl  = document.getElementById('freeDaysDisplay');
+  const goalDisplay = document.getElementById('goalDisplay');
+  const goalText = document.getElementById('goalText');
+  const goalValue = document.getElementById('goalValue');
+  const settingsToggle = document.getElementById('settingsToggle');
+  const settingsPanel = document.getElementById('settingsPanel');
+  const startDateInput = document.getElementById('startDateInput');
+  const endDateInput = document.getElementById('endDateInput');
+  const goalNameInput = document.getElementById('goalNameInput');
+  const goalTargetInput = document.getElementById('goalTargetInput');
+  const goalCurrentInput = document.getElementById('goalCurrentInput');
+
+  // Saved settings
+  let customStart = null;
+  let customEnd = null;
+  let goalName = '';
+  let goalTarget = 100;
+  let goalCurrent = 0;
+
+  function isLeap(y) {
+    return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+  }
+
+  function daysInYear(y) {
+    return isLeap(y) ? 366 : 365;
+  }
+
+  function getToday() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const d = now.getDate();
+    return { year: y, month: m, day: d, date: new Date(y, m, d) };
+  }
+
+  function dayOfYear(year, month, day) {
+    const start = new Date(year, 0, 0);
+    const diff  = new Date(year, month, day) - start;
+    return Math.floor(diff / 86400000);
+  }
+
+  function countFreeDaysRemaining(year, month, day) {
+    let count = 0;
+    const start = new Date(year, month, day + 1);
+    const end   = new Date(year, 11, 31);
+    let cur = new Date(start);
+    while (cur <= end) {
+      const dow = cur.getDay();
+      if (dow === 0 || dow === 6) count++;
+      cur.setDate(cur.getDate() + 1);
+    }
+    return count;
+  }
+
+  function dateToStr(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+
+  function strToDate(s) {
+    if (!s) return null;
+    const d = new Date(s + 'T00:00:00');
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem('yp-settings');
+      if (raw) {
+        const s = JSON.parse(raw);
+        customStart = s.start || null;
+        customEnd = s.end || null;
+        goalName = s.goalName || '';
+        goalTarget = s.goalTarget || 100;
+        goalCurrent = s.goalCurrent || 0;
+      }
+    } catch(e) {}
+    if (customStart) startDateInput.value = customStart;
+    if (customEnd) endDateInput.value = customEnd;
+    goalNameInput.value = goalName;
+    goalTargetInput.value = goalTarget;
+    goalCurrentInput.value = goalCurrent;
+  }
+
+  function saveSettings() {
+    try {
+      localStorage.setItem('yp-settings', JSON.stringify({
+        start: customStart,
+        end: customEnd,
+        goalName: goalName,
+        goalTarget: goalTarget,
+        goalCurrent: goalCurrent
+      }));
+    } catch(e) {}
+  }
+
+  function update() {
+    const { year, month, day, date: today } = getToday();
+
+    // Determine date range
+    let rangeStart, rangeEnd;
+    if (customStart) {
+      rangeStart = strToDate(customStart);
+    }
+    if (!rangeStart) rangeStart = new Date(year, 0, 1); // Jan 1
+
+    if (customEnd) {
+      rangeEnd = strToDate(customEnd);
+    }
+    if (!rangeEnd) rangeEnd = new Date(year, 11, 31); // Dec 31
+
+    // Ensure start <= end
+    if (rangeStart > rangeEnd) {
+      const tmp = rangeStart;
+      rangeStart = rangeEnd;
+      rangeEnd = tmp;
+    }
+
+    const totalDays = Math.round((rangeEnd - rangeStart) / 86400000) + 1;
+    const elapsedDays = Math.round((today - rangeStart) / 86400000);
+    const pct = totalDays > 0 ? Math.min(1, Math.max(0, elapsedDays / totalDays)) : 0;
+    const pctDisplay = Math.min(100, Math.round(pct * 100));
+
+    const total = daysInYear(year);
+    const doy = dayOfYear(year, month, day);
+    const daysLeft = total - doy;
+    const freeDays = countFreeDaysRemaining(year, month, day);
+
+    // Year + leap badge
+    yrEl.textContent = year;
+    leapEl.hidden = !isLeap(year);
+
+    // Ring
+    const offset = C * (1 - pct);
+    ringFg.setAttribute('stroke-dashoffset', offset);
+
+    // Bar
+    barFill.style.width = (pct * 100) + '%';
+
+    // Percentage
+    pctEl.innerHTML = pctDisplay + '<span class="pct-sign">%</span>';
+
+    // Stats (still show calendar year stats)
+    dayEl.textContent = doy;
+    leftEl.textContent = daysLeft;
+    freeEl.textContent = freeDays;
+
+    // Custom goal
+    if (goalName && goalTarget > 0) {
+      const goalPct = Math.min(100, Math.max(0, (goalCurrent / goalTarget) * 100));
+      goalDisplay.style.display = 'block';
+      goalText.textContent = goalName;
+      goalValue.textContent = formatNumber(goalCurrent) + ' / ' + formatNumber(goalTarget) + ' (' + goalPct.toFixed(1) + '%)';
+    } else {
+      goalDisplay.style.display = 'none';
+    }
+
+    // Update document title
+    document.title = pctDisplay + '% — Year Progress ' + year;
+  }
+
+  function formatNumber(n) {
+    return Number(n).toLocaleString();
+  }
+
+  // Settings event handlers
+  settingsToggle.addEventListener('click', function() {
+    settingsPanel.classList.toggle('open');
+  });
+
+  function onSettingChange() {
+    customStart = startDateInput.value || null;
+    customEnd = endDateInput.value || null;
+    goalName = goalNameInput.value.trim();
+    goalTarget = parseInt(goalTargetInput.value) || 100;
+    goalCurrent = parseInt(goalCurrentInput.value) || 0;
+    saveSettings();
+    update();
+  }
+
+  startDateInput.addEventListener('change', onSettingChange);
+  endDateInput.addEventListener('change', onSettingChange);
+  goalNameInput.addEventListener('input', onSettingChange);
+  goalTargetInput.addEventListener('input', onSettingChange);
+  goalCurrentInput.addEventListener('input', onSettingChange);
+
+  loadSettings();
+  update();
+  setInterval(update, 60000);
+})();
+</script>
+</body>
+</html>

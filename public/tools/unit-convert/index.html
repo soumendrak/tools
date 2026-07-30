@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>unit-convert</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>⇄</text></svg>">
+<style>
+:root {
+    --bg: #0a0a14;
+    --surface: #16162a;
+    --accent: #ff6b35;
+    --accent-light: #ff8c42;
+    --accent-dark: #d94f1a;
+    --accent-glow: rgba(255, 107, 53, 0.15);
+    --accent-subtle: rgba(255, 107, 53, 0.06);
+    --text: #f0ece4;
+    --text-dim: #8a8a9a;
+    --text-muted: #5a5a6e;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --mono: "SF Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.container {
+    width: 100%;
+    max-width: 640px;
+    padding: 2rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+header { text-align: center; margin-bottom: 1.5rem; }
+h1 {
+    text-transform: uppercase;
+    letter-spacing: 0.35em;
+    font-weight: 200;
+    opacity: 0.5;
+    font-size: 1.5rem;
+}
+.tagline { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.3rem; }
+.categories {
+    display: flex;
+    gap: 0.3rem;
+    margin-bottom: 1.2rem;
+    flex-wrap: wrap;
+}
+.cat-btn {
+    padding: 0.5rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--text-muted);
+    border-radius: var(--radius-sm);
+    color: var(--text-dim);
+    cursor: pointer;
+    font-family: var(--font);
+    font-size: 0.8rem;
+    transition: all 0.2s;
+}
+.cat-btn:hover { border-color: var(--accent); color: var(--text); }
+.cat-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+.converter-card {
+    background: var(--surface);
+    border: 1px solid var(--text-muted);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+}
+.converter-content { display: none; }
+.converter-content.active { display: block; }
+.converter-row {
+    display: flex;
+    gap: 0.8rem;
+    align-items: center;
+    margin: 1rem 0;
+}
+.converter-row select, .converter-row input {
+    background: var(--bg);
+    border: 1px solid var(--text-muted);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    padding: 0.6rem 0.8rem;
+    font-family: var(--font);
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.converter-row select:focus, .converter-row input:focus { border-color: var(--accent); }
+.converter-row select { min-width: 5rem; cursor: pointer; }
+.converter-row input[type="number"] { flex: 1; min-width: 0; }
+.converter-row input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
+.swap-btn {
+    padding: 0.5rem;
+    background: var(--bg);
+    border: 1px solid var(--text-muted);
+    border-radius: var(--radius-sm);
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: all 0.2s;
+    line-height: 1;
+}
+.swap-btn:hover { border-color: var(--accent); color: var(--accent); }
+.result-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1rem;
+    padding: 1rem;
+    background: var(--bg);
+    border-radius: var(--radius-md);
+    min-height: 3.5rem;
+}
+.result-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--accent-light);
+    font-family: var(--mono);
+}
+.result-unit {
+    font-size: 1rem;
+    color: var(--text-dim);
+    margin-left: 0.5rem;
+}
+.result-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-align: center;
+    margin-top: 0.3rem;
+}
+.equivalents {
+    margin-top: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+.equivalent-tag {
+    background: var(--accent-subtle);
+    border: 1px solid var(--accent-glow);
+    border-radius: var(--radius-sm);
+    padding: 0.3rem 0.6rem;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.equivalent-tag:hover { border-color: var(--accent); color: var(--text); }
+.equivalent-tag strong { color: var(--accent-light); }
+footer {
+    text-align: center;
+    padding: 1.5rem;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    margin-top: auto;
+}
+footer a { color: var(--text-muted); text-decoration: none; }
+footer a:hover { color: var(--accent); }
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<div class="container">
+<header>
+    <h1>unit-convert</h1>
+    <p class="tagline">Quick unit conversions</p>
+</header>
+<div class="categories" id="catTabs">
+    <div class="cat-btn active" data-cat="temp">Temperature</div>
+    <div class="cat-btn" data-cat="length">Length</div>
+    <div class="cat-btn" data-cat="weight">Weight</div>
+    <div class="cat-btn" data-cat="area">Area</div>
+    <div class="cat-btn" data-cat="volume">Volume</div>
+    <div class="cat-btn" data-cat="speed">Speed</div>
+    <div class="cat-btn" data-cat="pressure">Pressure</div>
+    <div class="cat-btn" data-cat="energy">Energy</div>
+    <div class="cat-btn" data-cat="storage">Storage</div>
+</div>
+<div class="converter-card">
+    <div class="converter-content active" id="cat-temp">
+        <div class="converter-row">
+            <select id="tempFrom"></select>
+            <input type="number" id="tempInput" value="100" step="any">
+            <button class="swap-btn" data-cat="temp" title="Swap units">⇄</button>
+            <select id="tempTo"></select>
+        </div>
+        <div class="result-row">
+            <span class="result-value" id="tempResult">212</span>
+            <span class="result-unit" id="tempResultUnit">°F</span>
+        </div>
+        <div class="result-label">converted</div>
+    </div>
+    <div class="converter-content" id="cat-length">
+        <div class="converter-row">
+            <select id="lenFrom"></select>
+            <input type="number" id="lenInput" value="1" step="any">
+            <button class="swap-btn" data-cat="length" title="Swap units">⇄</button>
+            <select id="lenTo"></select>
+        </div>
+        <div class="result-row">
+            <span class="result-value" id="lenResult">1000</span>
+            <span class="result-unit" id="lenResultUnit">mm</span>
+        </div>
+        <div class="result-label">converted</div>
+    </div>
+    <div class="converter-content" id="cat-weight">
+        <div class="converter-row">
+            <select id="wgtFrom"></select>
+            <input type="number" id="wgtInput" value="1" step="any">
+            <button class="swap-btn" data-cat="weight" title="Swap units">⇄</button>
+            <select id="wgtTo"></select>
+        </div>
+        <div class="result-row">
+            <span class="result-value" id="wgtResult">1000</span>
+            <span class="result-unit" id="wgtResultUnit">mg</span>
+        </div>
+        <div class="result-label">converted</div>
+    </div>
+    <div class="converter-content" id="cat-area">
+        <div class="converter-row">
+            <select id="areaFrom"></select>
+            <input type="number" id="areaInput" value="1" step="any">
+            <button class="swap-btn" data-cat="area" title="Swap units">⇄</button>
+            <select id="areaTo"></select>
+        </div>
+        <div class="result-row">
+            <span class="result-value" id="areaResult">1000000</span>
+            <span class="result-unit" id="areaResultUnit">sq mm</span>
+        </div>
+        <div class="result-label">converted</div>
+    </div>
+    <div class="converter-content" id="cat-volume">
+        <div class="converter-row">
+            <select id="volFrom"></select>
+            <input type="number" id="volInput" value="1" step="any">
+            <button class="swap-btn" data-cat="volume" title="Swap units">⇄</button>
+            <select id="volTo"></select>
+        </div>
+        <div class="result-row">
+            <span class="result-value" id="volResult">1000</span>
+            <span class="result-unit" id="volResultUnit">mL</span>
+        </div>
+        <div class="result-label">converted</div>
+    </div>
+    <div class="converter-content" id="cat-speed">
+        <div class="converter-row">
+            <select id="spdFrom"></select>
+            <input type="number" id="spdInput" value="1" step="any">
+            <button class="swap-btn" data-cat="speed" title="Swap units">⇄</button>
+            <select id="spdTo"></select>
+        </div>
+        <div class="result-row">
+            <span class="result-value" id="spdResult">0.621371</span>
+            <span class="result-unit" id="spdResultUnit">mph</span>
+        </div>
+        <div class="result-label">converted</div>
+    </div>
+    <div class="converter-content" id="cat-pressure">
+        <div class="converter-row">
+            <select id="prsFrom"></select>
+            <input type="number" id="prsInput" value="1" step="any">
+            <button class="swap-btn" data-cat="pressure" title="Swap units">⇄</button>
+            <select id="prsTo"></select>
+        </div>
+        <div class="result-row">
+            <span class="result-value" id="prsResult">0.01</span>
+            <span class="result-unit" id="prsResultUnit">hPa</span>
+        </div>
+        <div class="result-label">converted</div>
+    </div>
+    <div class="converter-content" id="cat-energy">
+        <div class="converter-row">
+            <select id="engFrom"></select>
+            <input type="number" id="engInput" value="1" step="any">
+            <button class="swap-btn" data-cat="energy" title="Swap units">⇄</button>
+            <select id="engTo"></select>
+        </div>
+        <div class="result-row">
+            <span class="result-value" id="engResult">0.239006</span>
+            <span class="result-unit" id="engResultUnit">cal</span>
+        </div>
+        <div class="result-label">converted</div>
+    </div>
+    <div class="converter-content" id="cat-storage">
+        <div class="converter-row">
+            <select id="stgFrom"></select>
+            <input type="number" id="stgInput" value="1" step="any">
+            <button class="swap-btn" data-cat="storage" title="Swap units">⇄</button>
+            <select id="stgTo"></select>
+        </div>
+        <div class="result-row">
+            <span class="result-value" id="stgResult">1024</span>
+            <span class="result-unit" id="stgResultUnit">KB</span>
+        </div>
+        <div class="result-label">converted</div>
+    </div>
+</div>
+</div>
+<script>
+(function(){
+'use strict';
+
+const categories = {
+    temp: {
+        units: ['°C', '°F', 'K'],
+        toBase: { '°C': v => v, '°F': v => (v - 32) * 5/9, 'K': v => v - 273.15 },
+        fromBase: { '°C': v => v, '°F': v => v * 9/5 + 32, 'K': v => v + 273.15 }
+    },
+    length: {
+        units: ['mm', 'cm', 'm', 'km', 'in', 'ft', 'yd', 'mi'],
+        toBase: { 'mm': v => v / 1000, 'cm': v => v / 100, 'm': v => v, 'km': v => v * 1000, 'in': v => v * 0.0254, 'ft': v => v * 0.3048, 'yd': v => v * 0.9144, 'mi': v => v * 1609.344 },
+        fromBase: { 'mm': v => v * 1000, 'cm': v => v * 100, 'm': v => v, 'km': v => v / 1000, 'in': v => v / 0.0254, 'ft': v => v / 0.3048, 'yd': v => v / 0.9144, 'mi': v => v / 1609.344 }
+    },
+    weight: {
+        units: ['mg', 'g', 'kg', 'oz', 'lb'],
+        toBase: { 'mg': v => v / 1e6, 'g': v => v / 1000, 'kg': v => v, 'oz': v => v * 0.0283495, 'lb': v => v * 0.453592 },
+        fromBase: { 'mg': v => v * 1e6, 'g': v => v * 1000, 'kg': v => v, 'oz': v => v / 0.0283495, 'lb': v => v / 0.453592 }
+    },
+    area: {
+        units: ['sq mm', 'sq cm', 'sq m', 'sq km', 'sq ft', 'sq yd', 'acre'],
+        toBase: { 'sq mm': v => v / 1e6, 'sq cm': v => v / 10000, 'sq m': v => v, 'sq km': v => v * 1e6, 'sq ft': v => v * 0.092903, 'sq yd': v => v * 0.836127, 'acre': v => v * 4046.86 },
+        fromBase: { 'sq mm': v => v * 1e6, 'sq cm': v => v * 10000, 'sq m': v => v, 'sq km': v => v / 1e6, 'sq ft': v => v / 0.092903, 'sq yd': v => v / 0.836127, 'acre': v => v / 4046.86 }
+    },
+    volume: {
+        units: ['mL', 'L', 'gal (US)', 'cup', 'fl oz'],
+        toBase: { 'mL': v => v / 1000, 'L': v => v, 'gal (US)': v => v * 3.78541, 'cup': v => v * 0.236588, 'fl oz': v => v * 0.0295735 },
+        fromBase: { 'mL': v => v * 1000, 'L': v => v, 'gal (US)': v => v / 3.78541, 'cup': v => v / 0.236588, 'fl oz': v => v / 0.0295735 }
+    },
+    speed: {
+        units: ['km/h', 'mph', 'knot', 'mach'],
+        toBase: { 'km/h': v => v / 3.6, 'mph': v => v * 0.44704, 'knot': v => v * 0.514444, 'mach': v => v * 343 },
+        fromBase: { 'km/h': v => v * 3.6, 'mph': v => v / 0.44704, 'knot': v => v / 0.514444, 'mach': v => v / 343 }
+    },
+    pressure: {
+        units: ['Pa', 'hPa', 'kPa', 'bar', 'psi', 'atm'],
+        toBase: { 'Pa': v => v, 'hPa': v => v * 100, 'kPa': v => v * 1000, 'bar': v => v * 100000, 'psi': v => v * 6894.76, 'atm': v => v * 101325 },
+        fromBase: { 'Pa': v => v, 'hPa': v => v / 100, 'kPa': v => v / 1000, 'bar': v => v / 100000, 'psi': v => v / 6894.76, 'atm': v => v / 101325 }
+    },
+    energy: {
+        units: ['J', 'kJ', 'cal', 'kcal', 'Wh', 'kWh'],
+        toBase: { 'J': v => v, 'kJ': v => v * 1000, 'cal': v => v * 4.184, 'kcal': v => v * 4184, 'Wh': v => v * 3600, 'kWh': v => v * 3600000 },
+        fromBase: { 'J': v => v, 'kJ': v => v / 1000, 'cal': v => v / 4.184, 'kcal': v => v / 4184, 'Wh': v => v / 3600, 'kWh': v => v / 3600000 }
+    },
+    storage: {
+        units: ['B', 'KB', 'MB', 'GB', 'TB'],
+        toBase: { 'B': v => v, 'KB': v => v * 1024, 'MB': v => v * 1048576, 'GB': v => v * 1073741824, 'TB': v => v * 1099511627776 },
+        fromBase: { 'B': v => v, 'KB': v => v / 1024, 'MB': v => v / 1048576, 'GB': v => v / 1073741824, 'TB': v => v / 1099511627776 }
+    }
+};
+
+const catKeys = ['temp', 'length', 'weight', 'area', 'volume', 'speed', 'pressure', 'energy', 'storage'];
+const prefixMap = {
+    temp: 'temp', length: 'len', weight: 'wgt', area: 'area', volume: 'vol',
+    speed: 'spd', pressure: 'prs', energy: 'eng', storage: 'stg'
+};
+const defaults = {
+    temp: { from: '°C', to: '°F' },
+    length: { from: 'm', to: 'mm' },
+    weight: { from: 'kg', to: 'mg' },
+    area: { from: 'sq m', to: 'sq mm' },
+    volume: { from: 'L', to: 'mL' },
+    speed: { from: 'km/h', to: 'mph' },
+    pressure: { from: 'Pa', to: 'hPa' },
+    energy: { from: 'J', to: 'cal' },
+    storage: { from: 'MB', to: 'KB' }
+};
+
+const selects = {};
+const inputs = {};
+const results = {};
+const resultUnits = {};
+
+catKeys.forEach(key => {
+    const prefix = prefixMap[key];
+    selects[key + 'From'] = document.getElementById(prefix + 'From');
+    selects[key + 'To'] = document.getElementById(prefix + 'To');
+    inputs[key] = document.getElementById(prefix + 'Input');
+    results[key] = document.getElementById(prefix + 'Result');
+    resultUnits[key] = document.getElementById(prefix + 'ResultUnit');
+});
+
+function populateSelect(sel, units) {
+    sel.innerHTML = '';
+    units.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u;
+        opt.textContent = u;
+        sel.appendChild(opt);
+    });
+}
+
+catKeys.forEach(key => {
+    populateSelect(selects[key + 'From'], categories[key].units);
+    populateSelect(selects[key + 'To'], categories[key].units);
+    selects[key + 'From'].value = defaults[key].from;
+    selects[key + 'To'].value = defaults[key].to;
+});
+
+function convert(catKey) {
+    const cat = categories[catKey];
+    const fromUnit = selects[catKey + 'From'].value;
+    const toUnit = selects[catKey + 'To'].value;
+    const inputVal = parseFloat(inputs[catKey].value);
+    if (isNaN(inputVal)) { results[catKey].textContent = '—'; return; }
+    const baseVal = cat.toBase[fromUnit](inputVal);
+    const result = cat.fromBase[toUnit](baseVal);
+    const formatted = result < 1e-8 && result > -1e-8 ? '0' : result.toLocaleString(undefined, { maximumFractionDigits: 10 });
+    results[catKey].textContent = formatted;
+    resultUnits[catKey].textContent = toUnit;
+}
+
+catKeys.forEach(key => {
+    const prefix = prefixMap[key];
+    const fromSel = selects[key + 'From'];
+    const toSel = selects[key + 'To'];
+    const input = inputs[key];
+    fromSel.addEventListener('change', () => convert(key));
+    toSel.addEventListener('change', () => convert(key));
+    input.addEventListener('input', () => convert(key));
+});
+
+// Swap buttons
+document.querySelectorAll('.swap-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const cat = this.dataset.cat;
+        const fromSel = selects[cat + 'From'];
+        const toSel = selects[cat + 'To'];
+        const tmp = fromSel.value;
+        fromSel.value = toSel.value;
+        toSel.value = tmp;
+        convert(cat);
+    });
+});
+
+// Category tabs
+document.querySelectorAll('.cat-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        document.querySelectorAll('.converter-content').forEach(c => c.classList.remove('active'));
+        document.getElementById('cat-' + this.dataset.cat).classList.add('active');
+    });
+});
+
+// Initial conversions
+catKeys.forEach(key => convert(key));
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>diff-checker</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>⇄</text></svg>">
+<style>
+:root {
+    --bg: #0a0a14;
+    --surface: #16162a;
+    --accent: #ff6b35;
+    --accent-light: #ff8c42;
+    --accent-dark: #d94f1a;
+    --accent-glow: rgba(255, 107, 53, 0.15);
+    --accent-subtle: rgba(255, 107, 53, 0.06);
+    --text: #f0ece4;
+    --text-dim: #8a8a9a;
+    --text-muted: #5a5a6e;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --mono: "SF Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.container {
+    width: 100%;
+    max-width: 1400px;
+    padding: 2rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+header { text-align: center; margin-bottom: 1.5rem; }
+h1 {
+    text-transform: uppercase;
+    letter-spacing: 0.35em;
+    font-weight: 200;
+    opacity: 0.5;
+    font-size: 1.5rem;
+}
+.tagline { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.3rem; }
+.controls {
+    display: flex;
+    gap: 0.8rem;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+.btn {
+    padding: 0.5rem 1.2rem;
+    background: var(--surface);
+    border: 1px solid var(--text-muted);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    cursor: pointer;
+    font-family: var(--font);
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-light); }
+.btn-danger { border-color: #d44; color: #d44; }
+.btn-danger:hover { background: rgba(221,68,68,0.1); border-color: #f66; }
+.compare-wrap {
+    display: flex;
+    gap: 1rem;
+    flex: 1;
+    min-height: 0;
+}
+.pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.pane-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+.pane-header label { font-size: 0.8rem; color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase; }
+.editor-area {
+    flex: 1;
+    display: flex;
+    background: var(--surface);
+    border: 1px solid var(--text-muted);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    min-height: 300px;
+}
+.line-nums {
+    padding: 0.8rem 0.5rem;
+    background: var(--bg);
+    color: var(--text-muted);
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    line-height: 1.6;
+    text-align: right;
+    min-width: 2.5rem;
+    user-select: none;
+    border-right: 1px solid var(--text-muted);
+    white-space: pre;
+}
+.text-content {
+    flex: 1;
+    padding: 0.8rem;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    outline: none;
+}
+.text-content[contenteditable="true"]:focus { outline: none; }
+.text-content .removed { background: rgba(221,68,68,0.25); }
+.text-content .added { background: rgba(68,221,68,0.2); }
+.text-content .removed-char { background: rgba(221,68,68,0.4); text-decoration: line-through; }
+.text-content .added-char { background: rgba(68,221,68,0.35); }
+.text-content.empty { color: var(--text-muted); }
+.pane textarea {
+    display: none;
+}
+.options {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-top: 0.8rem;
+}
+.toggle-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+.toggle-wrap input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: 1rem;
+    height: 1rem;
+    cursor: pointer;
+}
+.stats {
+    margin-top: 0.8rem;
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    flex-wrap: wrap;
+}
+.stats span { display: inline-flex; align-items: center; gap: 0.3rem; }
+.stats .added-count { color: #4c4; }
+.stats .removed-count { color: #d44; }
+footer {
+    text-align: center;
+    padding: 1.5rem;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+footer a { color: var(--text-muted); text-decoration: none; }
+footer a:hover { color: var(--accent); }
+@media (max-width: 768px) {
+    .container { padding: 1rem; }
+    .compare-wrap { flex-direction: column; }
+}
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<div class="container">
+<header>
+    <h1>diff-checker</h1>
+    <p class="tagline">Compare text side by side</p>
+</header>
+<div class="controls">
+    <button class="btn btn-danger" id="clearLeftBtn">Clear Left</button>
+    <button class="btn btn-danger" id="clearRightBtn">Clear Right</button>
+</div>
+<div class="compare-wrap">
+    <div class="pane">
+        <div class="pane-header">
+            <label>Original</label>
+        </div>
+        <div class="editor-area" id="leftArea">
+            <div class="line-nums" id="leftNums"></div>
+            <div class="text-content" id="leftContent" contenteditable="true" spellcheck="false"></div>
+        </div>
+    </div>
+    <div class="pane">
+        <div class="pane-header">
+            <label>Modified</label>
+        </div>
+        <div class="editor-area" id="rightArea">
+            <div class="line-nums" id="rightNums"></div>
+            <div class="text-content" id="rightContent" contenteditable="true" spellcheck="false"></div>
+        </div>
+    </div>
+</div>
+<div class="options">
+    <label class="toggle-wrap">
+        <input type="checkbox" id="wordWrapToggle" checked> Word Wrap
+    </label>
+</div>
+<div class="stats" id="stats">
+    <span class="removed-count" id="removedCount">−0 lines</span>
+    <span class="added-count" id="addedCount">+0 lines</span>
+</div>
+</div>
+<script>
+(function(){
+'use strict';
+
+const leftContent = document.getElementById('leftContent');
+const rightContent = document.getElementById('rightContent');
+const leftNums = document.getElementById('leftNums');
+const rightNums = document.getElementById('rightNums');
+const clearLeftBtn = document.getElementById('clearLeftBtn');
+const clearRightBtn = document.getElementById('clearRightBtn');
+const wordWrapToggle = document.getElementById('wordWrapToggle');
+const removedCount = document.getElementById('removedCount');
+const addedCount = document.getElementById('addedCount');
+
+// Debounce utility
+function debounce(fn, ms) {
+    let timer;
+    return function(...args) {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn.apply(this, args), ms);
+    };
+}
+
+leftContent.textContent = 'Hello World\nThis is a test\nThird line\nFourth line';
+rightContent.textContent = 'Hello World\nThis is a modified test\nThird line\nAnother line\nFifth line';
+
+function updateLineNums() {
+    const leftLines = leftContent.textContent.split('\n');
+    const rightLines = rightContent.textContent.split('\n');
+    const maxLines = Math.max(leftLines.length, rightLines.length);
+    let leftNumStr = '', rightNumStr = '';
+    for (let i = 1; i <= maxLines; i++) {
+        leftNumStr += i + '\n';
+        rightNumStr += i + '\n';
+    }
+    leftNums.textContent = leftNumStr;
+    rightNums.textContent = rightNumStr;
+}
+
+function getText(el) {
+    return el.textContent;
+}
+
+function setText(el, text) {
+    el.textContent = text;
+}
+
+// LCS-based diff
+function lcs(a, b) {
+    const m = a.length, n = b.length;
+    const dp = Array.from({length: m + 1}, () => new Int32Array(n + 1));
+    for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+            if (a[i - 1] === b[j - 1]) dp[i][j] = dp[i - 1][j - 1] + 1;
+            else dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+        }
+    }
+    const result = [];
+    let i = m, j = n;
+    while (i > 0 || j > 0) {
+        if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
+            result.unshift({type: 'same', value: a[i - 1]});
+            i--; j--;
+        } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+            result.unshift({type: 'added', value: b[j - 1]});
+            j--;
+        } else {
+            result.unshift({type: 'removed', value: a[i - 1]});
+            i--;
+        }
+    }
+    return result;
+}
+
+function charDiff(a, b) {
+    const m = a.length, n = b.length;
+    const dp = Array.from({length: m + 1}, () => new Int32Array(n + 1));
+    for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+            if (a[i - 1] === b[j - 1]) dp[i][j] = dp[i - 1][j - 1] + 1;
+            else dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+        }
+    }
+    const result = [];
+    let i = m, j = n;
+    while (i > 0 || j > 0) {
+        if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
+            result.unshift({type: 'same', char: a[i - 1]});
+            i--; j--;
+        } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+            result.unshift({type: 'added', char: b[j - 1]});
+            j--;
+        } else {
+            result.unshift({type: 'removed', char: a[i - 1]});
+            i--;
+        }
+    }
+    return result;
+}
+
+function renderCharDiff(chars) {
+    let html = '';
+    for (const c of chars) {
+        if (c.type === 'same') html += escapeHtml(c.char);
+        else if (c.type === 'removed') html += '<span class="removed-char">' + escapeHtml(c.char) + '</span>';
+        else if (c.type === 'added') html += '<span class="added-char">' + escapeHtml(c.char) + '</span>';
+    }
+    return html;
+}
+
+function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function compare() {
+    const leftText = getText(leftContent);
+    const rightText = getText(rightContent);
+    const leftLines = leftText.split('\n');
+    const rightLines = rightText.split('\n');
+
+    const diff = lcs(leftLines, rightLines);
+
+    let leftResult = '', rightResult = '';
+    let removedTotal = 0, addedTotal = 0;
+
+    for (const d of diff) {
+        if (d.type === 'same') {
+            leftResult += escapeHtml(d.value) + '\n';
+            rightResult += escapeHtml(d.value) + '\n';
+        } else if (d.type === 'removed') {
+            leftResult += '<span class="removed">' + renderCharDiff(charDiff(d.value, '')) + '</span>\n';
+            rightResult += '\n';
+            removedTotal++;
+        } else if (d.type === 'added') {
+            leftResult += '\n';
+            rightResult += '<span class="added">' + renderCharDiff(charDiff('', d.value)) + '</span>\n';
+            addedTotal++;
+        }
+    }
+
+    // Character-level diffs for changed lines
+    // Re-do with character detail
+    leftResult = ''; rightResult = '';
+    for (const d of diff) {
+        if (d.type === 'same') {
+            leftResult += escapeHtml(d.value) + '\n';
+            rightResult += escapeHtml(d.value) + '\n';
+        } else if (d.type === 'removed') {
+            const chars = charDiff(d.value, '');
+            leftResult += '<span class="removed">' + renderCharDiff(chars) + '</span>\n';
+            rightResult += '\n';
+            removedTotal++;
+        } else if (d.type === 'added') {
+            leftResult += '\n';
+            const chars = charDiff('', d.value);
+            rightResult += '<span class="added">' + renderCharDiff(chars) + '</span>\n';
+            addedTotal++;
+        }
+    }
+
+    // Now handle changed lines with character diff
+    // Re-diff with character-level on mismatched pairs
+    leftResult = ''; rightResult = '';
+    let li = 0, ri = 0;
+    for (const d of diff) {
+        if (d.type === 'same') {
+            leftResult += escapeHtml(d.value) + '\n';
+            rightResult += escapeHtml(d.value) + '\n';
+            li++; ri++;
+        } else if (d.type === 'removed') {
+            const lineA = d.value;
+            let lineB = '';
+            if (ri < rightLines.length && (li >= leftLines.length || leftLines[li] !== rightLines[ri])) {
+                lineB = rightLines[ri];
+                const chars = charDiff(lineA, lineB);
+                leftResult += '<span class="removed">' + renderCharDiff(chars) + '</span>\n';
+                rightResult += '<span class="added">' + renderCharDiff(chars) + '</span>\n';
+                li++; ri++;
+                removedTotal++; addedTotal++;
+                // skip the next added if it matches
+                continue;
+            }
+            const chars = charDiff(d.value, '');
+            leftResult += '<span class="removed">' + renderCharDiff(chars) + '</span>\n';
+            rightResult += '\n';
+            removedTotal++;
+            li++;
+        } else if (d.type === 'added') {
+            // Check if it was already consumed by a removed+added pair above
+            let consumed = false;
+            // This is an orphaned added line
+            const chars = charDiff('', d.value);
+            leftResult += '\n';
+            rightResult += '<span class="added">' + renderCharDiff(chars) + '</span>\n';
+            addedTotal++;
+            ri++;
+        }
+    }
+
+    leftContent.innerHTML = leftResult.replace(/\n$/, '');
+    rightContent.innerHTML = rightResult.replace(/\n$/, '');
+
+    removedCount.textContent = '−' + removedTotal + ' line' + (removedTotal !== 1 ? 's' : '');
+    addedCount.textContent = '+' + addedTotal + ' line' + (addedTotal !== 1 ? 's' : '');
+    updateLineNums();
+}
+
+const debouncedCompare = debounce(compare, 300);
+
+leftContent.addEventListener('input', function() {
+    updateLineNums();
+    debouncedCompare();
+});
+rightContent.addEventListener('input', function() {
+    updateLineNums();
+    debouncedCompare();
+});
+
+clearLeftBtn.addEventListener('click', function() {
+    leftContent.textContent = '';
+    leftContent.innerHTML = '';
+    updateLineNums();
+    compare();
+});
+
+clearRightBtn.addEventListener('click', function() {
+    rightContent.textContent = '';
+    rightContent.innerHTML = '';
+    updateLineNums();
+    compare();
+});
+
+wordWrapToggle.addEventListener('change', function() {
+    const ww = this.checked ? 'pre-wrap' : 'pre';
+    leftContent.style.whiteSpace = ww;
+    rightContent.style.whiteSpace = ww;
+});
+
+updateLineNums();
+compare();
+})();
+</script>
+</body>
+</html>

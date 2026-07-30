@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Day Left</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      background: #0d0d0d;
+      color: #f0f0f0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 1.25rem;
+      padding: 2rem;
+      transition: background 0.6s;
+    }
+    body.overtime { background: #1a0a0a; }
+    .timer {
+      font-size: clamp(4rem, 18vw, 14rem);
+      font-weight: 200;
+      letter-spacing: 0.02em;
+      font-variant-numeric: tabular-nums;
+      color: #e0e0e0;
+      transition: color 0.6s;
+    }
+    body.overtime .timer { color: #cc4444; }
+    .target-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.3em;
+      user-select: none;
+      transition: color 0.3s;
+    }
+    .target-row input {
+      background: none;
+      border: none;
+      border-bottom: 1px solid #333;
+      color: #aaa;
+      font-size: 0.85rem;
+      font-family: inherit;
+      letter-spacing: 0.15em;
+      width: 65px;
+      text-align: center;
+      outline: none;
+      padding: 2px 0;
+      transition: border-color 0.3s, color 0.3s;
+    }
+    .target-row input:focus { border-color: #888; color: #e0e0e0; }
+    .target-row .sep { color: #333; letter-spacing: 0; }
+    .date-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.7rem;
+      color: #444;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      user-select: none;
+      position: relative;
+    }
+    .date-row .arrow {
+      cursor: pointer;
+      color: #444;
+      transition: color 0.3s;
+      font-size: 0.9rem;
+      padding: 0 4px;
+    }
+    .date-row .arrow:hover { color: #888; }
+    .date-label {
+      min-width: 120px;
+      text-align: center;
+      cursor: pointer;
+      transition: color 0.3s;
+    }
+    .date-label:hover { color: #888; }
+    .date-picker {
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      margin-top: 4px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #aaa;
+      font-family: inherit;
+      font-size: 0.8rem;
+      padding: 6px 8px;
+      border-radius: 4px;
+      outline: none;
+      cursor: pointer;
+      display: none;
+      color-scheme: dark;
+    }
+    .date-picker:focus,
+    .date-picker.open { display: block; }
+    .date-picker::-webkit-calendar-picker-indicator {
+      filter: invert(0.5); cursor: pointer;
+    }
+    .done {
+      color: #3a3;
+      font-size: 0.85rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+    }
+    .meter {
+      width: min(320px, 70vw);
+      height: 1px;
+      background: #222;
+    }
+    .meter-fill {
+      height: 100%;
+      background: #e0e0e0;
+      transition: width 1s linear;
+    }
+    body.overtime .meter-fill { background: #cc4444; }
+    footer {
+      position: fixed;
+      bottom: 2rem;
+      font-size: 0.75rem;
+      color: #333;
+      letter-spacing: 0.1em;
+    }
+    .reset {
+      margin-top: 1.5rem;
+      font-size: 0.7rem;
+      color: #333;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      cursor: pointer;
+      background: none;
+      border: none;
+      font-family: inherit;
+      transition: color 0.3s;
+    }
+    .reset:hover { color: #666; }
+    /* Watch list styles */
+    .watch-section {
+      margin-top: 1rem;
+      width: min(400px, 85vw);
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .watch-section::-webkit-scrollbar { width: 4px; }
+    .watch-section::-webkit-scrollbar-track { background: transparent; }
+    .watch-section::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+    .watch-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.65rem;
+      color: #444;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      margin-bottom: 0.5rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    .watch-add-btn {
+      background: none;
+      border: 1px solid #333;
+      color: #666;
+      font-size: 0.7rem;
+      font-family: inherit;
+      padding: 2px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.1em;
+    }
+    .watch-add-btn:hover { border-color: #888; color: #aaa; }
+    .watch-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-size: 0.78rem;
+      color: #555;
+    }
+    .watch-item:hover { background: #1a1a1a; color: #aaa; }
+    .watch-item.active {
+      color: #e0e0e0;
+      background: #1a1a1a;
+    }
+    .watch-item .watch-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin-right: 0.5rem;
+    }
+    .watch-item .watch-info {
+      font-size: 0.6rem;
+      color: #444;
+      font-variant-numeric: tabular-nums;
+      margin-right: 0.5rem;
+      flex-shrink: 0;
+    }
+    .watch-item .watch-remove {
+      background: none;
+      border: none;
+      color: #333;
+      font-size: 0.7rem;
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: all 0.2s;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+    .watch-item .watch-remove:hover { color: #cc4444; background: rgba(204,68,68,0.1); }
+    .watch-empty {
+      font-size: 0.7rem;
+      color: #333;
+      text-align: center;
+      padding: 0.5rem;
+    }
+    .watch-name-input {
+      background: none;
+      border: none;
+      border-bottom: 1px solid #333;
+      color: #aaa;
+      font-size: 0.78rem;
+      font-family: inherit;
+      outline: none;
+      padding: 2px 4px;
+      flex: 1;
+      min-width: 0;
+      margin-right: 0.5rem;
+    }
+    .watch-name-input:focus { border-color: #888; color: #e0e0e0; }
+  </style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+  <div class="target-row" title="Click to edit target time">
+    <span>UNTIL</span>
+    <input type="text" id="hourInput" maxlength="2" value="11">
+    <span class="sep">:</span>
+    <input type="text" id="minInput" maxlength="2" value="59">
+    <span id="ampm">PM</span>
+  </div>
+  <div class="date-row">
+    <span class="arrow" id="prevDay">◂</span>
+    <span class="date-label" id="dateLabel">Today</span>
+    <input type="date" class="date-picker" id="datePicker">
+    <span class="arrow" id="nextDay">▸</span>
+  </div>
+  <div class="timer" id="timer">--:--:--</div>
+  <div class="done" id="done" style="display:none">Done</div>
+  <div class="meter">
+    <div class="meter-fill" id="meter"></div>
+  </div>
+  <button class="reset" id="reset">Reset to 11:59 PM Today</button>
+
+  <!-- Watch List -->
+  <div class="watch-section" id="watchSection">
+    <div class="watch-header">
+      <span>Watch List</span>
+      <button class="watch-add-btn" id="watchAddBtn">+ Save Current</button>
+    </div>
+    <div id="watchList"></div>
+  </div>
+
+  <footer id="footer">your timezone</footer>
+
+  <script>
+    const timer = document.getElementById('timer');
+    const meter = document.getElementById('meter');
+    const done = document.getElementById('done');
+    const body = document.body;
+    const hourInput = document.getElementById('hourInput');
+    const minInput = document.getElementById('minInput');
+    const ampm = document.getElementById('ampm');
+    const dateLabel = document.getElementById('dateLabel');
+    const datePicker = document.getElementById('datePicker');
+    const reset = document.getElementById('reset');
+    const watchList = document.getElementById('watchList');
+    const watchAddBtn = document.getElementById('watchAddBtn');
+
+    let targetH = 23;
+    let targetM = 59;
+    let dayOffset = 0;
+    let targets = [];
+    let activeTargetIdx = -1;
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    function getTargetDate() {
+      const d = new Date();
+      d.setDate(d.getDate() + dayOffset);
+      d.setHours(targetH, targetM, 0, 0);
+      return d;
+    }
+
+    function formatDate(d) {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const targetDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const diffDays = Math.round((targetDay - today) / 86400000);
+
+      if (diffDays === 0) return 'Today';
+      if (diffDays === 1) return 'Tomorrow';
+      if (diffDays === -1) return 'Yesterday';
+
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]}`;
+    }
+
+    function getTargetLabel() {
+      let h = targetH;
+      const am = targetH < 12 ? 'AM' : 'PM';
+      if (h === 0) h = 12;
+      else if (h > 12) h -= 12;
+      return `${h}:${pad(targetM)} ${am}`;
+    }
+
+    function saveTargets() {
+      try {
+        localStorage.setItem('dayleft-targets', JSON.stringify(targets));
+      } catch(e) {}
+    }
+
+    function loadTargets() {
+      try {
+        const raw = localStorage.getItem('dayleft-targets');
+        if (raw) targets = JSON.parse(raw);
+      } catch(e) { targets = []; }
+    }
+
+    function save() {
+      try {
+        localStorage.setItem('dayleft-target', JSON.stringify([targetH, targetM, dayOffset]));
+      } catch(e) {}
+    }
+
+    function load() {
+      try {
+        const raw = localStorage.getItem('dayleft-target');
+        if (raw) {
+          const v = JSON.parse(raw);
+          targetH = v[0]; targetM = v[1];
+          dayOffset = (typeof v[2] === 'number') ? v[2] : 0;
+        }
+      } catch(e) {}
+      updateInputs();
+      updateDateLabel();
+    }
+
+    function updateInputs() {
+      if (targetH === 0) {
+        hourInput.value = '12'; ampm.textContent = 'AM';
+      } else if (targetH < 12) {
+        hourInput.value = targetH; ampm.textContent = 'AM';
+      } else if (targetH === 12) {
+        hourInput.value = '12'; ampm.textContent = 'PM';
+      } else {
+        hourInput.value = targetH - 12; ampm.textContent = 'PM';
+      }
+      minInput.value = pad(targetM);
+    }
+
+    function toDateStr(d) {
+      return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+    }
+
+    function updateDateLabel() {
+      const d = getTargetDate();
+      dateLabel.textContent = formatDate(d);
+      datePicker.value = toDateStr(d);
+    }
+
+    function pickDateFromPicker() {
+      if (!datePicker.value) return;
+      const picked = new Date(datePicker.value + 'T00:00:00');
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      dayOffset = Math.round((picked - today) / 86400000);
+      save();
+      updateDateLabel();
+      tick();
+    }
+
+    function parseInputs() {
+      let h = parseInt(hourInput.value, 10);
+      let m = parseInt(minInput.value, 10);
+      if (isNaN(h) || h < 1 || h > 12) return false;
+      if (isNaN(m) || m < 0 || m > 59) return false;
+      if (ampm.textContent === 'PM' && h !== 12) h += 12;
+      if (ampm.textContent === 'AM' && h === 12) h = 0;
+
+      if (dayOffset === 0) {
+        const now = new Date();
+        const candidate = new Date(now);
+        candidate.setHours(h, m, 0, 0);
+        if (candidate <= now) {
+          dayOffset = 1;
+        }
+      }
+
+      targetH = h; targetM = m;
+      save();
+      updateInputs();
+      updateDateLabel();
+      tick();
+      return true;
+    }
+
+    function toggleAmPm() {
+      if (ampm.textContent === 'PM') ampm.textContent = 'AM';
+      else ampm.textContent = 'PM';
+      parseInputs();
+    }
+
+    function shiftDay(delta) {
+      dayOffset = Math.max(-30, Math.min(365, dayOffset + delta));
+      save();
+      updateDateLabel();
+      tick();
+    }
+
+    function renderWatchList() {
+      if (!targets.length) {
+        watchList.innerHTML = '<div class="watch-empty">No saved targets. Set one and click "Save Current".</div>';
+        return;
+      }
+      let html = '';
+      for (let i = 0; i < targets.length; i++) {
+        const t = targets[i];
+        const isActive = (activeTargetIdx === i);
+        const activeClass = isActive ? ' active' : '';
+        // Show the target's remaining time info
+        const d = new Date();
+        d.setDate(d.getDate() + t.dayOffset);
+        d.setHours(t.h, t.m, 0, 0);
+        const remaining = d - new Date();
+        const info = remaining > 0 ? '—' : '✓ done';
+        html += `<div class="watch-item${activeClass}" data-idx="${i}">
+          <span class="watch-name">${escapeHtml(t.name)}</span>
+          <span class="watch-info">${getWatchTime(t)} ${info}</span>
+          <button class="watch-remove" data-idx="${i}" title="Remove">✕</button>
+        </div>`;
+      }
+      watchList.innerHTML = html;
+
+      watchList.querySelectorAll('.watch-item').forEach(item => {
+        item.addEventListener('click', function(e) {
+          if (e.target.classList.contains('watch-remove')) return;
+          const idx = parseInt(this.dataset.idx);
+          loadWatchTarget(idx);
+        });
+      });
+      watchList.querySelectorAll('.watch-remove').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const idx = parseInt(this.dataset.idx);
+          targets.splice(idx, 1);
+          if (activeTargetIdx === idx) activeTargetIdx = -1;
+          else if (activeTargetIdx > idx) activeTargetIdx--;
+          saveTargets();
+          renderWatchList();
+        });
+      });
+    }
+
+    function getWatchTime(t) {
+      let h = t.h;
+      const am = h < 12 ? 'AM' : 'PM';
+      if (h === 0) h = 12;
+      else if (h > 12) h -= 12;
+      const suffix = t.dayOffset === 0 ? '' : t.dayOffset > 0 ? ' (+' + t.dayOffset + 'd)' : ' (' + t.dayOffset + 'd)';
+      return `${h}:${pad(t.m)} ${am}${suffix}`;
+    }
+
+    function loadWatchTarget(idx) {
+      const t = targets[idx];
+      if (!t) return;
+      targetH = t.h;
+      targetM = t.m;
+      dayOffset = t.dayOffset;
+      activeTargetIdx = idx;
+      save();
+      updateInputs();
+      updateDateLabel();
+      tick();
+      renderWatchList();
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
+    function addCurrentToWatch() {
+      // Prompt for a name
+      const name = prompt('Name this target:', 'Target ' + (targets.length + 1));
+      if (name === null) return;
+      const cleanName = name.trim() || ('Target ' + (targets.length + 1));
+      targets.push({ name: cleanName, h: targetH, m: targetM, dayOffset: dayOffset });
+      activeTargetIdx = targets.length - 1;
+      saveTargets();
+      renderWatchList();
+    }
+
+    hourInput.addEventListener('blur', parseInputs);
+    minInput.addEventListener('blur', parseInputs);
+    hourInput.addEventListener('keydown', e => { if (e.key === 'Enter') parseInputs(); });
+    minInput.addEventListener('keydown', e => { if (e.key === 'Enter') parseInputs(); });
+    hourInput.addEventListener('focus', () => hourInput.select());
+    minInput.addEventListener('focus', () => minInput.select());
+    ampm.addEventListener('click', e => { e.stopPropagation(); toggleAmPm(); });
+    document.getElementById('prevDay').addEventListener('click', () => shiftDay(-1));
+    document.getElementById('nextDay').addEventListener('click', () => shiftDay(1));
+    dateLabel.addEventListener('click', () => { datePicker.classList.add('open'); datePicker.showPicker(); });
+    datePicker.addEventListener('change', pickDateFromPicker);
+    datePicker.addEventListener('blur', () => datePicker.classList.remove('open'));
+
+    watchAddBtn.addEventListener('click', addCurrentToWatch);
+
+    reset.addEventListener('click', () => {
+      targetH = 23; targetM = 59; dayOffset = 0;
+      datePicker.value = '';
+      activeTargetIdx = -1;
+      save();
+      updateInputs();
+      updateDateLabel();
+      tick();
+      renderWatchList();
+    });
+
+    function tick() {
+      const now = new Date();
+      const end = getTargetDate();
+
+      if (now >= end) {
+        const diff = now - end;
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        timer.textContent = `+${pad(h)}:${pad(m)}:${pad(s)}`;
+        meter.style.width = '100%';
+        body.classList.add('overtime');
+        done.style.display = 'block';
+        return;
+      }
+
+      body.classList.remove('overtime');
+      done.style.display = 'none';
+
+      const remaining = end - now;
+      const totalMs = 24 * 60 * 60 * 1000;
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const targetMsFromMidnight = (end - todayStart) - (dayOffset * totalMs);
+      const pct = 100 - ((remaining / targetMsFromMidnight) * 100);
+
+      const h = Math.floor(remaining / 3600000);
+      const m = Math.floor((remaining % 3600000) / 60000);
+      const s = Math.floor((remaining % 60000) / 1000);
+
+      timer.textContent = `${pad(h)}:${pad(m)}:${pad(s)}`;
+      meter.style.width = `${Math.min(100, Math.max(0, pct)).toFixed(2)}%`;
+    }
+
+    loadTargets();
+    load();
+    renderWatchList();
+    tick();
+    setInterval(tick, 1000);
+  </script>
+</body>
+</html>

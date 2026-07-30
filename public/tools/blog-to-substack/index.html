@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RSS → Substack</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6;
+         background: var(--bg, #fff); color: var(--text, #333); }
+  a { color: var(--accent, #b4522e); }
+  h1 { margin-bottom: 6px; }
+  .intro { color: var(--text-dim, #666); margin-top: 0; }
+  .feed-row { display: flex; gap: 8px; margin: 14px 0 6px; flex-wrap: wrap; }
+  #feedUrl { flex: 1; min-width: 240px; font-size: 15px; padding: 10px 12px; border-radius: 6px;
+             background: var(--surface, #fff); color: var(--text, #333);
+             border: 1px solid var(--border, #ddd); }
+  .proxy { display: block; font-size: 13px; color: var(--text-dim, #666); margin: 0 0 10px; }
+  .proxy input { vertical-align: middle; margin-right: 4px; }
+  select { font-size: 16px; padding: 8px; max-width: 100%; border-radius: 6px;
+           background: var(--surface, #f4f5f7); color: var(--text, #333);
+           border: 1px solid var(--border, #ddd); }
+  button { padding: 12px 20px; font-size: 16px; border: none; border-radius: 6px;
+           cursor: pointer; background: var(--accent, #b4522e); color: #fff; font-weight: bold; }
+  button.secondary { background: var(--surface, #666); color: var(--text, #fff);
+                     border: 1px solid var(--border, transparent); }
+  .buttons { display: flex; gap: 10px; margin: 15px 0; flex-wrap: wrap; }
+  #status { padding: 10px; border-radius: 6px; margin: 10px 0; display: none; }
+  #status.ok { display: block; background: #d4edda; color: #155724; }
+  #status.err { display: block; background: #f8d7da; color: #721c24; }
+  #preview { border: 1px solid var(--border, #ddd); border-radius: 6px; padding: 20px;
+             margin-top: 20px; background: var(--surface, transparent); }
+  #preview img { max-width: 100%; height: auto; }
+  #preview a { color: var(--accent, #b4522e); text-decoration: underline; text-underline-offset: 2px; }
+  #preview a:hover { color: var(--accent-hover, var(--accent-dark, #9c4527)); }
+  #preview blockquote { border-left: 3px solid var(--accent, #b4522e);
+                        margin-left: 0; padding-left: 15px; }
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<h1>RSS → Substack</h1>
+<p class="intro">Load any blog's RSS or Atom feed, pick a post, and copy it as
+   Substack-ready rich text — formatting, links and images carry over. Then paste
+   into a new <a href="https://substack.com/home" target="_blank" rel="noopener">Substack post</a>.</p>
+
+<div class="feed-row">
+  <input id="feedUrl" type="url" placeholder="https://example.com/feed.xml"
+         value="https://www.soumendrak.com/atom.xml" spellcheck="false">
+  <button id="loadFeed">Load feed</button>
+</div>
+<label class="proxy">
+  <input type="checkbox" id="useProxy"> Fetch via CORS proxy (allorigins.win) — try this if a feed blocks direct access
+</label>
+
+<p><label>Post: <select id="picker"></select></label></p>
+<div class="buttons">
+  <button id="copyRich">Copy rich text for Substack</button>
+  <button id="copyHtml" class="secondary">Copy raw HTML</button>
+</div>
+<div id="status"></div>
+<div id="preview">Enter a feed URL and click “Load feed”.</div>
+
+<script>
+const DEFAULT_FEED = 'https://www.soumendrak.com/atom.xml';
+const STORE_KEY = 'substack-feed-url';
+const ATOM = 'http://www.w3.org/2005/Atom';
+const CONTENT_NS = 'http://purl.org/rss/1.0/modules/content/';
+
+let entries = [];
+let baseUrl = DEFAULT_FEED;
+
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/[&<>"]/g,
+  c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+
+function status(msg, cls) {
+  const el = $('status');
+  el.textContent = msg;
+  el.className = cls || '';
+}
+
+function fmtDate(raw) {
+  if (!raw) return '';
+  const d = new Date(raw);
+  return isNaN(d) ? raw.slice(0, 16) : d.toISOString().slice(0, 10);
+}
+
+// Handles both Atom (<entry>) and RSS 2.0 (<item>) feeds.
+function parseFeed(text) {
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  if (doc.querySelector('parsererror')) throw new Error('could not parse feed XML');
+
+  const atom = [...doc.getElementsByTagNameNS(ATOM, 'entry')];
+  if (atom.length) {
+    return atom.map(e => {
+      const tag = t => e.getElementsByTagNameNS(ATOM, t)[0];
+      const links = [...e.getElementsByTagNameNS(ATOM, 'link')];
+      const alt = links.find(l => (l.getAttribute('rel') || 'alternate') === 'alternate') || links[0];
+      const content = tag('content') || tag('summary');
+      return {
+        title: (tag('title')?.textContent || '(untitled)').trim(),
+        url: alt?.getAttribute('href') || '',
+        date: fmtDate((tag('published') || tag('updated'))?.textContent),
+        html: content?.textContent || '',
+      };
+    });
+  }
+
+  const items = [...doc.querySelectorAll('item')];
+  if (!items.length) {
+    throw new Error('no <entry> or <item> elements found — is this an RSS or Atom feed?');
+  }
+  return items.map(it => {
+    const encoded = it.getElementsByTagNameNS(CONTENT_NS, 'encoded')[0];
+    return {
+      title: (it.querySelector('title')?.textContent || '(untitled)').trim(),
+      url: (it.querySelector('link')?.textContent || '').trim(),
+      date: fmtDate(it.querySelector('pubDate')?.textContent),
+      html: encoded?.textContent || it.querySelector('description')?.textContent || '',
+    };
+  });
+}
+
+// Remote feed HTML is untrusted. Strip anything that can execute in the
+// same-origin preview: dangerous elements, event-handler attributes, inline
+// styles, and javascript:/data: URLs. (Same origin as every other tool, so an
+// XSS here could read their localStorage — API tokens, etc.)
+const SAFE_URL = /^(https?:|mailto:|tel:|#|\/)/i;
+function safeUrl(v) {
+  return SAFE_URL.test((v || '').trim()) ? v : '#';
+}
+function sanitize(root) {
+  root.querySelectorAll(
+    'script,style,iframe,object,embed,link,meta,base,form,input,button,textarea,select,svg'
+  ).forEach(el => el.remove());
+  root.querySelectorAll('*').forEach(el => {
+    [...el.attributes].forEach(a => {
+      const n = a.name.toLowerCase();
+      const v = (a.value || '').trim();
+      if (n.startsWith('on') || n === 'style' || n === 'srcset') {
+        el.removeAttribute(a.name);
+        return;
+      }
+      if (n === 'href' || n === 'src' || n === 'xlink:href' || n === 'formaction') {
+        const ok = SAFE_URL.test(v) ||
+          (n === 'src' && el.tagName === 'IMG' && /^data:image\//i.test(v));
+        if (!ok) el.removeAttribute(a.name);
+      }
+    });
+  });
+}
+
+// Converts common shortcode/embed output into markup that survives a Substack
+// paste: dual-theme images → light only, youtube iframes → linked thumbnail,
+// admonitions → blockquote, <object> PDFs → link, relative URLs → absolute.
+function cleanForSubstack(html) {
+  const d = document.createElement('div');
+  d.innerHTML = html;
+  d.querySelectorAll('img.img-dark').forEach(el => el.remove());
+  d.querySelectorAll('iframe').forEach(f => {
+    const m = (f.getAttribute('src') || '')
+      .match(/(?:youtube(?:-nocookie)?\.com\/embed\/|youtu\.be\/)([\w-]{6,})/);
+    const wrap = f.parentElement?.tagName === 'DIV' &&
+      f.parentElement.children.length === 1 ? f.parentElement : f;
+    if (!m) { wrap.remove(); return; }
+    const watch = `https://www.youtube.com/watch?v=${m[1]}`;
+    const p = document.createElement('p');
+    p.innerHTML = `<a href="${watch}"><img src="https://img.youtube.com/vi/${m[1]}/hqdefault.jpg" alt="YouTube video" width="480" height="360"></a><br><a href="${watch}">▶ Watch on YouTube</a>`;
+    wrap.replaceWith(p);
+  });
+  d.querySelectorAll('div.admonition').forEach(a => {
+    const bq = document.createElement('blockquote');
+    const title = a.querySelector('.admonition-title');
+    if (title) {
+      const p = document.createElement('p');
+      p.innerHTML = `<strong>${title.innerHTML}</strong>`;
+      bq.appendChild(p);
+      title.remove();
+    }
+    const content = a.querySelector('.admonition-content') || a;
+    while (content.firstChild) bq.appendChild(content.firstChild);
+    a.replaceWith(bq);
+  });
+  d.querySelectorAll('object').forEach(o => {
+    const p = document.createElement('p');
+    p.innerHTML = `<a href="${abs(o.getAttribute('data'))}">📄 View PDF</a>`;
+    o.replaceWith(p);
+  });
+  d.querySelectorAll('a[href], img[src]').forEach(el => {
+    const attr = el.tagName === 'A' ? 'href' : 'src';
+    let v = el.getAttribute(attr);
+    if (!v || /^(https?:|mailto:|#|data:)/.test(v)) return;
+    if (v.startsWith('@/')) {
+      // Zola internal link that escaped rendering: @/path/page.md → /path/page/
+      v = ('/' + v.slice(2)).replace(/\/index\.md$/, '/').replace(/\.md$/, '/')
+        .replaceAll(' ', '-').toLowerCase();
+    }
+    el.setAttribute(attr, abs(v));
+  });
+  sanitize(d);
+  return d.innerHTML;
+}
+
+// Resolve a possibly-relative URL against the loaded feed's origin.
+function abs(v) {
+  try { return new URL(v || '', baseUrl).href; } catch { return v || ''; }
+}
+
+function currentHtml() {
+  const e = entries[$('picker').value];
+  return `<h1>${esc(e.title)}</h1>\n${cleanForSubstack(e.html)}\n<p><a href="${esc(safeUrl(e.url))}">Read this on the web</a></p>`;
+}
+
+function render() {
+  $('preview').innerHTML = currentHtml();
+}
+
+async function loadFeed() {
+  const feed = $('feedUrl').value.trim();
+  if (!feed) { status('Enter a feed URL first.', 'err'); return; }
+  status('Loading feed…', '');
+  $('preview').textContent = 'Loading…';
+  try {
+    const target = $('useProxy').checked
+      ? 'https://api.allorigins.win/raw?url=' + encodeURIComponent(feed)
+      : feed;
+    const res = await fetch(target);
+    if (!res.ok) throw new Error(`feed fetch failed: ${res.status}`);
+    entries = parseFeed(await res.text());
+    if (!entries.length) throw new Error('no posts found in this feed');
+    baseUrl = feed;
+    try { localStorage.setItem(STORE_KEY, feed); } catch {}
+    const picker = $('picker');
+    picker.innerHTML = entries.map((e, i) =>
+      `<option value="${i}">${e.date ? e.date + ' — ' : ''}${esc(e.title)}</option>`).join('');
+    picker.onchange = render;
+    render();
+    status(`Loaded ${entries.length} posts.`, 'ok');
+  } catch (err) {
+    $('preview').textContent = '';
+    const hint = !$('useProxy').checked && /fetch|Failed|NetworkError|Load failed/i.test(err.message)
+      ? ' — the feed may block cross-origin requests; try the CORS proxy checkbox above.'
+      : '';
+    status(err.message + hint, 'err');
+  }
+}
+
+$('loadFeed').onclick = loadFeed;
+$('feedUrl').addEventListener('keydown', e => { if (e.key === 'Enter') loadFeed(); });
+
+$('copyRich').onclick = async () => {
+  if (!entries.length) { status('Load a feed first.', 'err'); return; }
+  try {
+    const html = currentHtml();
+    const plain = $('preview').innerText;
+    await navigator.clipboard.write([new ClipboardItem({
+      'text/html': new Blob([html], { type: 'text/html' }),
+      'text/plain': new Blob([plain], { type: 'text/plain' }),
+    })]);
+    status('Copied! Paste into the Substack editor.', 'ok');
+  } catch (err) { status(`Copy failed: ${err.message}`, 'err'); }
+};
+
+$('copyHtml').onclick = async () => {
+  if (!entries.length) { status('Load a feed first.', 'err'); return; }
+  try {
+    await navigator.clipboard.writeText(currentHtml());
+    status('HTML copied.', 'ok');
+  } catch (err) { status(`Copy failed: ${err.message}`, 'err'); }
+};
+
+// Restore the last-used feed and load it on open.
+try {
+  const saved = localStorage.getItem(STORE_KEY);
+  if (saved) $('feedUrl').value = saved;
+} catch {}
+loadFeed();
+</script>
+</body>
+</html>

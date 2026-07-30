@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Citation Manager</title>
+<style>
+:root {
+  --bg: #0f0f1a; --surface: #1a1a2e; --accent: #ff6b35;
+  --text: #e0e0e0; --text-muted: #8888aa; --green: #22c55e;
+  --red: #ef4444; --yellow: #eab308; --blue: #3b82f6;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg); color: var(--text); min-height: 100vh;
+}
+header {
+  background: var(--surface); padding: 16px 24px; display: flex;
+  align-items: center; justify-content: space-between;
+  border-bottom: 2px solid var(--accent);
+}
+header h1 { font-size: 1.2rem; color: var(--accent); }
+.layout {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  padding: 24px; height: calc(100vh - 90px);
+}
+.input-panel {
+  background: var(--surface); border-radius: 10px; padding: 24px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.input-panel h3 { font-size: 0.95rem; color: var(--accent); }
+.input-panel label { font-size: 0.75rem; color: var(--text-muted); }
+.input-panel input, .input-panel textarea {
+  background: var(--bg); border: 1px solid var(--surface);
+  color: var(--text); padding: 10px 14px; border-radius: 6px;
+  font-size: 0.85rem; outline: none; font-family: inherit;
+}
+.input-panel input:focus, .input-panel textarea:focus { border-color: var(--accent); }
+.input-panel textarea { resize: vertical; min-height: 60px; }
+.url-row { display: flex; gap: 10px; }
+.url-row input { flex: 1; }
+.url-row button {
+  background: var(--accent); color: #fff; border: none;
+  padding: 10px 20px; border-radius: 6px; cursor: pointer;
+  font-size: 0.85rem; font-weight: 600; white-space: nowrap;
+}
+.url-row button:hover { opacity: 0.85; }
+.meta-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+.meta-grid .full-width { grid-column: 1 / -1; }
+.preview-card {
+  background: var(--bg); border-radius: 8px; padding: 16px;
+  border: 1px solid rgba(255,107,53,0.15);
+}
+.preview-card img {
+  max-width: 100%; max-height: 200px; border-radius: 6px;
+  object-fit: cover; margin-bottom: 10px;
+}
+.output-panel {
+  background: var(--surface); border-radius: 10px; padding: 24px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.output-panel h3 { font-size: 0.95rem; color: var(--accent); }
+.format-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.format-tab {
+  padding: 6px 14px; border-radius: 6px; font-size: 0.75rem;
+  font-weight: 600; cursor: pointer; border: 1px solid var(--surface);
+  background: var(--bg); color: var(--text-muted);
+}
+.format-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.output-box {
+  background: var(--bg); border: 1px solid var(--surface);
+  border-radius: 8px; padding: 16px; font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 0.8rem; line-height: 1.6; white-space: pre-wrap;
+  overflow-y: auto; flex: 1; min-height: 200px; color: var(--text);
+}
+.copy-btn {
+  background: var(--accent); color: #fff; border: none;
+  padding: 8px 16px; border-radius: 6px; cursor: pointer;
+  font-size: 0.8rem; align-self: flex-end;
+}
+.copy-btn:hover { opacity: 0.85; }
+.history-list {
+  display: flex; flex-direction: column; gap: 6px;
+  max-height: 160px; overflow-y: auto;
+}
+.history-item {
+  background: var(--bg); padding: 8px 12px; border-radius: 6px;
+  font-size: 0.75rem; cursor: pointer; border: 1px solid transparent;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.history-item:hover { border-color: var(--accent); }
+.history-item .domain { color: var(--text-muted); font-size: 0.65rem; }
+.history-item .del-btn {
+  color: var(--red); cursor: pointer; font-size: 1rem;
+  background: none; border: none; padding: 0 4px;
+}
+.error { color: var(--red); font-size: 0.8rem; }
+.loading { color: var(--text-muted); font-size: 0.85rem; }
+
+/* Responsive & Mobile - Universal */
+@media (max-width: 768px) {
+  html { font-size: 15px; }
+  body { flex-direction: column !important; }
+  .sidebar, aside, nav.sidebar { width: 100% !important; flex-direction: row !important; flex-wrap: wrap !important; padding: 10px !important; gap: 8px !important; border-right: none !important; border-bottom: 1px solid var(--border); }
+  .main, .content-area { padding: 12px !important; }
+  .cards, .card-grid { grid-template-columns: 1fr !important; }
+  .toolbar { flex-wrap: wrap !important; gap: 6px !important; }
+  .toolbar input, .toolbar select { flex: 1 1 100% !important; min-width: 0 !important; }
+  .pane { border-right: none !important; border-bottom: 1px solid var(--border); flex: none !important; height: 50vh !important; }
+  .pane:last-child { border-bottom: none !important; }
+  header { flex-wrap: wrap !important; gap: 8px !important; padding: 12px 16px !important; }
+  .sidebar-actions button { flex: 1 !important; min-width: 80px !important; }
+  .collection-list { flex-direction: row !important; flex-wrap: wrap !important; }
+  .tabs { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  .tab { padding: 10px 14px !important; white-space: nowrap !important; }
+  .modal { width: 90% !important; max-width: 400px !important; }
+  .summary-row { padding: 12px 16px !important; gap: 8px !important; }
+  .summary-card { min-width: 80px !important; padding: 10px 14px !important; }
+  .summary-card .value { font-size: 1.2rem !important; }
+  .add-form { flex-wrap: wrap !important; }
+  .add-form input { flex: 1 1 100% !important; }
+  .status-grid { padding: 0 16px 16px !important; }
+  .url-card { padding: 12px 16px !important; }
+  .url-header { flex-wrap: wrap !important; }
+  .url-name { font-size: 0.8rem !important; word-break: break-all !important; }
+  .form-group input, .form-group select { font-size: 16px !important; }
+}
+
+@media (max-width: 480px) {
+  html { font-size: 14px; }
+  .sidebar { padding: 8px !important; gap: 4px !important; }
+  .sidebar h2 { font-size: 11px !important; }
+  .main { padding: 8px !important; }
+  header h1 { font-size: 1rem !important; }
+  .toolbar { padding: 8px !important; }
+  .send-btn, button, .btn { min-height: 44px; min-width: 44px; padding: 10px 16px !important; font-size: 14px !important; }
+  .tabs { padding: 0 8px !important; }
+  .tab { padding: 8px 12px !important; font-size: 12px !important; }
+  .headers-panel { padding: 8px !important; }
+  .header-row { flex-wrap: wrap !important; }
+  .header-row input { flex: 1 1 100% !important; }
+  .pane { height: 40vh !important; }
+  .pane textarea { padding: 10px !important; font-size: 12px !important; }
+  .output-area { max-height: 60% !important; }
+  .response-area { padding: 8px !important; }
+  .response-body { padding: 8px !important; font-size: 12px !important; }
+  .collection-item { min-width: 100px !important; padding: 6px 8px !important; font-size: 12px !important; }
+  .summary-card { min-width: 70px !important; padding: 8px 10px !important; }
+  .summary-card .value { font-size: 1rem !important; }
+  .card { padding: 14px !important; }
+  .card .value { font-size: 1.3rem !important; }
+  .chart-container { padding: 12px !important; }
+  canvas { height: 180px !important; }
+  .modal { padding: 16px !important; }
+  .empty-state { padding: 40px 16px !important; }
+  button, .btn, input[type="submit"] { min-height: 44px; }
+}
+
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<header>
+  <h1>📚 Citation Manager</h1>
+  <span style="font-size:0.75rem;color:var(--text-muted)">Paste URL → fetch metadata → generate citation</span>
+</header>
+
+<div class="layout">
+  <div class="input-panel">
+    <h3>🔗 Source Input</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+      <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;cursor:pointer;color:var(--text)">
+        <input type="radio" name="sourceType" value="url" checked onchange="switchSourceType('url')"> URL
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;cursor:pointer;color:var(--text)">
+        <input type="radio" name="sourceType" value="doi" onchange="switchSourceType('doi')"> DOI
+      </label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;cursor:pointer;color:var(--text)">
+        <input type="radio" name="sourceType" value="isbn" onchange="switchSourceType('isbn')"> ISBN
+      </label>
+    </div>
+    <div class="url-row">
+      <input id="urlInput" type="url" placeholder="https://example.com/article" onkeydown="if(event.key==='Enter')fetchMetadata()">
+      <button onclick="fetchMetadata()">🔍 Fetch</button>
+    </div>
+    <div class="error" id="fetchError"></div>
+    <div class="loading" id="fetchLoading" style="display:none">Fetching metadata...</div>
+
+    <div class="preview-card" id="previewCard" style="display:none">
+      <img id="previewImg" src="" alt="" style="display:none">
+      <div class="meta-grid">
+        <div class="full-width"><label>Title</label><input id="metaTitle" placeholder="Page title"></div>
+        <div class="full-width"><label>Description</label><textarea id="metaDesc" rows="2" placeholder="Description"></textarea></div>
+        <div><label>Author</label><input id="metaAuthor" placeholder="Author"></div>
+        <div><label>Site Name</label><input id="metaSite" placeholder="Site name"></div>
+        <div><label>Published Date</label><input id="metaDate" type="date"></div>
+        <div><label>Access Date</label><input id="metaAccess" type="date"></div>
+      </div>
+    </div>
+
+    <div style="flex:1"></div>
+    <details>
+      <summary style="color:var(--text-muted);cursor:pointer;font-size:0.8rem">📋 Recent citations</summary>
+      <div class="history-list" id="historyList">
+        <div style="color:var(--text-muted);font-size:0.75rem">No recent citations.</div>
+      </div>
+      <button onclick="clearHistory()" style="background:transparent;border:1px solid var(--red);color:var(--red);padding:4px 10px;border-radius:4px;font-size:0.7rem;cursor:pointer;margin-top:8px">Clear history</button>
+    </details>
+  </div>
+
+  <div class="output-panel">
+    <h3>📄 Citation Output</h3>
+    <div class="format-tabs">
+      <div class="format-tab active" data-format="inline" onclick="switchFormat('inline')">Inline Link</div>
+      <div class="format-tab" data-format="footnote" onclick="switchFormat('footnote')">Footnote</div>
+      <div class="format-tab" data-format="reference" onclick="switchFormat('reference')">Reference-style</div>
+      <div class="format-tab" data-format="apa" onclick="switchFormat('apa')">APA</div>
+      <div class="format-tab" data-format="bibtex" onclick="switchFormat('bibtex')">BibTeX</div>
+    </div>
+    <div class="output-box" id="outputBox">Fetch a URL or fill in metadata to generate citations.</div>
+    <button class="copy-btn" onclick="copyOutput()">📋 Copy</button>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'citation_manager_history';
+let currentFormat = 'inline';
+let history = [];
+
+function loadHistory() {
+  try { history = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+  catch(e) { history = []; }
+}
+
+function saveHistory() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(0, 50)));
+}
+
+function addToHistory(url, title) {
+  history = history.filter(h => h.url !== url);
+  history.unshift({ url, title, ts: Date.now() });
+  saveHistory();
+  renderHistory();
+}
+
+function clearHistory() {
+  if (!confirm('Clear all citation history?')) return;
+  history = [];
+  saveHistory();
+  renderHistory();
+}
+
+function renderHistory() {
+  const el = document.getElementById('historyList');
+  if (history.length === 0) {
+    el.innerHTML = '<div style="color:var(--text-muted);font-size:0.75rem">No recent citations.</div>';
+    return;
+  }
+  el.innerHTML = history.map(h => `
+    <div class="history-item" onclick="loadFromHistory('${escapeAttr(h.url)}')">
+      <span>${escapeHtml(h.title || h.url.substring(0, 50))}</span>
+      <span class="domain">${extractDomain(h.url)}</span>
+    </div>`).join('');
+}
+
+function loadFromHistory(url) {
+  document.getElementById('urlInput').value = url;
+  fetchMetadata();
+}
+
+function extractDomain(url) {
+  try { return new URL(url).hostname.replace('www.', ''); }
+  catch(e) { return url; }
+}
+
+function getSourceType() {
+  const r = document.querySelector('input[name="sourceType"]:checked');
+  return r ? r.value : 'url';
+}
+
+function switchSourceType(type) {
+  const input = document.getElementById('urlInput');
+  if (type === 'doi') {
+    input.placeholder = '10.1000/xyz123 (DOI)';
+    input.type = 'text';
+  } else if (type === 'isbn') {
+    input.placeholder = '978-3-16-148410-0 (ISBN)';
+    input.type = 'text';
+  } else {
+    input.placeholder = 'https://example.com/article';
+    input.type = 'url';
+  }
+  // Auto-detection: if input matches a different type, switch radio
+  autoDetectInputType();
+}
+
+function autoDetectInputType() {
+  const input = document.getElementById('urlInput').value.trim();
+  // DOI pattern: 10.xxxx/xxxx
+  const doiRe = /^10\.\d{4,}\/[\S]+$/;
+  // ISBN pattern: 978-X-XX-XXXXXX-X or 10 digits
+  const isbnRe = /^(?:\d[- ]?){9,13}[\dXx]$/;
+  // PMID pattern: just digits
+  const pmidRe = /^\d{1,8}$/;
+
+  if (doiRe.test(input)) {
+    document.querySelector('input[name="sourceType"][value="doi"]').checked = true;
+    switchSourceType('doi');
+    return 'doi';
+  } else if (isbnRe.test(input)) {
+    document.querySelector('input[name="sourceType"][value="isbn"]').checked = true;
+    switchSourceType('isbn');
+    return 'isbn';
+  }
+  return getSourceType();
+}
+
+function getMetaValues() {
+  return {
+    url: document.getElementById('urlInput').value.trim(),
+    title: document.getElementById('metaTitle').value.trim(),
+    desc: document.getElementById('metaDesc').value.trim(),
+    author: document.getElementById('metaAuthor').value.trim(),
+    site: document.getElementById('metaSite').value.trim(),
+    date: document.getElementById('metaDate').value,
+    accessDate: document.getElementById('metaAccess').value || new Date().toISOString().split('T')[0]
+  };
+}
+
+async function fetchMetadata() {
+  const input = document.getElementById('urlInput').value.trim();
+  if (!input) return;
+
+  const errEl = document.getElementById('fetchError');
+  const loadEl = document.getElementById('fetchLoading');
+  errEl.textContent = '';
+  loadEl.style.display = 'block';
+  document.getElementById('previewCard').style.display = 'none';
+  document.getElementById('previewImg').style.display = 'none';
+
+  // Auto-detect type regardless of radio selection
+  const detectedType = autoDetectInputType();
+  const sourceType = detectedType;
+
+  try {
+    let data = null;
+
+    if (sourceType === 'doi') {
+      // Crossref API
+      const doi = input.replace(/^https?:\/\/(?:doi\.org\/)?/, ''); // strip prefix
+      const resp = await fetch(`https://api.crossref.org/works/${encodeURIComponent(doi)}`);
+      if (!resp.ok) throw new Error(`Crossref HTTP ${resp.status}`);
+      const json = await resp.json();
+      const msg = json.message;
+      if (!msg) throw new Error('No data from Crossref');
+
+      const title = (msg.title && msg.title[0]) || '';
+      const author = (msg.author && msg.author.length)
+        ? msg.author.map(a => [a.given, a.family].filter(Boolean).join(' ')).join(', ')
+        : '';
+      const date = msg.created && msg.created['date-parts']
+        ? msg.created['date-parts'][0].join('-')
+        : '';
+      const publisher = msg.publisher || '';
+      const doiDisplay = `https://doi.org/${doi}`;
+
+      document.getElementById('metaTitle').value = title;
+      document.getElementById('metaDesc').value = msg.subtitle ? msg.subtitle[0] : (msg.abstract ? msg.abstract.replace(/<[^>]+>/g, '') : '');
+      document.getElementById('metaAuthor').value = author;
+      document.getElementById('metaSite').value = publisher || extractDomain(doiDisplay);
+      document.getElementById('metaDate').value = date;
+      document.getElementById('urlInput').value = doiDisplay;
+
+      addToHistory(doiDisplay, title);
+      data = { title, author, publisher, date };
+
+    } else if (sourceType === 'isbn') {
+      // Open Library API
+      const isbn = input.replace(/[-\s]/g, '');
+      const resp = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
+      if (!resp.ok) throw new Error(`Open Library HTTP ${resp.status}`);
+      const json = await resp.json();
+      const book = json[`ISBN:${isbn}`];
+      if (!book) throw new Error('Book not found on Open Library');
+
+      const title = book.title || '';
+      const author = (book.authors && book.authors.length)
+        ? book.authors.map(a => a.name).join(', ')
+        : '';
+      const date = book.publish_date || '';
+      const publisher = book.publishers ? book.publishers.map(p => p.name).join(', ') : '';
+      const desc = book.subtitle || '';
+      const url = `https://openlibrary.org/isbn/${isbn}`;
+
+      document.getElementById('metaTitle').value = title;
+      document.getElementById('metaDesc').value = desc;
+      document.getElementById('metaAuthor').value = author;
+      document.getElementById('metaSite').value = publisher || 'Open Library';
+      document.getElementById('metaDate').value = date;
+      document.getElementById('urlInput').value = url;
+
+      if (book.cover && book.cover.large) {
+        document.getElementById('previewImg').src = book.cover.large;
+        document.getElementById('previewImg').style.display = 'block';
+      }
+
+      addToHistory(url, title);
+      data = { title, author, publisher, date };
+
+    } else {
+      // URL mode — microlink.io fetch (existing logic)
+      const resp = await fetch(`https://api.microlink.io?url=${encodeURIComponent(input)}`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const json = await resp.json();
+
+      if (json.status === 'success' && json.data) {
+        const d = json.data;
+        document.getElementById('metaTitle').value = d.title || '';
+        document.getElementById('metaDesc').value = d.description || '';
+        document.getElementById('metaAuthor').value = d.author || '';
+        document.getElementById('metaSite').value = d.publisher || extractDomain(input);
+        document.getElementById('metaDate').value = d.date ? d.date.split('T')[0] : '';
+
+        if (d.image && d.image.url) {
+          document.getElementById('previewImg').src = d.image.url;
+          document.getElementById('previewImg').style.display = 'block';
+        }
+      } else {
+        // Fallback: set basic info from URL
+        document.getElementById('metaTitle').value = extractDomain(input);
+        document.getElementById('metaSite').value = extractDomain(input);
+      }
+
+      addToHistory(input, document.getElementById('metaTitle').value);
+      data = { title: document.getElementById('metaTitle').value };
+    }
+
+    document.getElementById('previewCard').style.display = 'block';
+    loadEl.style.display = 'none';
+    generateCitation();
+  } catch(e) {
+    loadEl.style.display = 'none';
+    document.getElementById('metaTitle').value = extractDomain(input);
+    document.getElementById('metaSite').value = extractDomain(input);
+    document.getElementById('previewImg').style.display = 'none';
+    document.getElementById('previewCard').style.display = 'block';
+    errEl.textContent = `Could not fetch metadata: ${e.message}. You can fill in manually.`;
+    generateCitation();
+  }
+}
+
+function switchFormat(format) {
+  currentFormat = format;
+  document.querySelectorAll('.format-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.format-tab[data-format="${format}"]`).classList.add('active');
+  generateCitation();
+}
+
+function generateCitation() {
+  const m = getMetaValues();
+  if (!m.url && !m.title) {
+    document.getElementById('outputBox').textContent = 'Enter a URL, DOI, or ISBN to generate citations.';
+    return;
+  }
+
+  const title = m.title || 'Untitled';
+  const url = m.url || '';
+  const desc = m.desc || '';
+  const author = m.author || '';
+  const site = m.site || extractDomain(url);
+  const date = m.date || '';
+  const accessDate = m.accessDate || new Date().toISOString().split('T')[0];
+
+  let output = '';
+
+  switch(currentFormat) {
+    case 'inline':
+      output = `[${title}](${url})${desc ? ' — ' + desc : ''}`;
+      break;
+    case 'footnote':
+      output = `${title}[^1]\n\n[^1]: ${url}${date ? ' (' + date + ')' : ''}. Accessed ${accessDate}.`;
+      break;
+    case 'reference':
+      const refId = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').substring(0, 30);
+      output = `[${title}][${refId}]\n\n[${refId}]: ${url} "${title}"`;
+      break;
+    case 'apa':
+      const apaDate = date ? `(${date}). ` : '(n.d.). ';
+      output = `${author ? author + '. ' : ''}${apaDate}*${title}*. ${site}. ${url}`;
+      break;
+    case 'bibtex':
+      const bibKey = (author || 'anon').toLowerCase().replace(/[^a-z0-9]/g, '')
+        + (date ? date.substring(0,4) : '');
+      output = `@online{${bibKey},\n  title = {${title}},\n  url = {${url}},`;
+      if (author) output += `\n  author = {${author}},`;
+      if (date) output += `\n  date = {${date}},`;
+      output += `\n  organization = {${site}},\n  urldate = {${accessDate}}\n}`;
+      break;
+  }
+
+  document.getElementById('outputBox').textContent = output;
+}
+
+async function copyOutput() {
+  const text = document.getElementById('outputBox').textContent;
+  await navigator.clipboard.writeText(text);
+  const btn = document.querySelector('.copy-btn');
+  const orig = btn.textContent;
+  btn.textContent = '✓ Copied!';
+  setTimeout(() => btn.textContent = orig, 1500);
+}
+
+function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function escapeAttr(s) { return s.replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+
+// Live preview on any field change
+document.addEventListener('DOMContentLoaded', () => {
+  loadHistory();
+  renderHistory();
+  document.getElementById('metaAccess').value = new Date().toISOString().split('T')[0];
+  ['metaTitle','metaDesc','metaAuthor','metaSite','metaDate','metaAccess','urlInput'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', generateCitation);
+  });
+  // Auto-detect on input
+  document.getElementById('urlInput').addEventListener('input', autoDetectInputType);
+});
+</script>
+</body>
+</html>

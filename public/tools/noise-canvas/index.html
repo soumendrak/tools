@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Noise Canvas</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌫️</text></svg>">
+<style>
+:root {
+    --bg: #0a0a14;
+    --surface: #16162a;
+    --accent: #ff6b35;
+    --accent-light: #ff8c42;
+    --accent-dark: #d94f1a;
+    --accent-glow: rgba(255, 107, 53, 0.15);
+    --accent-subtle: rgba(255, 107, 53, 0.06);
+    --text: #f0ece4;
+    --text-dim: #8a8a9a;
+    --text-muted: #5a5a6e;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --mono: "SF Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+}
+#app {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+#canvas-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    min-height: 0;
+}
+canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    cursor: pointer;
+}
+#controls {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface);
+    border: 1px solid var(--accent-subtle);
+    border-radius: var(--radius-lg);
+    padding: 16px 24px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+    z-index: 10;
+    max-width: 95vw;
+    transition: opacity 0.4s, transform 0.4s;
+}
+#controls.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-50%) translateY(20px);
+}
+.ctl-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+.ctl-group label {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--text-muted);
+}
+.ctl-group input[type="range"] {
+    width: 100px;
+    accent-color: var(--accent);
+    background: transparent;
+}
+.ctl-group .val {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--accent);
+}
+.ctl-group select {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--accent-subtle);
+    border-radius: var(--radius-sm);
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    font-family: var(--font);
+}
+.ctl-group select:focus { outline: none; border-color: var(--accent); }
+#fps {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    z-index: 10;
+}
+#title-bar {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    z-index: 10;
+    pointer-events: none;
+    transition: opacity 0.4s;
+}
+#title-bar h1 {
+    text-transform: uppercase;
+    letter-spacing: 0.35em;
+    font-weight: 200;
+    opacity: 0.4;
+    font-size: 0.9rem;
+}
+#title-bar .tagline {
+    color: var(--text-muted);
+    font-size: 0.65rem;
+    opacity: 0.6;
+}
+#title-bar.hidden { opacity: 0; }
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<div id="app">
+<div id="canvas-wrap">
+<canvas id="canvas"></canvas>
+<div id="title-bar">
+<h1>Noise Canvas</h1>
+<div class="tagline">Click to toggle screensaver mode</div>
+</div>
+<div id="fps">60 FPS</div>
+<div id="controls">
+<div class="ctl-group">
+<label>Frequency</label>
+<input type="range" id="freq" min="1" max="20" value="4" step="0.5">
+<div class="val" id="freq-val">4.0</div>
+</div>
+<div class="ctl-group">
+<label>Octaves</label>
+<input type="range" id="octaves" min="1" max="8" value="4" step="1">
+<div class="val" id="oct-val">4</div>
+</div>
+<div class="ctl-group">
+<label>Speed</label>
+<input type="range" id="speed" min="0" max="5" value="1" step="0.1">
+<div class="val" id="speed-val">1.0</div>
+</div>
+<div class="ctl-group">
+<label>Colors</label>
+<select id="scheme">
+<option value="fire">Fire</option>
+<option value="ocean">Ocean</option>
+<option value="aurora">Aurora</option>
+<option value="gray">Grayscale</option>
+</select>
+</div>
+<div class="ctl-group">
+<label>&nbsp;</label>
+<button id="export-btn" onclick="exportPNG()" title="Export current frame as PNG" style="background:var(--accent);border:none;color:#fff;padding:6px 14px;border-radius:var(--radius-sm);cursor:pointer;font-size:0.75rem;font-weight:600;white-space:nowrap">⬇ Export PNG</button>
+</div>
+</div>
+</div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const fpsEl = document.getElementById('fps');
+const controls = document.getElementById('controls');
+const titleBar = document.getElementById('title-bar');
+
+const freqSlider = document.getElementById('freq');
+const octSlider = document.getElementById('octaves');
+const speedSlider = document.getElementById('speed');
+const schemeSelect = document.getElementById('scheme');
+const freqVal = document.getElementById('freq-val');
+const octVal = document.getElementById('oct-val');
+const speedVal = document.getElementById('speed-val');
+
+let W, H;
+let screensaver = false;
+let time = 0;
+let lastFrame = 0;
+let frameCount = 0;
+let fpsTimer = 0;
+
+function resize() {
+    const wrap = document.getElementById('canvas-wrap');
+    W = wrap.clientWidth;
+    H = wrap.clientHeight;
+    canvas.width = W;
+    canvas.height = H;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// --- Value noise implementation ---
+function hash(x, y, z) {
+    let n = (x * 374761393 + y * 668265263 + z * 1274126177) | 0;
+    n = (n ^ (n >> 13)) * 1274126177;
+    n = n ^ (n >> 16);
+    return (n & 0x7fffffff) / 0x7fffffff;
+}
+
+function smoothstep(t) {
+    return t * t * (3 - 2 * t);
+}
+
+function lerp(a, b, t) {
+    return a + (b - a) * t;
+}
+
+function valueNoise(x, y, z) {
+    const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
+    const fx = x - ix, fy = y - iy, fz = z - iz;
+    const sx = smoothstep(fx), sy = smoothstep(fy), sz = smoothstep(fz);
+    const n000 = hash(ix, iy, iz);
+    const n100 = hash(ix + 1, iy, iz);
+    const n010 = hash(ix, iy + 1, iz);
+    const n110 = hash(ix + 1, iy + 1, iz);
+    const n001 = hash(ix, iy, iz + 1);
+    const n101 = hash(ix + 1, iy, iz + 1);
+    const n011 = hash(ix, iy + 1, iz + 1);
+    const n111 = hash(ix + 1, iy + 1, iz + 1);
+    const n00 = lerp(n000, n100, sx);
+    const n10 = lerp(n010, n110, sx);
+    const n01 = lerp(n001, n101, sx);
+    const n11 = lerp(n011, n111, sx);
+    const n0 = lerp(n00, n10, sy);
+    const n1 = lerp(n01, n11, sy);
+    return lerp(n0, n1, sz);
+}
+
+function fbm(x, y, z, octaves) {
+    let val = 0, amp = 1, freq = 1, maxAmp = 0;
+    for (let i = 0; i < octaves; i++) {
+        val += amp * valueNoise(x * freq, y * freq, z * freq);
+        maxAmp += amp;
+        amp *= 0.5;
+        freq *= 2;
+    }
+    return val / maxAmp;
+}
+
+// Color schemes
+function getColor(t, scheme) {
+    t = Math.max(0, Math.min(1, t));
+    let r, g, b;
+    switch (scheme) {
+        case 'fire':
+            r = Math.min(1, t * 3);
+            g = Math.min(1, Math.max(0, (t - 0.33) * 3));
+            b = Math.min(1, Math.max(0, (t - 0.66) * 3)) * 0.3;
+            break;
+        case 'ocean':
+            r = t * 0.2;
+            g = t * 0.7;
+            b = 0.3 + t * 0.7;
+            break;
+        case 'aurora':
+            r = 0.1 + 0.5 * Math.sin(t * Math.PI * 4);
+            g = 0.3 + 0.7 * Math.sin(t * Math.PI * 3 + 1);
+            b = 0.3 + 0.7 * Math.sin(t * Math.PI * 2 + 2);
+            break;
+        case 'gray':
+        default:
+            r = t;
+            g = t;
+            b = t;
+            break;
+    }
+    return [r * 255, g * 255, b * 255];
+}
+
+function render(ts) {
+    if (!lastFrame) lastFrame = ts;
+    const dt = (ts - lastFrame) / 1000;
+    lastFrame = ts;
+
+    // FPS
+    frameCount++;
+    fpsTimer += dt;
+    if (fpsTimer >= 1) {
+        fpsEl.textContent = Math.round(frameCount / fpsTimer) + ' FPS';
+        frameCount = 0;
+        fpsTimer = 0;
+    }
+
+    const freq = parseFloat(freqSlider.value);
+    const oct = parseInt(octSlider.value);
+    const spd = parseFloat(speedSlider.value);
+    const scheme = schemeSelect.value;
+
+    time += dt * spd * 0.3;
+
+    const imgData = ctx.createImageData(W, H);
+    const data = imgData.data;
+
+    for (let py = 0; py < H; py++) {
+        for (let px = 0; px < W; px++) {
+            const nx = px / W;
+            const ny = py / H;
+            const n = fbm(nx * freq, ny * freq, time, oct);
+            const [r, g, b] = getColor(n, scheme);
+            const idx = (py * W + px) * 4;
+            data[idx] = r;
+            data[idx + 1] = g;
+            data[idx + 2] = b;
+            data[idx + 3] = 255;
+        }
+    }
+    ctx.putImageData(imgData, 0, 0);
+
+    requestAnimationFrame(render);
+}
+
+// Controls
+freqSlider.addEventListener('input', () => freqVal.textContent = parseFloat(freqSlider.value).toFixed(1));
+octSlider.addEventListener('input', () => octVal.textContent = octSlider.value);
+speedSlider.addEventListener('input', () => speedVal.textContent = parseFloat(speedSlider.value).toFixed(1));
+
+// Screensaver toggle
+canvas.addEventListener('click', () => {
+    screensaver = !screensaver;
+    controls.classList.toggle('hidden', screensaver);
+    titleBar.classList.toggle('hidden', screensaver);
+    if (screensaver) {
+        canvas.style.cursor = 'none';
+    } else {
+        canvas.style.cursor = 'pointer';
+    }
+});
+
+function exportPNG() {
+    const link = document.createElement('a');
+    link.download = 'noise-canvas-' + Date.now() + '.png';
+    link.href = canvas.toDataURL('image/png');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+requestAnimationFrame(render);
+</script>
+</body>
+</html>

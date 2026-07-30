@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Writing Scheduler</title>
+<style>
+:root {
+  --bg: #0f0f1a; --surface: #1a1a2e; --accent: #ff6b35;
+  --text: #e0e0e0; --text-muted: #8888aa; --green: #22c55e;
+  --red: #ef4444; --yellow: #eab308; --blue: #3b82f6;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg); color: var(--text); min-height: 100vh;
+}
+header {
+  background: var(--surface); padding: 16px 24px; display: flex;
+  align-items: center; justify-content: space-between;
+  border-bottom: 2px solid var(--accent);
+}
+header h1 { font-size: 1.2rem; color: var(--accent); }
+.nav-row { display: flex; align-items: center; gap: 12px; }
+.nav-row button {
+  background: var(--surface); border: 1px solid var(--accent);
+  color: var(--accent); padding: 6px 14px; border-radius: 6px;
+  cursor: pointer; font-size: 0.85rem;
+}
+.nav-row button:hover { background: var(--accent); color: #fff; }
+.nav-row .month-label { font-size: 1rem; font-weight: 600; min-width: 160px; text-align: center; }
+.layout {
+  display: grid; grid-template-columns: 1fr 320px; gap: 20px;
+  padding: 24px; height: calc(100vh - 130px);
+}
+.calendar { background: var(--surface); border-radius: 10px; padding: 16px; }
+.calendar-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+}
+.calendar-grid .day-header {
+  text-align: center; font-size: 0.7rem; color: var(--text-muted);
+  padding: 8px 0; font-weight: 600;
+}
+.calendar-grid .day {
+  background: var(--bg); border-radius: 6px; min-height: 80px;
+  padding: 6px; font-size: 0.8rem; border: 1px solid transparent;
+  cursor: pointer; position: relative; transition: border-color 0.2s;
+}
+.calendar-grid .day:hover { border-color: var(--accent); }
+.calendar-grid .day.other-month { opacity: 0.3; }
+.calendar-grid .day.today { border-color: var(--blue); }
+.calendar-grid .day .date-num { font-weight: 600; margin-bottom: 4px; }
+.calendar-grid .day .note-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  margin-right: 3px;
+}
+.note-dot.draft { background: var(--yellow); }
+.note-dot.published { background: var(--green); }
+.calendar-grid .day .note-label {
+  font-size: 0.65rem; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; color: var(--text-muted);
+}
+.sidebar {
+  background: var(--surface); border-radius: 10px; padding: 20px;
+  display: flex; flex-direction: column; gap: 12px; overflow-y: auto;
+}
+.sidebar h3 { font-size: 0.95rem; color: var(--accent); }
+.sidebar .note-list { display: flex; flex-direction: column; gap: 8px; }
+.note-card {
+  background: var(--bg); border-radius: 8px; padding: 12px;
+  border: 1px solid rgba(255,107,53,0.1); cursor: pointer;
+  transition: border-color 0.2s; draggable: true;
+}
+.note-card:hover { border-color: var(--accent); }
+.note-card.dragging { opacity: 0.5; border-color: var(--accent); }
+.note-card .note-title { font-weight: 600; font-size: 0.85rem; margin-bottom: 4px; }
+.note-card .note-meta { font-size: 0.7rem; color: var(--text-muted); }
+.note-card .note-meta a { color: var(--blue); }
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 0.65rem; font-weight: 600;
+}
+.badge-draft { background: rgba(234,179,8,0.2); color: var(--yellow); }
+.badge-published { background: rgba(34,197,94,0.2); color: var(--green); }
+.modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.7); z-index: 10; display: flex;
+  align-items: center; justify-content: center;
+}
+.modal {
+  background: var(--surface); border-radius: 12px; padding: 24px;
+  width: 420px; max-width: 90vw; display: flex; flex-direction: column; gap: 14px;
+}
+.modal h3 { color: var(--accent); }
+.modal input, .modal textarea, .modal select {
+  background: var(--bg); border: 1px solid var(--surface);
+  color: var(--text); padding: 10px; border-radius: 6px;
+  font-size: 0.85rem; outline: none; font-family: inherit; resize: vertical;
+}
+.modal input:focus, .modal textarea:focus, .modal select:focus { border-color: var(--accent); }
+.modal .btn-row { display: flex; gap: 10px; justify-content: flex-end; }
+.modal button {
+  padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
+  font-size: 0.85rem; font-weight: 600;
+}
+.modal .btn-primary { background: var(--accent); color: #fff; }
+.modal .btn-delete { background: var(--red); color: #fff; }
+.modal .btn-cancel { background: transparent; border: 1px solid var(--text-muted); color: var(--text-muted); }
+.empty-state { color: var(--text-muted); text-align: center; padding: 20px; font-size: 0.85rem; }
+
+/* Responsive & Mobile - Universal */
+@media (max-width: 768px) {
+  html { font-size: 15px; }
+  body { flex-direction: column !important; }
+  .sidebar, aside, nav.sidebar { width: 100% !important; flex-direction: row !important; flex-wrap: wrap !important; padding: 10px !important; gap: 8px !important; border-right: none !important; border-bottom: 1px solid var(--border); }
+  .main, .content-area { padding: 12px !important; }
+  .cards, .card-grid { grid-template-columns: 1fr !important; }
+  .toolbar { flex-wrap: wrap !important; gap: 6px !important; }
+  .toolbar input, .toolbar select { flex: 1 1 100% !important; min-width: 0 !important; }
+  .pane { border-right: none !important; border-bottom: 1px solid var(--border); flex: none !important; height: 50vh !important; }
+  .pane:last-child { border-bottom: none !important; }
+  header { flex-wrap: wrap !important; gap: 8px !important; padding: 12px 16px !important; }
+  .sidebar-actions button { flex: 1 !important; min-width: 80px !important; }
+  .collection-list { flex-direction: row !important; flex-wrap: wrap !important; }
+  .tabs { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  .tab { padding: 10px 14px !important; white-space: nowrap !important; }
+  .modal { width: 90% !important; max-width: 400px !important; }
+  .summary-row { padding: 12px 16px !important; gap: 8px !important; }
+  .summary-card { min-width: 80px !important; padding: 10px 14px !important; }
+  .summary-card .value { font-size: 1.2rem !important; }
+  .add-form { flex-wrap: wrap !important; }
+  .add-form input { flex: 1 1 100% !important; }
+  .status-grid { padding: 0 16px 16px !important; }
+  .url-card { padding: 12px 16px !important; }
+  .url-header { flex-wrap: wrap !important; }
+  .url-name { font-size: 0.8rem !important; word-break: break-all !important; }
+  .form-group input, .form-group select { font-size: 16px !important; }
+}
+
+@media (max-width: 480px) {
+  html { font-size: 14px; }
+  .sidebar { padding: 8px !important; gap: 4px !important; }
+  .sidebar h2 { font-size: 11px !important; }
+  .main { padding: 8px !important; }
+  header h1 { font-size: 1rem !important; }
+  .toolbar { padding: 8px !important; }
+  .send-btn, button, .btn { min-height: 44px; min-width: 44px; padding: 10px 16px !important; font-size: 14px !important; }
+  .tabs { padding: 0 8px !important; }
+  .tab { padding: 8px 12px !important; font-size: 12px !important; }
+  .headers-panel { padding: 8px !important; }
+  .header-row { flex-wrap: wrap !important; }
+  .header-row input { flex: 1 1 100% !important; }
+  .pane { height: 40vh !important; }
+  .pane textarea { padding: 10px !important; font-size: 12px !important; }
+  .output-area { max-height: 60% !important; }
+  .response-area { padding: 8px !important; }
+  .response-body { padding: 8px !important; font-size: 12px !important; }
+  .collection-item { min-width: 100px !important; padding: 6px 8px !important; font-size: 12px !important; }
+  .summary-card { min-width: 70px !important; padding: 8px 10px !important; }
+  .summary-card .value { font-size: 1rem !important; }
+  .card { padding: 14px !important; }
+  .card .value { font-size: 1.3rem !important; }
+  .chart-container { padding: 12px !important; }
+  canvas { height: 180px !important; }
+  .modal { padding: 16px !important; }
+  .empty-state { padding: 40px 16px !important; }
+  button, .btn, input[type="submit"] { min-height: 44px; }
+}
+
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<header>
+  <h1>✍️ Writing Scheduler</h1>
+  <div class="nav-row">
+    <button onclick="navMonth(-1)">◀</button>
+    <span class="month-label" id="monthLabel"></span>
+    <button onclick="navMonth(1)">▶</button>
+    <button onclick="navMonth(0)" style="font-size:0.75rem">Today</button>
+    <button onclick="openNoteEditor()" style="background:var(--accent);color:#fff;border:none">+ New Note</button>
+  </div>
+</header>
+
+<div class="layout">
+  <div class="calendar">
+    <div class="calendar-grid" id="calendarGrid"></div>
+  </div>
+  <div class="sidebar" id="sidebar">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input id="tagFilter" placeholder="Filter by tag..." style="flex:1;background:var(--bg);border:1px solid var(--text-muted);color:var(--text);padding:6px 10px;border-radius:6px;font-size:0.8rem;outline:none" oninput="renderSidebar()">
+      <span id="tagFilterClear" style="display:none;cursor:pointer;color:var(--text-muted);font-size:0.8rem" onclick="document.getElementById('tagFilter').value='';renderSidebar()">✕</span>
+    </div>
+    <h3>📝 Unscheduled Notes</h3>
+    <div class="note-list" id="unscheduledList">
+      <div class="empty-state">No unscheduled notes. Create one or drag to remove from calendar.</div>
+    </div>
+    <hr style="border-color:rgba(255,107,53,0.2);margin:8px 0">
+    <h3>📅 Notes for Selected Day</h3>
+    <div class="note-list" id="selectedDayNotes">
+      <div class="empty-state">Click a day to see notes, or drag notes onto the calendar.</div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h3 id="modalTitle">New Note</h3>
+    <input id="noteTitle" placeholder="Note title">
+    <textarea id="noteDesc" placeholder="Description (optional)" rows="3"></textarea>
+    <input id="noteTags" placeholder="Tags: comma-separated (e.g. react, tutorial, draft)" style="font-size:0.8rem">
+    <input id="noteLink" placeholder="GitHub commit URL (optional)" type="url">
+    <div style="display:flex;gap:10px;align-items:center">
+      <label style="font-size:0.8rem;color:var(--text-muted)">Status:</label>
+      <select id="noteStatus"><option value="draft">Draft</option><option value="published">Published</option></select>
+    </div>
+    <div class="btn-row">
+      <button class="btn-delete" id="btnDelete" style="display:none" onclick="deleteNote()">Delete</button>
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveNote()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'writing_scheduler_notes';
+let notes = [];
+let currentMonth = new Date().getMonth();
+let currentYear = new Date().getFullYear();
+let selectedDay = null;
+let editingNoteId = null;
+let dragNoteId = null;
+
+function loadNotes() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    notes = raw ? JSON.parse(raw) : [];
+  } catch(e) { notes = []; }
+}
+
+function saveNotes() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+}
+
+function generateId() { return 'n_' + Date.now() + '_' + Math.random().toString(36).substr(2,6); }
+
+function navMonth(dir) {
+  if (dir === 0) { currentMonth = new Date().getMonth(); currentYear = new Date().getFullYear(); }
+  else {
+    currentMonth += dir;
+    if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+    if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+  }
+  selectedDay = null;
+  renderAll();
+}
+
+function getNotesForDay(year, month, day) {
+  const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+  return notes.filter(n => n.date === dateStr);
+}
+
+function getUnscheduledNotes() {
+  return notes.filter(n => !n.date);
+}
+
+function renderAll() {
+  renderCalendar();
+  renderSidebar();
+}
+
+function renderCalendar() {
+  const grid = document.getElementById('calendarGrid');
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('monthLabel').textContent = `${monthNames[currentMonth]} ${currentYear}`;
+
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  let html = days.map(d => `<div class="day-header">${d}</div>`).join('');
+
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const daysInPrevMonth = new Date(currentYear, currentMonth, 0).getDate();
+
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+  // Previous month fill
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const day = daysInPrevMonth - i;
+    const m = currentMonth === 0 ? 11 : currentMonth - 1;
+    const y = currentMonth === 0 ? currentYear - 1 : currentYear;
+    const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const dayNotes = getNotesForDay(y, m, day);
+    html += renderDay(day, dateStr, dayNotes, true, false);
+  }
+
+  // Current month
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const dayNotes = getNotesForDay(currentYear, currentMonth, day);
+    const isToday = dateStr === todayStr;
+    const isSelected = dateStr === selectedDay;
+    html += renderDay(day, dateStr, dayNotes, false, isToday, isSelected);
+  }
+
+  // Next month fill
+  const remaining = 42 - (firstDay + daysInMonth);
+  for (let day = 1; day <= remaining; day++) {
+    const m = currentMonth === 11 ? 0 : currentMonth + 1;
+    const y = currentMonth === 11 ? currentYear + 1 : currentYear;
+    const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const dayNotes = getNotesForDay(y, m, day);
+    html += renderDay(day, dateStr, dayNotes, true, false);
+  }
+
+  grid.innerHTML = html;
+}
+
+function renderDay(dayNum, dateStr, dayNotes, otherMonth, isToday, isSelected) {
+  let cls = 'day';
+  if (otherMonth) cls += ' other-month';
+  if (isToday) cls += ' today';
+  const notesHtml = dayNotes.slice(0, 3).map(n =>
+    `<span class="note-dot ${n.status}"></span><span class="note-label">${escapeHtml(n.title)}</span>`
+  ).join('<br>');
+  const moreCount = dayNotes.length > 3 ? `<span style="font-size:0.6rem;color:var(--text-muted)">+${dayNotes.length-3}</span>` : '';
+
+  return `<div class="${cls}" data-date="${dateStr}" 
+    onclick="selectDay('${dateStr}')"
+    ondragover="event.preventDefault(); event.currentTarget.style.borderColor='var(--accent)'"
+    ondragleave="event.currentTarget.style.borderColor=''"
+    ondrop="dropOnDay(event, '${dateStr}')">
+    <div class="date-num">${dayNum}</div>
+    ${notesHtml}
+    ${moreCount}
+  </div>`;
+}
+
+function selectDay(dateStr) {
+  selectedDay = dateStr;
+  renderAll();
+}
+
+function renderSidebar() {
+  const filterTag = (document.getElementById('tagFilter').value || '').trim().toLowerCase();
+  const clearBtn = document.getElementById('tagFilterClear');
+  if (clearBtn) clearBtn.style.display = filterTag ? 'inline' : 'none';
+
+  let unscheduled = getUnscheduledNotes();
+  if (filterTag) {
+    unscheduled = unscheduled.filter(n => n.tags && n.tags.some(t => t.toLowerCase().includes(filterTag)));
+  }
+  const ul = document.getElementById('unscheduledList');
+
+  if (unscheduled.length === 0) {
+    ul.innerHTML = '<div class="empty-state">No unscheduled notes. Create one or drag to remove from calendar.</div>';
+  } else {
+    ul.innerHTML = unscheduled.map(n => renderNoteCard(n)).join('');
+  }
+
+  const sdn = document.getElementById('selectedDayNotes');
+  if (selectedDay) {
+    let dayNotes = getNotesForDay(
+      parseInt(selectedDay.split('-')[0]),
+      parseInt(selectedDay.split('-')[1]) - 1,
+      parseInt(selectedDay.split('-')[2])
+    );
+    if (filterTag) {
+      dayNotes = dayNotes.filter(n => n.tags && n.tags.some(t => t.toLowerCase().includes(filterTag)));
+    }
+    if (dayNotes.length === 0) {
+      sdn.innerHTML = `<div class="empty-state">No notes for ${selectedDay}. Drop a note here or create one.</div>`;
+    } else {
+      sdn.innerHTML = dayNotes.map(n => renderNoteCard(n)).join('');
+    }
+  } else {
+    sdn.innerHTML = '<div class="empty-state">Click a day to see notes, or drag notes onto the calendar.</div>';
+  }
+}
+
+function renderNoteCard(note) {
+  const statusBadge = note.status === 'published'
+    ? '<span class="badge badge-published">published</span>'
+    : '<span class="badge badge-draft">draft</span>';
+  const linkHtml = note.link ? ` <a href="${escapeHtml(note.link)}" target="_blank" onclick="event.stopPropagation()" style="color:var(--blue)">🔗</a>` : '';
+  const tagHtml = (note.tags && note.tags.length)
+    ? '<div style="margin-top:4px">' + note.tags.map(t => `<span class="tag-badge" style="display:inline-block;padding:1px 7px;border-radius:8px;font-size:0.6rem;font-weight:600;margin-right:4px;background:${tagColor(t)};color:#000">${escapeHtml(t)}</span>`).join('') + '</div>'
+    : '';
+  return `<div class="note-card" draggable="true" 
+    ondragstart="dragStart(event, '${note.id}')" 
+    ondragend="dragEnd(event)" 
+    onclick="openNoteEditor('${note.id}')" 
+    data-id="${note.id}">
+    <div class="note-title">${escapeHtml(note.title)}${linkHtml}</div>
+    <div class="note-meta">${statusBadge} ${note.date || 'unscheduled'}</div>
+    ${tagHtml}
+  </div>`;
+}
+
+const TAG_COLORS = ['#ff6b35','#4fc3f7','#ba68c8','#4caf50','#eab308','#ef4444','#3b82f6','#ec4899','#14b8a6','#f97316','#a855f7','#22d3ee'];
+function tagColor(tag) {
+  let hash = 0;
+  for (let i = 0; i < tag.length; i++) { hash = tag.charCodeAt(i) + ((hash << 5) - hash); }
+  return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length];
+}
+
+function getAllTags() {
+  const tags = new Set();
+  notes.forEach(n => { if (n.tags) n.tags.forEach(t => tags.add(t)); });
+  return [...tags].sort();
+}
+
+function dragStart(e, noteId) {
+  dragNoteId = noteId;
+  e.dataTransfer.effectAllowed = 'move';
+  e.target.classList.add('dragging');
+  setTimeout(() => { if (e.target.classList) e.target.style.opacity = '0.4'; }, 0);
+}
+
+function dragEnd(e) {
+  dragNoteId = null;
+  if (e.target.classList) { e.target.classList.remove('dragging'); e.target.style.opacity = ''; }
+  document.querySelectorAll('.day').forEach(d => d.style.borderColor = '');
+}
+
+function dropOnDay(e, dateStr) {
+  e.preventDefault();
+  e.currentTarget.style.borderColor = '';
+  if (!dragNoteId) return;
+  const note = notes.find(n => n.id === dragNoteId);
+  if (note) {
+    note.date = dateStr;
+    saveNotes();
+    selectedDay = dateStr;
+    renderAll();
+  }
+}
+
+function openNoteEditor(noteId) {
+  editingNoteId = noteId || null;
+  if (noteId) {
+    const note = notes.find(n => n.id === noteId);
+    if (!note) return;
+    document.getElementById('modalTitle').textContent = 'Edit Note';
+    document.getElementById('noteTitle').value = note.title;
+    document.getElementById('noteDesc').value = note.desc || '';
+    document.getElementById('noteTags').value = (note.tags || []).join(', ');
+    document.getElementById('noteLink').value = note.link || '';
+    document.getElementById('noteStatus').value = note.status;
+    document.getElementById('btnDelete').style.display = 'inline-block';
+  } else {
+    document.getElementById('modalTitle').textContent = 'New Note';
+    document.getElementById('noteTitle').value = '';
+    document.getElementById('noteDesc').value = '';
+    document.getElementById('noteTags').value = '';
+    document.getElementById('noteLink').value = '';
+    document.getElementById('noteStatus').value = 'draft';
+    document.getElementById('btnDelete').style.display = 'none';
+  }
+  document.getElementById('modal').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('modal').style.display = 'none';
+  editingNoteId = null;
+}
+
+function saveNote() {
+  const title = document.getElementById('noteTitle').value.trim();
+  if (!title) return;
+  const desc = document.getElementById('noteDesc').value.trim();
+  const tagsRaw = document.getElementById('noteTags').value.trim();
+  const tags = tagsRaw ? tagsRaw.split(/,\s*/).filter(t => t.trim()) : [];
+  const link = document.getElementById('noteLink').value.trim();
+  const status = document.getElementById('noteStatus').value;
+
+  if (editingNoteId) {
+    const note = notes.find(n => n.id === editingNoteId);
+    if (note) {
+      note.title = title;
+      note.desc = desc;
+      note.tags = tags;
+      note.link = link;
+      note.status = status;
+    }
+  } else {
+    notes.push({
+      id: generateId(),
+      title, desc, tags, link, status,
+      date: selectedDay || null,
+      createdAt: new Date().toISOString()
+    });
+  }
+  saveNotes();
+  closeModal();
+  renderAll();
+}
+
+function deleteNote() {
+  if (!editingNoteId || !confirm('Delete this note?')) return;
+  notes = notes.filter(n => n.id !== editingNoteId);
+  saveNotes();
+  closeModal();
+  renderAll();
+}
+
+function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+loadNotes();
+renderAll();
+</script>
+</body>
+</html>

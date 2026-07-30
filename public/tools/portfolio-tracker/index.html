@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portfolio Tracker v2</title>
+<style>
+:root {
+  --bg: #0f0f1a;
+  --surface: #1a1a2e;
+  --accent: #ff6b35;
+  --accent-dim: rgba(255, 107, 53, 0.15);
+  --text: #e0e0e0;
+  --text-dim: #9090a0;
+  --green: #4caf50;
+  --red: #ef5350;
+  --border: #2a2a3e;
+  --radius: 8px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+header h1 { font-size: 1.25rem; font-weight: 600; color: var(--accent); }
+nav { display: flex; gap: 4px; }
+nav button {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 6px 14px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+nav button:hover { border-color: var(--accent); color: var(--text); }
+nav button.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+.container { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.card h2 { font-size: 1rem; margin-bottom: 16px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500; }
+
+/* Stats row */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+}
+.stat-label { font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.stat-value { font-size: 1.5rem; font-weight: 700; }
+.stat-sub { font-size: 0.8rem; margin-top: 2px; }
+.green { color: var(--green); }
+.red { color: var(--red); }
+
+/* Table */
+table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+th, td { text-align: right; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--text-dim); font-weight: 500; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; }
+tr:hover { background: rgba(255,255,255,0.02); }
+
+/* Forms */
+.form-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 12px; }
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group label { font-size: 0.75rem; color: var(--text-dim); }
+.form-group input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  width: 120px;
+}
+.form-group input:focus { outline: none; border-color: var(--accent); }
+.form-group input.wide { width: 180px; }
+
+.btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 8px 18px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: opacity 0.2s;
+}
+.btn:hover { opacity: 0.85; }
+.btn-sm { padding: 4px 10px; font-size: 0.8rem; }
+.btn-danger { background: var(--red); }
+.btn-outline { background: none; border: 1px solid var(--accent); color: var(--accent); }
+
+/* Pie chart */
+.pie-container { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.pie-legend { display: flex; flex-direction: column; gap: 8px; }
+.legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+.legend-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+
+/* Calendar */
+.calendar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.month-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+  font-size: 0.8rem;
+}
+.month-card h4 { color: var(--accent); margin-bottom: 4px; font-size: 0.85rem; }
+.month-card .div-event { color: var(--green); font-size: 0.75rem; margin: 2px 0; }
+
+/* Goals */
+.goal-bar { margin-bottom: 16px; }
+.goal-header { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 0.85rem; }
+.goal-track {
+  height: 8px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.goal-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+/* Panel toggle */
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* Refresh button */
+.refresh-bar { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 12px; }
+
+.empty { color: var(--text-dim); text-align: center; padding: 32px; font-size: 0.9rem; }
+
+footer { text-align: center; padding: 20px; color: var(--text-dim); font-size: 0.75rem; border-top: 1px solid var(--border); margin-top: 32px; }
+footer a { color: var(--accent); text-decoration: none; }
+
+/* Responsive & Mobile - Universal */
+@media (max-width: 768px) {
+  html { font-size: 15px; }
+  body { flex-direction: column !important; }
+  .sidebar, aside, nav.sidebar { width: 100% !important; flex-direction: row !important; flex-wrap: wrap !important; padding: 10px !important; gap: 8px !important; border-right: none !important; border-bottom: 1px solid var(--border); }
+  .main, .content-area { padding: 12px !important; }
+  .cards, .card-grid { grid-template-columns: 1fr !important; }
+  .toolbar { flex-wrap: wrap !important; gap: 6px !important; }
+  .toolbar input, .toolbar select { flex: 1 1 100% !important; min-width: 0 !important; }
+  .pane { border-right: none !important; border-bottom: 1px solid var(--border); flex: none !important; height: 50vh !important; }
+  .pane:last-child { border-bottom: none !important; }
+  header { flex-wrap: wrap !important; gap: 8px !important; padding: 12px 16px !important; }
+  .sidebar-actions button { flex: 1 !important; min-width: 80px !important; }
+  .collection-list { flex-direction: row !important; flex-wrap: wrap !important; }
+  .tabs { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  .tab { padding: 10px 14px !important; white-space: nowrap !important; }
+  .modal { width: 90% !important; max-width: 400px !important; }
+  .summary-row { padding: 12px 16px !important; gap: 8px !important; }
+  .summary-card { min-width: 80px !important; padding: 10px 14px !important; }
+  .summary-card .value { font-size: 1.2rem !important; }
+  .add-form { flex-wrap: wrap !important; }
+  .add-form input { flex: 1 1 100% !important; }
+  .status-grid { padding: 0 16px 16px !important; }
+  .url-card { padding: 12px 16px !important; }
+  .url-header { flex-wrap: wrap !important; }
+  .url-name { font-size: 0.8rem !important; word-break: break-all !important; }
+  .form-group input, .form-group select { font-size: 16px !important; }
+}
+
+@media (max-width: 480px) {
+  html { font-size: 14px; }
+  .sidebar { padding: 8px !important; gap: 4px !important; }
+  .sidebar h2 { font-size: 11px !important; }
+  .main { padding: 8px !important; }
+  header h1 { font-size: 1rem !important; }
+  .toolbar { padding: 8px !important; }
+  .send-btn, button, .btn { min-height: 44px; min-width: 44px; padding: 10px 16px !important; font-size: 14px !important; }
+  .tabs { padding: 0 8px !important; }
+  .tab { padding: 8px 12px !important; font-size: 12px !important; }
+  .headers-panel { padding: 8px !important; }
+  .header-row { flex-wrap: wrap !important; }
+  .header-row input { flex: 1 1 100% !important; }
+  .pane { height: 40vh !important; }
+  .pane textarea { padding: 10px !important; font-size: 12px !important; }
+  .output-area { max-height: 60% !important; }
+  .response-area { padding: 8px !important; }
+  .response-body { padding: 8px !important; font-size: 12px !important; }
+  .collection-item { min-width: 100px !important; padding: 6px 8px !important; font-size: 12px !important; }
+  .summary-card { min-width: 70px !important; padding: 8px 10px !important; }
+  .summary-card .value { font-size: 1rem !important; }
+  .card { padding: 14px !important; }
+  .card .value { font-size: 1.3rem !important; }
+  .chart-container { padding: 12px !important; }
+  canvas { height: 180px !important; }
+  .modal { padding: 16px !important; }
+  .empty-state { padding: 40px 16px !important; }
+  button, .btn, input[type="submit"] { min-height: 44px; }
+}
+
+</style>
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+
+<header>
+  <h1> Portfolio Tracker v2</h1>
+  <nav>
+    <button onclick="showPanel('holdings')" id="nav-holdings" class="active">Holdings</button>
+    <button onclick="showPanel('dividends')" id="nav-dividends">Dividends</button>
+    <button onclick="showPanel('performance')" id="nav-performance">Performance</button>
+    <button onclick="showPanel('goals')" id="nav-goals">Goals</button>
+    <button onclick="showPanel('settings')" id="nav-settings">Settings</button>
+  </nav>
+</header>
+
+<div class="container">
+
+  <!-- Stats Row -->
+  <div class="stats" id="stats-row"></div>
+
+  <!-- HOLDINGS PANEL -->
+  <div class="panel active" id="panel-holdings">
+    <div class="card">
+      <h2>Add Holding</h2>
+      <div class="form-row">
+        <div class="form-group"><label>Ticker</label><input id="h-ticker" placeholder="RELIANCE" class="wide"></div>
+        <div class="form-group"><label>Shares</label><input id="h-shares" type="number" step="0.01" placeholder="100"></div>
+        <div class="form-group"><label>Buy Price ()</label><input id="h-buy" type="number" step="0.01" placeholder="2500"></div>
+        <div class="form-group"><label>Current Price ()</label><input id="h-price" type="number" step="0.01" placeholder="2800"></div>
+        <div class="form-group"><label>Dividend/yr ()</label><input id="h-div" type="number" step="0.01" placeholder="50"></div>
+        <div class="form-group"><label>Div Month</label><input id="h-month" type="number" min="1" max="12" placeholder="6"></div>
+        <button class="btn" onclick="addHolding()">+ Add</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Portfolio Holdings</h2>
+      <table id="holdings-table">
+        <thead><tr>
+          <th>Ticker</th><th>Shares</th><th>Buy Price</th><th>Curr Price</th><th>Value</th><th>P&L</th><th>Return%</th><th>Div Yield</th><th></th>
+        </tr></thead>
+        <tbody id="holdings-tbody"></tbody>
+      </table>
+      <div id="holdings-empty" class="empty">No holdings yet. Add your first stock above.</div>
+    </div>
+
+    <div class="card">
+      <h2>Allocation</h2>
+      <div class="pie-container">
+        <svg id="pie-chart" width="200" height="200" viewBox="0 0 200 200"></svg>
+        <div class="pie-legend" id="pie-legend"></div>
+      </div>
+      <div id="pie-empty" class="empty">Add holdings to see allocation.</div>
+    </div>
+  </div>
+
+  <!-- DIVIDENDS PANEL -->
+  <div class="panel" id="panel-dividends">
+    <div class="card">
+      <h2>Dividend Calendar</h2>
+      <div class="calendar" id="div-calendar"></div>
+      <div id="div-empty" class="empty">No dividend-paying holdings added yet.</div>
+    </div>
+  </div>
+
+  <!-- PERFORMANCE PANEL -->
+  <div class="panel" id="panel-performance">
+    <div class="card">
+      <h2>Portfolio Value History</h2>
+      <div class="chart-container" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;">
+        <canvas id="performanceChart" style="width:100%;height:300px;"></canvas>
+        <div id="perf-empty" class="empty" style="display:none;">No history yet. Value snapshots are recorded on every update.</div>
+      </div>
+      <p style="font-size:0.75rem;color:var(--text-dim)">Shows up to 365 days of portfolio value history. Snapshots are taken automatically on each price update or holding change.</p>
+    </div>
+  </div>
+
+  <!-- GOALS PANEL -->
+  <div class="panel" id="panel-goals">
+    <div class="card">
+      <h2>Goal Tracking</h2>
+      <div class="goal-bar">
+        <div class="goal-header"><span>Monthly Income: 2.5L/mo</span><span id="goal-income-text">0%</span></div>
+        <div class="goal-track"><div class="goal-fill" id="goal-income-fill" style="width:0%"></div></div>
+      </div>
+      <div class="goal-bar">
+        <div class="goal-header"><span>Corpus Target: 10Cr by 2029</span><span id="goal-corpus-text">0%</span></div>
+        <div class="goal-track"><div class="goal-fill" id="goal-corpus-fill" style="width:0%"></div></div>
+      </div>
+      <p style="margin-top:12px;font-size:0.85rem;color:var(--text-dim)">
+        Based on current portfolio value and estimated annual return of 12%.
+      </p>
+    </div>
+  </div>
+
+  <!-- SETTINGS PANEL -->
+  <div class="panel" id="panel-settings">
+    <div class="card">
+      <h2>Settings</h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label>yfinance Proxy URL</label>
+          <input id="s-proxy" placeholder="https://your-worker.workers.dev" class="wide">
+        </div>
+        <button class="btn" onclick="updatePrices()">Fetch Prices</button>
+        <button class="btn btn-danger btn-sm" onclick="resetAll()">Reset All Data</button>
+      </div>
+      <p style="margin-top:8px;font-size:0.8rem;color:var(--text-dim)">
+        Enter a Cloudflare Worker URL that proxies yfinance API calls.
+        Format: GET /price?ticker=RELIANCE.NS returns {"price": 2800}.
+      </p>
+    </div>
+    <div class="card">
+      <h2>Export / Import</h2>
+      <div class="form-row">
+        <button class="btn btn-outline" onclick="exportData()">Export JSON</button>
+        <button class="btn btn-outline" onclick="document.getElementById('import-file').click()">Import JSON</button>
+        <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ DATA MODEL ============
+const STORAGE_KEY = 'pt-v2-data';
+const HISTORY_KEY = 'pt-v2-history';
+let holdings = [];
+let settings = { proxyUrl: '' };
+let valueHistory = [];
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const d = JSON.parse(raw);
+      holdings = d.holdings || [];
+      settings = d.settings || { proxyUrl: '' };
+    }
+    const histRaw = localStorage.getItem(HISTORY_KEY);
+    if (histRaw) {
+      valueHistory = JSON.parse(histRaw);
+    }
+  } catch(e) { holdings = []; settings = { proxyUrl: '' }; valueHistory = []; }
+}
+
+function saveData() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ holdings, settings }));
+}
+
+function saveHistory() {
+  // Keep only last 365 entries
+  if (valueHistory.length > 365) {
+    valueHistory = valueHistory.slice(valueHistory.length - 365);
+  }
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(valueHistory));
+}
+
+function snapshotPortfolioValue() {
+  const tv = totalValue();
+  const now = new Date().toISOString();
+  // Only snapshot if value changed significantly (>0.01) from last entry
+  if (valueHistory.length > 0) {
+    const last = valueHistory[valueHistory.length - 1];
+    if (Math.abs(last.value - tv) < 0.01 && now.split('T')[0] === last.date.split('T')[0]) {
+      return; // Skip if same day and same value
+    }
+  }
+  valueHistory.push({ date: now, value: tv });
+  saveHistory();
+}
+
+// ============ COMPUTATIONS ============
+function fmt(n) { return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n); }
+function fmtDec(n) { return new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n); }
+function fmtPct(n) { return (n >= 0 ? '+' : '') + n.toFixed(2) + '%'; }
+
+function totalValue() { return holdings.reduce((s,h) => s + h.shares * h.price, 0); }
+function totalCost() { return holdings.reduce((s,h) => s + h.shares * h.buy, 0); }
+function totalPL() { return totalValue() - totalCost(); }
+function totalReturn() { return totalCost() > 0 ? (totalPL() / totalCost() * 100) : 0; }
+function totalDividends() { return holdings.reduce((s,h) => s + h.shares * h.dividend, 0); }
+
+// ============ RENDER ============
+function renderStats() {
+  const tv = totalValue(), tc = totalCost(), pl = totalPL(), ret = totalReturn(), div = totalDividends();
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat"><div class="stat-label">Portfolio Value</div><div class="stat-value">${fmt(tv)}</div></div>
+    <div class="stat"><div class="stat-label">Total Cost</div><div class="stat-value">${fmt(tc)}</div></div>
+    <div class="stat"><div class="stat-label">Total P&L</div><div class="stat-value ${pl>=0?'green':'red'}">${fmt(pl)}</div></div>
+    <div class="stat"><div class="stat-label">Return</div><div class="stat-value ${ret>=0?'green':'red'}">${fmtPct(ret)}</div></div>
+    <div class="stat"><div class="stat-label">Annual Dividends</div><div class="stat-value green">${fmt(div)}</div></div>
+    <div class="stat"><div class="stat-label">Holdings</div><div class="stat-value">${holdings.length}</div></div>
+  `;
+}
+
+function renderTable() {
+  const tbody = document.getElementById('holdings-tbody');
+  const empty = document.getElementById('holdings-empty');
+  if (holdings.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  tbody.innerHTML = holdings.map((h,i) => {
+    const val = h.shares * h.price;
+    const cost = h.shares * h.buy;
+    const pl = val - cost;
+    const ret = cost > 0 ? (pl / cost * 100) : 0;
+    const divY = h.price > 0 ? (h.dividend / h.price * 100) : 0;
+    return `<tr>
+      <td><strong>${esc(h.ticker)}</strong></td>
+      <td>${h.shares}</td>
+      <td>${fmtDec(h.buy)}</td>
+      <td>${fmtDec(h.price)}</td>
+      <td>${fmt(val)}</td>
+      <td class="${pl>=0?'green':'red'}">${fmtPct(ret)}</td>
+      <td class="${pl>=0?'green':'red'}">${fmt(pl)}</td>
+      <td>${divY.toFixed(2)}%</td>
+      <td><button class="btn btn-danger btn-sm" onclick="removeHolding(${i})" title="Remove">x</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderPie() {
+  const svg = document.getElementById('pie-chart');
+  const legend = document.getElementById('pie-legend');
+  const empty = document.getElementById('pie-empty');
+  if (holdings.length === 0) { svg.style.display = 'none'; legend.innerHTML = ''; empty.style.display = 'block'; return; }
+  svg.style.display = 'block'; empty.style.display = 'none';
+
+  const total = totalValue();
+  if (total === 0) { svg.style.display = 'none'; empty.style.display = 'block'; empty.textContent = 'Portfolio value is 0.'; return; }
+
+  const colors = ['#ff6b35','#4fc3f7','#81c784','#ba68c8','#fff176','#e57373','#64b5f6','#ffb74d','#4db6ac','#9575cd'];
+  const cx = 100, cy = 100, r = 80;
+  let cumAngle = -Math.PI / 2;
+  let paths = '';
+
+  holdings.forEach((h, i) => {
+    const val = h.shares * h.price;
+    const pct = val / total;
+    const angle = pct * 2 * Math.PI;
+    const x1 = cx + r * Math.cos(cumAngle);
+    const y1 = cy + r * Math.sin(cumAngle);
+    const x2 = cx + r * Math.cos(cumAngle + angle);
+    const y2 = cy + r * Math.sin(cumAngle + angle);
+    const large = angle > Math.PI ? 1 : 0;
+    paths += `<path d="M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z" fill="${colors[i % colors.length]}" stroke="var(--bg)" stroke-width="1"/>`;
+    cumAngle += angle;
+  });
+
+  svg.innerHTML = paths;
+  legend.innerHTML = holdings.map((h,i) => {
+    const val = h.shares * h.price;
+    const pct = total > 0 ? (val / total * 100) : 0;
+    return `<div class="legend-item"><span class="legend-dot" style="background:${colors[i%colors.length]}"></span>${esc(h.ticker)}: ${pct.toFixed(1)}% (${fmt(val)})</div>`;
+  }).join('');
+}
+
+function renderCalendar() {
+  const cal = document.getElementById('div-calendar');
+  const empty = document.getElementById('div-empty');
+  const divHoldings = holdings.filter(h => h.dividend > 0);
+  if (divHoldings.length === 0) { cal.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  cal.innerHTML = months.map((m, mi) => {
+    const events = divHoldings.filter(h => h.divMonth === mi + 1)
+      .map(h => `<div class="div-event">${esc(h.ticker)}: ${fmtDec(h.dividend * h.shares)}</div>`)
+      .join('');
+    return `<div class="month-card"><h4>${m}</h4>${events || '<span style="color:var(--text-dim)">-</span>'}</div>`;
+  }).join('');
+}
+
+function renderGoals() {
+  const tv = totalValue();
+  // Monthly income goal: 2.5L/mo from dividends
+  const monthlyDiv = totalDividends() / 12;
+  const incomePct = Math.min(100, (monthlyDiv / 250000) * 100);
+  document.getElementById('goal-income-fill').style.width = incomePct + '%';
+  document.getElementById('goal-income-text').textContent = incomePct.toFixed(1) + '% (' + fmt(monthlyDiv) + '/mo)';
+
+  // Corpus goal: 10Cr = 100,000,000
+  const target = 100000000;
+  const corpusPct = Math.min(100, (tv / target) * 100);
+  document.getElementById('goal-corpus-fill').style.width = corpusPct + '%';
+  document.getElementById('goal-corpus-text').textContent = corpusPct.toFixed(2) + '% (' + fmt(tv) + ' / ' + fmt(target) + ')';
+}
+
+function renderPerformanceChart() {
+  const canvas = document.getElementById('performanceChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 300 * dpr;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = '300px';
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = 300;
+  const pad = {top:30,right:30,bottom:50,left:80};
+  const cw = W-pad.left-pad.right, ch = H-pad.top-pad.bottom;
+  ctx.clearRect(0,0,W,H);
+
+  const empty = document.getElementById('perf-empty');
+  if (valueHistory.length < 2) {
+    if (empty) empty.style.display = 'block';
+    ctx.fillStyle='#8888a0'; ctx.font='14px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('Not enough data points yet (need at least 2)', W/2, H/2);
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  // Use all history points
+  const data = valueHistory;
+  const values = data.map(d => d.value);
+  const minVal = Math.min(...values);
+  const maxVal = Math.max(...values);
+  const range = maxVal - minVal || 1;
+
+  // Axes
+  ctx.strokeStyle = '#2a2a3e'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.left, pad.top); ctx.lineTo(pad.left, pad.top+ch); ctx.lineTo(pad.left+cw, pad.top+ch); ctx.stroke();
+
+  // Y-axis labels
+  ctx.fillStyle='#8888a0'; ctx.font='10px sans-serif'; ctx.textAlign='right';
+  const ySteps = 5;
+  for (let i = 0; i <= ySteps; i++) {
+    const v = minVal + (range * i / ySteps);
+    const y = pad.top + ch - (i / ySteps) * ch;
+    ctx.fillText('₹' + Math.round(v).toLocaleString('en-IN'), pad.left-6, y+3);
+    ctx.strokeStyle='#1a1a2e';
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left+cw, y); ctx.stroke();
+  }
+
+  // X-axis labels
+  ctx.textAlign = 'center';
+  const maxXLabels = Math.min(data.length, Math.floor(cw / 70));
+  const labelStep = Math.max(1, Math.floor(data.length / maxXLabels));
+  data.forEach((d, i) => {
+    if (i % labelStep === 0 || i === data.length-1) {
+      const x = pad.left + (i/(data.length-1))*cw;
+      const dateStr = new Date(d.date).toLocaleDateString('en-IN', {day:'2-digit',month:'2-digit'});
+      ctx.fillStyle='#8888a0'; ctx.font='10px sans-serif';
+      ctx.fillText(dateStr, x, H - 8);
+    }
+  });
+
+  // Grid lines
+  ctx.strokeStyle='#1a1a2e'; ctx.lineWidth=1;
+  for (let i = 1; i <= ySteps; i++) {
+    const y = pad.top + ch - (i / ySteps) * ch;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left+cw, y); ctx.stroke();
+  }
+
+  // Fill area
+  ctx.beginPath();
+  ctx.moveTo(pad.left, pad.top+ch);
+  data.forEach((d, i) => {
+    const x = pad.left + (i/(data.length-1))*cw;
+    const v = (d.value - minVal) / range;
+    const y = pad.top + ch - v * ch;
+    ctx.lineTo(x, y);
+  });
+  ctx.lineTo(pad.left+cw, pad.top+ch);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(255,107,53,0.12)';
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  data.forEach((d, i) => {
+    const x = pad.left + (i/(data.length-1))*cw;
+    const v = (d.value - minVal) / range;
+    const y = pad.top + ch - v * ch;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = '#ff6b35'; ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Points (only if fewer than 60 points)
+  if (data.length <= 60) {
+    data.forEach((d, i) => {
+      const x = pad.left + (i/(data.length-1))*cw;
+      const v = (d.value - minVal) / range;
+      const y = pad.top + ch - v * ch;
+      ctx.fillStyle = '#ff6b35';
+      ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI*2); ctx.fill();
+    });
+  }
+
+  // Title
+  ctx.fillStyle='#8888a0'; ctx.font='11px sans-serif'; ctx.textAlign='left';
+  ctx.fillText('Portfolio Value (' + data.length + ' snapshots)', pad.left, 15);
+}
+
+function renderAll() {
+  renderStats();
+  renderTable();
+  renderPie();
+  renderCalendar();
+  renderGoals();
+  snapshotPortfolioValue();
+  renderPerformanceChart();
+  saveData();
+}
+
+// ============ ACTIONS ============
+function addHolding() {
+  const ticker = document.getElementById('h-ticker').value.trim().toUpperCase();
+  const shares = parseFloat(document.getElementById('h-shares').value);
+  const buy = parseFloat(document.getElementById('h-buy').value);
+  const price = parseFloat(document.getElementById('h-price').value);
+  const dividend = parseFloat(document.getElementById('h-div').value) || 0;
+  const divMonth = parseInt(document.getElementById('h-month').value) || 1;
+
+  if (!ticker || isNaN(shares) || isNaN(buy) || isNaN(price) || shares <= 0 || buy <= 0 || price <= 0) {
+    alert('Please fill all required fields with valid values.');
+    return;
+  }
+
+  holdings.push({ ticker, shares, buy, price, dividend, divMonth: Math.max(1, Math.min(12, divMonth)) });
+  // Clear form
+  ['h-ticker','h-shares','h-buy','h-price','h-div','h-month'].forEach(id => document.getElementById(id).value = '');
+  renderAll();
+}
+
+function removeHolding(index) {
+  holdings.splice(index, 1);
+  renderAll();
+}
+
+async function updatePrices() {
+  const proxy = document.getElementById('s-proxy').value.trim();
+  if (!proxy) { alert('Enter a yfinance proxy URL first.'); return; }
+  settings.proxyUrl = proxy;
+
+  let updated = 0;
+  for (const h of holdings) {
+    try {
+      const resp = await fetch(proxy + '/price?ticker=' + encodeURIComponent(h.ticker));
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.price && data.price > 0) {
+          h.price = data.price;
+          updated++;
+        }
+      }
+    } catch(e) { /* skip failed fetches */ }
+  }
+  alert(`Updated ${updated}/${holdings.length} holdings.`);
+  renderAll();
+}
+
+function resetAll() {
+  if (confirm('Delete all portfolio data? This cannot be undone.')) {
+    holdings = [];
+    settings = { proxyUrl: '' };
+    renderAll();
+  }
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify({ holdings, settings }, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'portfolio-tracker-backup.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const d = JSON.parse(e.target.result);
+      if (d.holdings) holdings = d.holdings;
+      if (d.settings) settings = d.settings;
+      renderAll();
+      document.getElementById('s-proxy').value = settings.proxyUrl || '';
+      alert('Data imported successfully.');
+    } catch(ex) { alert('Invalid JSON file.'); }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ============ NAVIGATION ============
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+}
+
+// ============ UTILS ============
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ============ INIT ============
+loadData();
+document.getElementById('s-proxy').value = settings.proxyUrl || '';
+renderAll();
+window.addEventListener('resize', renderPerformanceChart);
+</script>
+</body>
+</html>
