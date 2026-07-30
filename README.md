@@ -4,7 +4,7 @@
 
 <h1 align="center">Tools by Soumendra</h1>
 
-Single point of entry for all my [mini projects](https://www.soumendrak.com/projects/foss/#mini-projects) — 43 single-file, zero-dependency browser tools you can browse, search, and use in place.
+Single point of entry for all my [mini projects](https://www.soumendrak.com/projects/foss/#mini-projects) — 44 zero-dependency browser tools you can browse, search, and use in place. Most are single-file; the Fasting Tracker is an offline-first multi-file PWA.
 
 Built with Next.js + Tailwind. **Statically exported** (`output: "export"` →
 `out/`) and hosted on **Cloudflare Pages** at
@@ -23,6 +23,21 @@ The landing page also shows **Recently added / Recently updated** lists and a
 per-category filter (7 categories: Time & Life, Developer Tools, Fun & Visual,
 DevOps & Monitoring, Finance, Telephony, Writing & Content).
 
+## Search and machine-readable discovery
+
+The static export includes the same catalog in formats intended for crawlers,
+answer engines, and agents:
+
+- `/sitemap.xml` and `/robots.txt` for conventional crawling.
+- `/llms.txt` for a concise, categorized Markdown index.
+- `/llms-full.txt` for expanded entries with canonical, direct-use, and source
+  URLs.
+
+Both LLM indexes are generated directly from `src/data/tools.ts` during the
+Next.js build, so adding a catalog entry updates them automatically. Raw
+`/tools/<slug>/` pages canonicalize to their descriptive `/t/<slug>` pages via
+the head block injected by `scripts/skin-tools.py`.
+
 The recency lists are **automatic**: `scripts/tool-dates.py` runs before every
 build (via `prebuild`) and derives each tool's `updated` date from the vendored
 file's last git commit, so committing an edit refreshes the list on the next
@@ -34,7 +49,8 @@ date.
 Full steps live in the `tools-catalog` skill (`.claude/skills/tools-catalog/`).
 Short version:
 
-1. Vendor the tool's page into `public/tools/<slug>/index.html`.
+1. Vendor the tool's page into `public/tools/<slug>/index.html`. If it has
+   relative assets, vendor the complete deployable directory.
 2. `python3 scripts/skin-tools.py` — apply the theme skin.
 3. Add one line to `src/data/tools.ts` (card, `/t/<slug>` page, sitemap, and
    structured data all derive from it).
@@ -78,6 +94,11 @@ print('\n'.join(re.findall(r'^\s*t\(\s*\"([^\"]+)\"', open('src/data/tools.ts').
 done
 python3 scripts/skin-tools.py   # re-apply the theme skin
 ```
+
+The loop above is only for single-file tools. For a multi-file tool such as
+`fasting-tracker`, copy every deployable asset from its repository
+(`index.html`, JavaScript, manifest, service worker, and icons) before
+re-applying the skin.
 
 ## Deploy (Cloudflare Pages → tools.soumendrak.com)
 

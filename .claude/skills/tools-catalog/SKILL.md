@@ -10,19 +10,22 @@ description: >
 
 # Tools catalog standard
 
-This site is a single point of entry for 40+ single-file HTML tools. Each tool
-is **vendored** (a self-contained `index.html` copied into this repo) and served
-same-origin at `/tools/<slug>/`, then embedded on an SEO page at `/t/<slug>`.
+This site is a single point of entry for 40+ browser tools. Each tool is
+**vendored** (a self-contained `index.html`, plus any relative assets it needs)
+and served same-origin at `/tools/<slug>/`, then embedded on an SEO page at
+`/t/<slug>`.
 
 ## Anatomy of a tool
 
 | Piece | Location | Source of truth |
 |-------|----------|-----------------|
 | Catalog entry | `src/data/tools.ts` | one `t(slug, name, description, category)` line |
-| Vendored page | `public/tools/<slug>/index.html` | the tool's own HTML |
+| Vendored page/assets | `public/tools/<slug>/` | the tool's deployable files |
 | Live URL | `/tools/<slug>/` | derived by `t()` |
 | Source link | this repo's file on GitHub | derived by `t()` (`repoUrl`) |
 | SEO + embed page | `/t/<slug>` | auto-generated from the catalog entry |
+| Raw-page canonical | `/tools/<slug>/` → `/t/<slug>` | injected by `scripts/skin-tools.py` |
+| Agent indexes | `/llms.txt`, `/llms-full.txt` | auto-generated from the catalog entry |
 | Added/updated dates | `src/data/tool-dates.ts` | generated from the origin repo (feeds the landing page's Recently added/updated lists) |
 
 `t()` derives `liveUrl` and `repoUrl`; never hand-write those. Categories are
@@ -32,8 +35,10 @@ badges derive from it automatically.
 
 ## Add a tool
 
-1. **Vendor the HTML.** Put the tool's self-contained page at
-   `public/tools/<slug>/index.html`. From GitHub Pages:
+1. **Vendor the deployable files.** Put the tool's page at
+   `public/tools/<slug>/index.html`. If it references relative JavaScript,
+   manifests, service workers, icons, or other assets, copy those too. For a
+   single-file tool from GitHub Pages:
    ```bash
    mkdir -p public/tools/<slug>
    curl -sL "https://soumendrak.github.io/<slug>/" -o public/tools/<slug>/index.html
@@ -45,7 +50,8 @@ badges derive from it automatically.
 3. **Remove the credit footer.** Delete any `<footer>`/`.footer` block that
    links to the author's name or GitHub. Leave demo data and code comments
    alone (e.g. a sample webhook payload that happens to contain the name).
-4. **Apply the theme skin:** `python3 scripts/skin-tools.py` (idempotent).
+4. **Apply the theme skin + canonical:** `python3 scripts/skin-tools.py <slug>`
+   (idempotent). Omit the slug to refresh every vendored tool.
 5. **Add the catalog entry** — one line in `src/data/tools.ts`:
    ```ts
    t("<slug>", "<Name>", "<one-sentence description>", "<Category>"),
@@ -62,10 +68,11 @@ don't hand-enter them; committing the tool is enough.
   `localStorage.theme`, toggled top-right (`ThemeToggle`), applied pre-paint by
   an inline script in `layout.tsx`. Palette lives in `globals.css` (terracotta
   accent on warm cream/espresso surfaces, matching soumendrak.com).
-- **Tools** are same-origin, so `scripts/skin-tools.py` injects one stylesheet
-  that remaps each tool's CSS variables (`--bg`, `--surface`, `--accent`,
-  `--orange`, …) to the shared palette for both modes, plus a tiny script that
-  reads the theme and reacts to live toggles (`storage` + `postMessage`).
+- **Tools** are same-origin, so `scripts/skin-tools.py` injects a canonical link
+  from each raw page to `/t/<slug>`, one stylesheet that remaps each tool's CSS
+  variables (`--bg`, `--surface`, `--accent`, `--orange`, …) to the shared
+  palette for both modes, and a tiny script that reads the theme and reacts to
+  live toggles (`storage` + `postMessage`).
 - To restyle all tools, edit the palette **once** in `scripts/skin-tools.py` and
   re-run it. Don't hand-edit colors in individual tool files — it won't scale
   and will drift.
@@ -95,16 +102,18 @@ repo name.
 Re-downloading a tool from upstream **overwrites** the local edits (skin,
 removed footer, any rewrites like the typing test). After any re-sync, redo
 steps 2–4 and run `python3 scripts/skin-tools.py`. See the README "Sync
-vendored tools" section for the batch loop.
+vendored tools" section for the single-file batch loop. Multi-file tools such
+as `fasting-tracker` must be refreshed as a complete deployable directory so
+their JavaScript, manifest, service worker, and icons stay in sync.
 
 ## The commit guard
 
 `.githooks/pre-commit` runs `scripts/check-tools.py` on every commit and blocks
 if the standard is violated (missing vendored file, missing skin, leftover
-credit footer, orphan dir). It validates the **staged snapshot** (the index
-exported to a temp dir, via `TOOLS_ROOT`), not the working tree, so a
-fixed-but-unstaged file can't let an invalid staged version through. Enable it
-once per clone:
+credit footer, orphan dir, or missing/incorrect raw-page canonical). It
+validates the **staged snapshot** (the index exported to a temp dir, via
+`TOOLS_ROOT`), not the working tree, so a fixed-but-unstaged file can't let an
+invalid staged version through. Enable it once per clone:
 
 ```bash
 git config core.hooksPath .githooks
