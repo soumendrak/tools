@@ -1,12 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CATEGORIES, TOOLS, type Category } from "@/data/tools";
 
 export default function ToolsExplorer() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<Category | "All">("All");
+
+  useEffect(() => {
+    const initialQuery = new URLSearchParams(window.location.search).get("q");
+    if (initialQuery) {
+      // This intentionally synchronizes the client-only URL with the static page.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setQuery(initialQuery);
+    }
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -22,26 +31,29 @@ export default function ToolsExplorer() {
   return (
     <section id="tools" aria-label="Tool catalog" className="mx-auto w-full max-w-6xl px-6 pb-24">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center">
-        <label className="relative flex-1">
-          <span className="sr-only">Search tools</span>
-          <svg
-            aria-hidden="true"
-            className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path strokeLinecap="round" d="m21 21-4.35-4.35M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z" />
-          </svg>
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={`Search ${TOOLS.length} tools…`}
-            className="w-full rounded-xl border border-border bg-card py-3 pl-11 pr-4 text-sm placeholder:text-muted focus:border-accent focus:outline-none"
-          />
-        </label>
+        <form action="/" role="search" className="relative flex-1">
+          <label className="block">
+            <span className="sr-only">Search tools</span>
+            <svg
+              aria-hidden="true"
+              className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" d="m21 21-4.35-4.35M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z" />
+            </svg>
+            <input
+              type="search"
+              name="q"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={`Search ${TOOLS.length} tools…`}
+              className="w-full rounded-xl border border-border bg-card py-3 pl-11 pr-4 text-sm placeholder:text-muted focus:border-accent focus:outline-none"
+            />
+          </label>
+        </form>
         <div role="group" aria-label="Filter by category" className="flex flex-wrap gap-2">
           {(["All", ...CATEGORIES] as const).map((c) => (
             <button

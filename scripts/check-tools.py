@@ -9,6 +9,7 @@ Invariants:
   3. No vendored tool ships a personal credit footer (name / GitHub link in a
      <footer> or .footer element).
   4. No orphan tool dirs: every public/tools/<slug>/ is listed in tools.ts.
+  5. Every raw tool page canonicalizes to its descriptive /t/<slug> page.
 
 Exits non-zero (with actionable messages) on any violation.
 """
@@ -24,6 +25,7 @@ ROOT = pathlib.Path(os.environ.get("TOOLS_ROOT") or
                     pathlib.Path(__file__).resolve().parent.parent)
 TOOLS_TS = ROOT / "src" / "data" / "tools.ts"
 TOOLS_DIR = ROOT / "public" / "tools"
+SITE_URL = "https://tools.soumendrak.com"
 
 # Footer-type element (either <footer> or class="...footer...") crediting the author.
 CREDIT_FOOTER = re.compile(
@@ -49,7 +51,7 @@ def main() -> int:
         return 1
 
     slug_set = set(slugs)
-    unskinned, footered = [], []
+    unskinned, footered, uncanonical = [], [], []
 
     for slug in slugs:
         html = TOOLS_DIR / slug / "index.html"
@@ -62,6 +64,12 @@ def main() -> int:
         s = html.read_text()
         if "site-theme-override" not in s or "site-theme-sync" not in s:
             unskinned.append(slug)
+        canonical = (
+            f'<link id="site-canonical" rel="canonical" '
+            f'href="{SITE_URL}/t/{slug}">'
+        )
+        if canonical not in s:
+            uncanonical.append(slug)
         if any("soumendrak" in m.group(0).lower() for m in CREDIT_FOOTER.finditer(s)):
             footered.append(slug)
 
@@ -84,6 +92,12 @@ def main() -> int:
             "personal credit footer still present on: "
             + ", ".join(footered)
             + "  → remove the <footer>/.footer credit block"
+        )
+    if uncanonical:
+        errors.append(
+            "canonical link missing or incorrect on: "
+            + ", ".join(uncanonical)
+            + "  → run: python3 scripts/skin-tools.py"
         )
 
     if errors:

@@ -47,18 +47,40 @@ export default function Home() {
 
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "ItemList",
-    name: "Tools by Soumendra",
-    description:
-      "A collection of free, single-file, zero-dependency browser tools.",
-    url: SITE_URL,
-    numberOfItems: TOOLS.length,
-    itemListElement: TOOLS.map((tool, i) => ({
-      "@type": "ListItem",
-      position: i + 1,
-      url: `${SITE_URL}/t/${tool.slug}`,
-      name: tool.name,
-    })),
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": `${SITE_URL}/#website`,
+        url: SITE_URL,
+        name: "Tools by Soumendra",
+        description:
+          "A collection of free, single-file, zero-dependency browser tools.",
+        inLanguage: "en",
+        potentialAction: {
+          "@type": "SearchAction",
+          target: {
+            "@type": "EntryPoint",
+            urlTemplate: `${SITE_URL}/?q={search_term_string}#tools`,
+          },
+          "query-input": "required name=search_term_string",
+        },
+      },
+      {
+        "@type": "ItemList",
+        "@id": `${SITE_URL}/#tool-catalog`,
+        name: "Tools by Soumendra",
+        description:
+          "A collection of free, single-file, zero-dependency browser tools.",
+        url: SITE_URL,
+        numberOfItems: TOOLS.length,
+        itemListElement: TOOLS.map((tool, i) => ({
+          "@type": "ListItem",
+          position: i + 1,
+          url: `${SITE_URL}/t/${tool.slug}`,
+          name: tool.name,
+        })),
+      },
+    ],
   };
 
   return (

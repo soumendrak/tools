@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e1512">
+<title>FastTrack</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+:root{
+  --bg:#0e1512; --card:#17211c; --card2:#1e2a24; --text:#e8f0ec; --muted:#8ba59a;
+  --accent:#34d399; --accent-dim:#34d39933; --warn:#fbbf24; --danger:#f87171; --line:#2a3830;
+}
+@media (prefers-color-scheme: light){
+  :root{--bg:#f4f7f5; --card:#ffffff; --card2:#eef3f0; --text:#15201b; --muted:#5b6f66;
+  --accent:#059669; --accent-dim:#05966922; --line:#dde5e0;}
+}
+*{box-sizing:border-box; margin:0}
+body{background:var(--bg); color:var(--text); font-family:-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;
+  padding-bottom:calc(64px + env(safe-area-inset-bottom));}
+header{display:flex; justify-content:space-between; align-items:center; padding:16px 16px 4px; max-width:560px; margin:0 auto;}
+header h1{font-size:20px; letter-spacing:.3px}
+#streak{background:var(--card); border:1px solid var(--line); border-radius:20px; padding:4px 12px; font-size:14px; color:var(--muted)}
+main{max-width:560px; margin:0 auto; padding:8px 16px}
+section{display:none}
+section.active{display:block}
+.card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; margin:12px 0}
+.card h2{font-size:15px; color:var(--muted); font-weight:600; margin-bottom:10px; text-transform:uppercase; letter-spacing:.5px}
+nav{position:fixed; bottom:0; left:0; right:0; display:flex; background:var(--card); border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom); z-index:10}
+nav button{flex:1; background:none; border:none; color:var(--muted); font-size:12px; padding:10px 0 8px; cursor:pointer}
+nav button.active{color:var(--accent)}
+nav button .ico{display:block; font-size:20px; margin-bottom:2px}
+button.primary{background:var(--accent); color:#06281c; border:none; border-radius:12px; padding:14px 24px;
+  font-size:16px; font-weight:700; width:100%; cursor:pointer}
+button.ghost{background:var(--card2); color:var(--text); border:1px solid var(--line); border-radius:10px; padding:8px 14px; cursor:pointer}
+button.danger{color:var(--danger)}
+input,select,textarea{background:var(--card2); color:var(--text); border:1px solid var(--line); border-radius:10px;
+  padding:10px; font-size:15px; width:100%}
+textarea{min-height:70px; resize:vertical}
+.row{display:flex; gap:8px; align-items:center; margin:8px 0}
+.row > *{flex:1}
+.row > .fit{flex:0 0 auto; width:auto}
+.chips{display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin:8px 0}
+.chip{background:var(--card2); border:1px solid var(--line); color:var(--text); border-radius:20px; padding:6px 14px; font-size:14px; cursor:pointer}
+.chip.sel{background:var(--accent-dim); border-color:var(--accent); color:var(--accent)}
+#ring-wrap{display:flex; flex-direction:column; align-items:center; padding:12px 0}
+#ring-wrap svg{width:230px; height:230px}
+.ring-bg{stroke:var(--card2)}
+.ring-fg{stroke:var(--accent); transition:stroke-dashoffset .5s linear}
+#ring-elapsed{font-size:34px; font-weight:700; font-variant-numeric:tabular-nums}
+#ring-sub{fill:var(--muted); font-size:13px}
+#ring-text tspan{fill:var(--text)}
+.stage-now{display:flex; gap:12px; align-items:center}
+.stage-now .emoji{font-size:32px}
+.stage-now small{color:var(--muted)}
+ul.plain{list-style:none}
+ul.plain li{display:flex; justify-content:space-between; gap:8px; padding:10px 0; border-bottom:1px solid var(--line); font-size:15px}
+ul.plain li:last-child{border-bottom:none}
+ul.plain .sub{color:var(--muted); font-size:13px}
+.del{background:none; border:none; color:var(--danger); cursor:pointer; font-size:16px}
+.big-num{font-size:28px; font-weight:700}
+.muted{color:var(--muted); font-size:14px}
+.bar{height:10px; background:var(--card2); border-radius:5px; overflow:hidden; margin:8px 0}
+.bar div{height:100%; background:var(--accent); border-radius:5px; transition:width .3s}
+svg.chart{width:100%; height:auto; display:block}
+.chart .axis{stroke:var(--line)} .chart text{fill:var(--muted); font-size:9px}
+.chart .hist{stroke:var(--accent); fill:none; stroke-width:2}
+.chart .proj{stroke:var(--warn); fill:none; stroke-width:2; stroke-dasharray:5 4}
+.chart .dot{fill:var(--accent)}
+details summary{cursor:pointer; color:var(--muted); padding:6px 0}
+.toast{position:fixed; top:16px; left:50%; transform:translateX(-50%); background:var(--accent); color:#06281c;
+  padding:12px 20px; border-radius:12px; font-weight:700; z-index:20; animation:fade 3s forwards}
+@keyframes fade{0%,80%{opacity:1}100%{opacity:0}}
+label.lbl{display:block; font-size:13px; color:var(--muted); margin:10px 0 4px}
+.hero{text-align:center; background:linear-gradient(160deg,var(--accent-dim),var(--card)); border-color:var(--accent)}
+.hero-badge{font-size:40px; line-height:1}
+.hero-title{font-size:22px; font-weight:700; color:var(--text); text-transform:none; letter-spacing:0; margin:8px 0 6px}
+.hero-sub{color:var(--muted); font-size:14px; margin-bottom:12px; line-height:1.45}
+.hero-feats{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-bottom:12px}
+.hero-feats span{background:var(--card2); border:1px solid var(--line); border-radius:20px; padding:6px 12px; font-size:13px}
+</style>
+<link id="site-canonical" rel="canonical" href="https://tools.soumendrak.com/t/fasting-tracker">
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--card:#2d251f;--card2:#38302a;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--card:#ffffff;--card2:#efe6d8;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<header><h1>⏳ FastTrack</h1><span id="streak"></span></header>
+<main>
+
+<section id="tab-timer" class="active">
+  <div class="card hero" id="welcome" hidden>
+    <div class="hero-badge">⏳</div>
+    <h2 class="hero-title">Welcome to FastTrack</h2>
+    <p class="hero-sub">Track your fasts and weight — and see where you're headed. Everything stays private on this device.</p>
+    <div class="hero-feats">
+      <span>🔥 Timer &amp; streaks</span><span>📈 Weight projection</span>
+      <span>💧 Water &amp; metrics</span><span>📴 Works offline</span>
+    </div>
+    <p class="hero-sub" style="margin-bottom:0">Pick a plan below and tap <b>Start fast</b> to begin.</p>
+  </div>
+  <div class="chips" id="presets"></div>
+  <div id="ring-wrap">
+    <svg viewBox="0 0 200 200">
+      <circle class="ring-bg" cx="100" cy="100" r="88" fill="none" stroke-width="12"/>
+      <circle class="ring-fg" id="ring" cx="100" cy="100" r="88" fill="none" stroke-width="12"
+        stroke-linecap="round" transform="rotate(-90 100 100)"/>
+      <text id="ring-text" text-anchor="middle">
+        <tspan id="ring-elapsed" x="100" y="98">--:--:--</tspan>
+        <tspan id="ring-sub" x="100" y="122">tap start</tspan>
+      </text>
+    </svg>
+  </div>
+  <button class="primary" id="fast-btn">Start fast</button>
+  <div class="card" id="edit-start-card" hidden>
+    <h2>Started at</h2>
+    <input type="datetime-local" id="edit-start">
+  </div>
+  <div class="card">
+    <h2>Current stage</h2>
+    <div class="stage-now" id="stage-now"><span class="muted">Start a fast to see your body's stages.</span></div>
+  </div>
+  <div class="card">
+    <details><summary>All fasting stages</summary><ul class="plain" id="stage-list"></ul></details>
+  </div>
+</section>
+
+<section id="tab-history">
+  <div class="card">
+    <h2>Log a past fast</h2>
+    <div class="row"><input type="datetime-local" id="past-start" title="start"><input type="datetime-local" id="past-end" title="end"></div>
+    <button class="ghost" id="past-add">Add fast</button>
+  </div>
+  <div class="card">
+    <h2>Fasting history</h2>
+    <ul class="plain" id="fast-list"></ul>
+  </div>
+</section>
+
+<section id="tab-weight">
+  <div class="card">
+    <h2>Log weight</h2>
+    <div class="row">
+      <input type="number" step="0.1" id="w-val" placeholder="Weight">
+      <input type="date" id="w-date">
+      <button class="ghost fit" id="w-add">Add</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Trend &amp; projection</h2>
+    <div id="w-chart"></div>
+    <p class="muted" id="w-proj" style="margin-top:8px"></p>
+    <label class="lbl">Goal weight (<span class="unit-lbl"></span>)</label>
+    <input type="number" step="0.1" id="w-goal" placeholder="e.g. 70">
+  </div>
+  <div class="card">
+    <h2>Entries</h2>
+    <ul class="plain" id="w-list"></ul>
+  </div>
+</section>
+
+<section id="tab-more">
+  <div class="card">
+    <h2>💧 Water today</h2>
+    <span class="big-num" id="water-num"></span> <span class="muted" id="water-goal-lbl"></span>
+    <div class="bar"><div id="water-bar"></div></div>
+    <div class="row">
+      <button class="ghost" data-water="250">+250 ml</button>
+      <button class="ghost" data-water="500">+500 ml</button>
+      <button class="ghost" data-water="-250">−250 ml</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>📏 Measurements &amp; metrics</h2>
+    <div class="row">
+      <select id="m-type"></select>
+      <input type="number" step="0.1" id="m-val" placeholder="Value">
+      <button class="ghost fit" id="m-add">Add</button>
+    </div>
+    <ul class="plain" id="m-list"></ul>
+  </div>
+  <div class="card">
+    <h2>📝 Notes</h2>
+    <textarea id="note-text" placeholder="How do you feel today?"></textarea>
+    <button class="ghost" id="note-add" style="margin-top:8px">Save note</button>
+    <ul class="plain" id="note-list"></ul>
+  </div>
+  <div class="card">
+    <h2>⚙️ Settings</h2>
+    <label class="lbl">Weight unit</label>
+    <select id="set-unit"><option value="kg">kg</option><option value="lb">lb</option></select>
+    <label class="lbl">Daily water goal (ml)</label>
+    <input type="number" id="set-water" step="250">
+    <div class="row" style="margin-top:14px">
+      <button class="ghost" id="export-btn">Export data</button>
+      <button class="ghost" id="import-btn">Import data</button>
+    </div>
+    <input type="file" id="import-file" accept=".json" hidden>
+  </div>
+</section>
+
+</main>
+<nav>
+  <button data-tab="timer" class="active"><span class="ico">⏳</span>Timer</button>
+  <button data-tab="history"><span class="ico">📅</span>Fasts</button>
+  <button data-tab="weight"><span class="ico">⚖️</span>Weight</button>
+  <button data-tab="more"><span class="ico">➕</span>More</button>
+</nav>
+<script src="app.js"></script>
+</body>
+</html>

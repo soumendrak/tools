@@ -4,11 +4,11 @@
 
 # Tools by Soumendra
 
-**43 free, single-file, zero-dependency browser tools — one searchable home.**
+**44 free, zero-dependency browser tools — one searchable home.**
 
 [![Live site](https://img.shields.io/badge/live-tools.soumendrak.com-b4522e?style=flat-square&logo=cloudflare&logoColor=white)](https://tools.soumendrak.com)
 &nbsp;
-![Tools](https://img.shields.io/badge/tools-43-b4522e?style=flat-square)
+![Tools](https://img.shields.io/badge/tools-44-b4522e?style=flat-square)
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=nextdotjs&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-38bdf8?style=flat-square&logo=tailwindcss&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?style=flat-square&logo=typescript&logoColor=white)
@@ -21,22 +21,22 @@
 
 ---
 
-A single point of entry for all my [mini projects](https://www.soumendrak.com/projects/foss/#mini-projects) — tiny, self-contained HTML tools you can **browse, search, and use right in place**. Everything runs locally in your browser; no sign-up, no accounts.
+A single point of entry for all my [mini projects](https://www.soumendrak.com/projects/foss/#mini-projects) — tiny, self-contained browser tools you can **browse, search, and use right in place**. Everything runs locally in your browser; no sign-up, no accounts.
 
 ## ✨ Features
 
-- **43 tools, one origin** — each is a single self-contained page, vendored under `public/tools/` and embedded on its own page at `/t/<slug>` with a one-click full screen.
+- **44 tools, one origin** — most are single-file pages; the Fasting Tracker is an offline-first multi-file PWA. Every tool is vendored under `public/tools/` and embedded on its own page at `/t/<slug>` with one-click full screen.
 - **Instant search & filter** — fuzzy search plus 7 category filters.
 - **Recently added / updated** — surfaced on the landing page and kept fresh automatically from git history.
 - **Light & dark** — a terracotta theme (matching [soumendrak.com](https://www.soumendrak.com)) shared across the site *and* every tool, with a persistent top-right toggle.
-- **Built for discovery** — `sitemap.xml`, `robots.txt`, JSON-LD, Open Graph, and per-tool canonical URLs.
+- **Built for discovery** — `sitemap.xml`, `robots.txt`, JSON-LD, Open Graph cards, per-tool canonical URLs, and machine-readable LLM indexes.
 - **Fast & private** — statically exported, edge-hosted on Cloudflare Pages, tools compute entirely client-side.
 
 ## 🗂️ Categories
 
 | Category | Tools | Examples |
 | --- | :---: | --- |
-| ⏳ Time & Life | 8 | Pomodoro, Year Progress, Life Calendar |
+| ⏳ Time & Life | 9 | Fasting Tracker, Pomodoro, Life Calendar |
 | 🛠️ Developer Tools | 9 | JSON Pretty, Diff Checker, Base64 |
 | 🎨 Fun & Visual | 11 | Mandelbrot, Conway's Game of Life, Odia 2048 |
 | 📡 DevOps & Monitoring | 8 | API Playground, Webhook Inspector, Uptime Radar |
@@ -57,14 +57,22 @@ pnpm build     # static export → ./out
 pnpm preview   # serve ./out like Cloudflare Pages (clean URLs + directory index)
 ```
 
+## 🔎 Search and machine-readable discovery
+
+The static export includes `/sitemap.xml` and `/robots.txt` for conventional crawling, `/llms.txt` for a concise categorized Markdown index, and `/llms-full.txt` for expanded entries with canonical, direct-use, and source URLs.
+
+Both LLM indexes are generated from `src/data/tools.ts` during the Next.js build. Raw `/tools/<slug>/` pages canonicalize to their descriptive `/t/<slug>` pages via the head block injected by `scripts/skin-tools.py`.
+
+The recency lists are automatic: `scripts/tool-dates.py` runs before every build and derives each tool's `updated` date from git history. A new tool's `added` date is seeded from its origin repository.
+
 ## ➕ Add a tool
 
 Full steps live in the `tools-catalog` skill (`.claude/skills/tools-catalog/`). Short version:
 
-1. Vendor the tool's page into `public/tools/<slug>/index.html`.
-2. `python3 scripts/skin-tools.py` — apply the shared theme skin.
-3. Add one line to `src/data/tools.ts` — the card, `/t/<slug>` page, sitemap, and structured data all derive from it.
-4. `python3 scripts/check-tools.py && pnpm build` — the build auto-refreshes the *Recently added/updated* dates.
+1. Vendor the tool into `public/tools/<slug>/index.html`. If it uses relative JavaScript, manifest, service-worker, or icon assets, vendor the complete deployable directory.
+2. `python3 scripts/skin-tools.py` — apply the shared theme skin and canonical URL.
+3. Add one entry to `src/data/tools.ts` — the card, `/t/<slug>` page, sitemap, structured data, and LLM indexes all derive from it.
+4. `python3 scripts/check-tools.py && pnpm build` — validate the catalog and refresh the *Recently added/updated* dates.
 
 ## 🎨 Theming
 

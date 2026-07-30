@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import { SITE_URL } from "@/data/tools";
@@ -20,6 +20,13 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
+const SOCIAL_IMAGE = {
+  url: "/social-card.png",
+  width: 1200,
+  height: 630,
+  alt: "Tools by Soumendra — tiny browser tools that just work",
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
@@ -36,6 +43,7 @@ export const metadata: Metadata = {
     "no signup tools",
   ],
   authors: [{ name: "Soumendra Kumar Sahoo", url: "https://www.soumendrak.com" }],
+  alternates: { canonical: SITE_URL },
   openGraph: {
     type: "website",
     siteName: "Tools by Soumendra",
@@ -43,12 +51,24 @@ export const metadata: Metadata = {
     title: "Tools by Soumendra — free, tiny, in-browser utilities",
     description:
       "40+ free, single-file browser tools. No sign-up — everything runs locally in your browser.",
+    images: [SOCIAL_IMAGE],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     creator: "@soumendrak_",
+    title: "Tools by Soumendra — free, tiny, in-browser utilities",
+    description:
+      "40+ free, single-file browser tools. No sign-up — everything runs locally in your browser.",
+    images: [SOCIAL_IMAGE.url],
   },
   robots: { index: true, follow: true },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f7f0e6" },
+    { media: "(prefers-color-scheme: dark)", color: "#231c17" },
+  ],
 };
 
 export default function RootLayout({

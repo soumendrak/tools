@@ -9,6 +9,7 @@ export const TOOL_DATES: Record<string, { added: string; updated: string }> = {
   "age-in-seconds": { added: "2026-06-02", updated: "2026-06-06" },
   "deadline-counter": { added: "2026-06-02", updated: "2026-06-06" },
   "lifecalendar": { added: "2026-06-02", updated: "2026-06-06" },
+  "fasting-tracker": { added: "2026-07-25", updated: "2026-07-25" },
   "json-pretty": { added: "2026-06-02", updated: "2026-06-06" },
   "color-palette": { added: "2026-06-02", updated: "2026-06-06" },
   "base64": { added: "2026-06-02", updated: "2026-06-06" },

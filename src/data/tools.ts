@@ -25,13 +25,16 @@ const t = (
   name: string,
   description: string,
   category: Category,
+  repoUrl?: string,
 ): Tool => ({
   slug,
   name,
   description,
   category,
   liveUrl: `/tools/${slug}/`,
-  repoUrl: `https://github.com/soumendrak/tools/blob/main/public/tools/${slug}/index.html`,
+  repoUrl:
+    repoUrl ??
+    `https://github.com/soumendrak/tools/blob/main/public/tools/${slug}/index.html`,
   added: TOOL_DATES[slug]?.added,
   updated: TOOL_DATES[slug]?.updated,
 });
@@ -56,6 +59,13 @@ export const TOOLS: Tool[] = [
   t("age-in-seconds", "Age in Seconds", "Real-time seconds counter from your birth date, plus heartbeats and breaths taken since birth.", "Time & Life"),
   t("deadline-counter", "Deadline Counter", "Flip-card countdown to any target date/time. Multiple deadlines with localStorage persistence.", "Time & Life"),
   t("lifecalendar", "Life Calendar", "90-year week grid — each box is one week of your life. Existential but motivating.", "Time & Life"),
+  t(
+    "fasting-tracker",
+    "Fasting Tracker",
+    "Offline-first fasting and weight tracker with timers, streaks, water and body metrics, plus a 30-day weight projection.",
+    "Time & Life",
+    "https://github.com/soumendrak/fasting-tracker",
+  ),
   // Developer Tools
   t("json-pretty", "JSON Pretty", "Paste JSON, get formatted, minified, or tree-view output. Drag-and-drop support.", "Developer Tools"),
   t("color-palette", "Color Palette", "Enter a hex colour, get complementary, analogous, triadic, and monochromatic palettes.", "Developer Tools"),
