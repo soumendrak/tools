@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Handwriting Font Maker</title>
+<meta name="description" content="Turn photos of your handwriting into a real TTF font. Print a template, write, snap a photo, download your font — entirely in your browser.">
+<style>
+:root{
+  --bg:#f7f0e6;--surface:#fdf8f0;--card:#ffffff;--border:#e6dccc;
+  --text:#2a201a;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
+.wrap{max-width:880px;margin:0 auto;padding:24px 16px 64px}
+h1{font-size:1.6rem;margin:0 0 4px}
+.tagline{color:var(--muted);margin:0 0 24px}
+.step{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:18px}
+.step h2{font-size:1.05rem;margin:0 0 8px;display:flex;align-items:center;gap:10px}
+.step h2 .n{background:var(--accent);color:#fff;border-radius:50%;width:26px;height:26px;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:.85rem}
+.step p{margin:6px 0;color:var(--muted);font-size:.92rem}
+.step p b{color:var(--text)}
+button{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:.92rem;cursor:pointer;font-family:inherit}
+button:hover{background:var(--accent-light)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
+input[type=file]{display:none}
+.status{font-size:.9rem;color:var(--accent);min-height:1.3em;margin-top:8px}
+#tapWrap{display:none;margin-top:12px}
+#tapCanvas{width:100%;max-height:70vh;object-fit:contain;border:1px solid var(--border);border-radius:8px;cursor:crosshair;touch-action:manipulation;background:#fff}
+#rectWrap{display:none;margin-top:12px}
+#rectCanvas{max-width:240px;width:100%;border:1px solid var(--border);border-radius:8px}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(66px,1fr));gap:8px;margin-top:12px}
+.tile{position:relative;background:#fff;border:1px dashed var(--border);border-radius:8px;padding:2px;text-align:center}
+.tile.got{border:1px solid var(--accent)}
+.tile canvas{width:100%;display:block;border-radius:6px}
+.tile .ch{position:absolute;top:2px;left:5px;font-size:.68rem;color:var(--muted)}
+.tile .n{position:absolute;top:2px;right:4px;font-size:.62rem;background:var(--accent);color:#fff;border-radius:8px;padding:0 5px;display:none}
+.tile.multi .n{display:block}
+.tile.multi{cursor:pointer}
+label.lab{font-size:.9rem;color:var(--muted)}
+input[type=text]{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 10px;font-size:.92rem;font-family:inherit}
+input[type=range]{accent-color:var(--accent)}
+#preview{display:none;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;margin-top:12px;font-size:34px;line-height:1.35;min-height:60px;word-break:break-word}
+.note{font-size:.8rem;color:var(--muted);margin-top:24px;text-align:center}
+
+/* ---------- printable template (fallback when the print tab is blocked) ---------- */
+#printSheet{display:none}
+@media print{
+  body>*:not(#printSheet){display:none!important}
+  #printSheet{display:block!important;background:#fff;color:#000}
+}
+</style>
+<style id="tplCss">
+@page{margin:8mm}
+.p-head{font:3.2mm/1.5 Arial,sans-serif;color:#333;margin:0 0 3mm 4mm;width:188mm}
+.p-area{position:relative;width:188mm;height:268mm}
+.p-mark{position:absolute;width:8mm;height:8mm;background:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.p-cell{position:absolute;border:.25mm solid #c9c9c9}
+.p-cell span{position:absolute;left:.5mm;top:.3mm;font:2.2mm/1 Arial,sans-serif;color:#c0c0c0}
+.p-cell i{position:absolute;left:0;right:0;border-top:.25mm dashed #c9c9c9}
+</style>
+<link id="site-canonical" rel="canonical" href="https://tools.soumendrak.com/t/handwriting-font">
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--card:#2d251f;--card2:#38302a;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--card:#ffffff;--card2:#efe6d8;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<div class="wrap">
+  <h1>Handwriting Font Maker</h1>
+  <p class="tagline">Print a template, write, snap a photo — download a TTF of your own handwriting. Everything runs in your browser; photos never leave your device.</p>
+
+  <section class="step">
+    <h2><span class="n">1</span>Print the template</h2>
+    <p>Print the sheet (any printer scale works) and fill the cells with a <b>dark pen</b> — the light guides are ignored automatically. Sit letters on the dashed baseline; let descenders (g, y, p) hang below it.</p>
+    <div class="row"><button id="printBtn">Print template</button></div>
+  </section>
+
+  <section class="step">
+    <h2><span class="n">2</span>Photograph &amp; upload</h2>
+    <p>Photograph the filled sheet flat, in good light, then upload it. Tap the <b>centre of each black corner square</b> in order: top-left → top-right → bottom-right → bottom-left. Upload as many sheets as you like — later sheets add alternate samples.</p>
+    <div class="row">
+      <button id="uploadBtn">Upload photo</button>
+      <input type="file" id="fileInput" accept="image/*">
+      <button id="resetBtn" class="ghost" style="display:none">Re-tap corners</button>
+      <button id="extractBtn" style="display:none" disabled>Extract letters</button>
+    </div>
+    <div class="status" id="shootStatus"></div>
+    <div id="tapWrap"><canvas id="tapCanvas"></canvas></div>
+    <div id="rectWrap"><p style="margin:0 0 4px">Rectified sheet (check the grid lines up):</p><canvas id="rectCanvas"></canvas></div>
+  </section>
+
+  <section class="step">
+    <h2><span class="n">3</span>Review your letters</h2>
+    <p id="gridStatus">Nothing captured yet — upload a photo above.</p>
+    <div id="grid"></div>
+  </section>
+
+  <section class="step">
+    <h2><span class="n">4</span>Preview &amp; download</h2>
+    <div class="row">
+      <label class="lab" for="fontName">Font name</label>
+      <input type="text" id="fontName" value="My Handwriting" maxlength="40">
+      <label class="lab" for="glyphScale">Size</label>
+      <input type="range" id="glyphScale" min="0.6" max="1.6" step="0.05" value="1">
+    </div>
+    <div class="row">
+      <button id="buildBtn" disabled>Build &amp; preview</button>
+      <button id="downloadBtn" disabled>Download .ttf</button>
+    </div>
+    <div class="status" id="buildStatus"></div>
+    <div id="preview" contenteditable="true" spellcheck="false">The quick brown fox jumps over the lazy dog 0123456789</div>
+  </section>
+
+  <p class="note">Tip: for natural variety, fill a second sheet and click any tile to switch between samples.</p>
+</div>
+
+<div id="printSheet"></div>
+
+<script src="imagetracer.js"></script>
+<script src="opentype.min.js"></script>
+<script>
+"use strict";
+/* All geometry in template millimetres; (0,0) = centre of the top-left corner marker. */
+const TPL = {
+  k: 10,               // rectified pixels per template mm
+  markerW: 180,        // marker-centre rectangle width  (mm)
+  markerH: 260,        // marker-centre rectangle height (mm)
+  markerSize: 8,       // corner square side (mm)
+  gridX: 2, gridY: 10, // grid origin (mm)
+  cellW: 22, cellH: 24,
+  cols: 8, rows: 10,
+  inset: 2.5,          // ignored border inside each cell (mm) — hides printed borders/labels
+  baseline: 0.70,      // baseline at 70% of cell height
+};
+const CHARSTR = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,!?;:'\"-()@#&$%+=";
+const CHARS = [...CHARSTR];
+console.assert(CHARS.length === TPL.cols * TPL.rows, "charset must fill the grid");
+
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+/* ---------- printable template ---------- */
+function buildPrintSheet(){
+  const half = TPL.markerSize/2, css = mm => (mm + half).toFixed(2) + "mm";
+  let h = `<div class="p-head"><b>Handwriting Font Maker — template</b>&nbsp; Write each character inside its cell with a dark pen. Sit letters on the dashed line; descenders go below it. Photograph flat, in good light.</div><div class="p-area">`;
+  for(const [mx,my] of [[0,0],[TPL.markerW,0],[TPL.markerW,TPL.markerH],[0,TPL.markerH]])
+    h += `<div class="p-mark" style="left:${css(mx-half)};top:${css(my-half)}"></div>`;
+  for(let r=0;r<TPL.rows;r++) for(let c=0;c<TPL.cols;c++){
+    h += `<div class="p-cell" style="left:${css(TPL.gridX+c*TPL.cellW)};top:${css(TPL.gridY+r*TPL.cellH)};width:${TPL.cellW}mm;height:${TPL.cellH}mm">`+
+         `<span>${esc(CHARS[r*TPL.cols+c])}</span><i style="top:${(TPL.baseline*TPL.cellH).toFixed(2)}mm"></i></div>`;
+  }
+  $("printSheet").innerHTML = h + "</div>";
+}
+buildPrintSheet();
+$("printBtn").onclick = () => {
+  // Print from a dedicated tab: window.print() inside the site's embed iframe
+  // prints the whole surrounding page in Safari.
+  const w = window.open("", "_blank");
+  if(!w){ window.print(); return; } // popup blocked — fall back to in-page print
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Handwriting font template</title>`+
+    `<style>body{margin:0;background:#fff;color:#000}${$("tplCss").textContent}</style></head>`+
+    `<body>${$("printSheet").innerHTML}</body></html>`);
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 300);
+};
+
+/* ---------- photo loading & corner tapping ---------- */
+const srcCanvas = document.createElement("canvas"); // pristine photo, full res
+let srcGray = null, tapPts = [];
+const CORNER_NAMES = ["top-left","top-right","bottom-right","bottom-left"];
+
+$("uploadBtn").onclick = () => $("fileInput").click();
+$("fileInput").onchange = async e => {
+  const f = e.target.files[0];
+  e.target.value = "";
+  if(!f) return;
+  let bmp;
+  try{ bmp = await createImageBitmap(f, {imageOrientation:"from-image"}); }
+  catch(err){
+    try{ bmp = await new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=URL.createObjectURL(f); }); }
+    catch(e2){ $("shootStatus").textContent = "Couldn't read that image — try a JPEG or PNG."; return; }
+  }
+  const long = Math.max(bmp.width, bmp.height), s = Math.min(1, 3500/long);
+  srcCanvas.width = Math.round(bmp.width*s); srcCanvas.height = Math.round(bmp.height*s);
+  srcCanvas.getContext("2d").drawImage(bmp, 0, 0, srcCanvas.width, srcCanvas.height);
+  const d = srcCanvas.getContext("2d").getImageData(0,0,srcCanvas.width,srcCanvas.height).data;
+  srcGray = new Uint8ClampedArray(srcCanvas.width*srcCanvas.height);
+  for(let i=0;i<srcGray.length;i++) srcGray[i] = 0.299*d[i*4] + 0.587*d[i*4+1] + 0.114*d[i*4+2];
+  tapPts = [];
+  const tc = $("tapCanvas"); tc.width = srcCanvas.width; tc.height = srcCanvas.height;
+  $("tapWrap").style.display = "block";
+  $("resetBtn").style.display = ""; $("extractBtn").style.display = "";
+  $("rectWrap").style.display = "none";
+  drawTap(); updateTapStatus();
+};
+
+function drawTap(){
+  const tc = $("tapCanvas"), ctx = tc.getContext("2d");
+  ctx.drawImage(srcCanvas, 0, 0);
+  const r = Math.max(6, tc.width/120);
+  ctx.lineWidth = Math.max(2, r/3);
+  if(tapPts.length > 1){
+    ctx.strokeStyle = "rgba(209,125,92,.9)";
+    ctx.beginPath(); ctx.moveTo(tapPts[0].x, tapPts[0].y);
+    for(const p of tapPts.slice(1)) ctx.lineTo(p.x, p.y);
+    if(tapPts.length === 4) ctx.closePath();
+    ctx.stroke();
+  }
+  tapPts.forEach((p,i)=>{
+    ctx.fillStyle = "#b4522e"; ctx.beginPath(); ctx.arc(p.x,p.y,r,0,7); ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.font = `bold ${r*1.2}px sans-serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(i+1, p.x, p.y);
+  });
+}
+function updateTapStatus(){
+  $("shootStatus").textContent = tapPts.length < 4
+    ? `Tap corner square ${tapPts.length+1} of 4: ${CORNER_NAMES[tapPts.length]}`
+    : "All four corners set — press “Extract letters”.";
+  $("extractBtn").disabled = tapPts.length !== 4;
+}
+$("tapCanvas").onclick = e => {
+  if(!srcGray || tapPts.length >= 4) return;
+  const tc = $("tapCanvas"), b = tc.getBoundingClientRect();
+  tapPts.push({x:(e.clientX-b.left)*tc.width/b.width, y:(e.clientY-b.top)*tc.height/b.height});
+  drawTap(); updateTapStatus();
+};
+$("resetBtn").onclick = () => { tapPts = []; drawTap(); updateTapStatus(); };
+
+/* ---------- rectification ---------- */
+function solveH(src, dst){ // homography h mapping dst -> src (8-param DLT, Gaussian elimination)
+  const A=[], b=[];
+  for(let i=0;i<4;i++){
+    const u=src[i].x, v=src[i].y, x=dst[i].x, y=dst[i].y;
+    A.push([x,y,1,0,0,0,-u*x,-u*y]); b.push(u);
+    A.push([0,0,0,x,y,1,-v*x,-v*y]); b.push(v);
+  }
+  for(let c=0;c<8;c++){
+    let p=c; for(let r=c+1;r<8;r++) if(Math.abs(A[r][c])>Math.abs(A[p][c])) p=r;
+    [A[c],A[p]]=[A[p],A[c]]; [b[c],b[p]]=[b[p],b[c]];
+    for(let r=c+1;r<8;r++){ const f=A[r][c]/A[c][c]; if(!f) continue;
+      for(let k=c;k<8;k++) A[r][k]-=f*A[c][k]; b[r]-=f*b[c]; }
+  }
+  const h=new Array(8);
+  for(let r=7;r>=0;r--){ let s=b[r]; for(let k=r+1;k<8;k++) s-=A[r][k]*h[k]; h[r]=s/A[r][r]; }
+  return h;
+}
+
+function rectify(pts){
+  const k=TPL.k, off=6*k;
+  const W=Math.round((TPL.markerW+12)*k), H=Math.round((TPL.markerH+12)*k);
+  const dst=[{x:off,y:off},{x:TPL.markerW*k+off,y:off},{x:TPL.markerW*k+off,y:TPL.markerH*k+off},{x:off,y:TPL.markerH*k+off}];
+  const h=solveH(pts,dst), sw=srcCanvas.width, sh=srcCanvas.height;
+  const out=new Uint8ClampedArray(W*H).fill(255);
+  for(let y=0;y<H;y++){
+    const hy1=h[1]*y+h[2], hy4=h[4]*y+h[5], hy7=h[7]*y+1;
+    for(let x=0;x<W;x++){
+      const w=h[6]*x+hy7, sx=(h[0]*x+hy1)/w, sy=(h[3]*x+hy4)/w;
+      if(sx<0||sy<0||sx>=sw-1||sy>=sh-1) continue;
+      const x0=sx|0, y0=sy|0, fx=sx-x0, fy=sy-y0, i=y0*sw+x0;
+      out[y*W+x] = srcGray[i]*(1-fx)*(1-fy) + srcGray[i+1]*fx*(1-fy)
+                 + srcGray[i+sw]*(1-fx)*fy + srcGray[i+sw+1]*fx*fy;
+    }
+  }
+  return {gray:out, W, H, off};
+}
+
+/* ---------- cell extraction ---------- */
+function otsu(hist, total){
+  let sum=0; for(let i=0;i<256;i++) sum+=i*hist[i];
+  let sumB=0, wB=0, best=0, thr=127;
+  for(let t=0;t<256;t++){
+    wB+=hist[t]; if(!wB) continue;
+    const wF=total-wB; if(!wF) break;
+    sumB+=t*hist[t];
+    const mB=sumB/wB, mF=(sum-sumB)/wF, v=wB*wF*(mB-mF)*(mB-mF);
+    if(v>best){best=v; thr=t;}
+  }
+  return thr;
+}
+
+function extractCell(rect, col, row){
+  const k=TPL.k, off=rect.off;
+  const x0=Math.round((TPL.gridX+col*TPL.cellW+TPL.inset)*k)+off;
+  const y0=Math.round((TPL.gridY+row*TPL.cellH+TPL.inset)*k)+off;
+  const w=Math.round((TPL.cellW-2*TPL.inset)*k), h=Math.round((TPL.cellH-2*TPL.inset)*k);
+  const hist=new Uint32Array(256), px=new Uint8ClampedArray(w*h);
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const g=rect.gray[(y0+y)*rect.W + x0+x]; px[y*w+x]=g; hist[g]++;
+  }
+  const thr=otsu(hist,w*h);
+  let nInk=0, sumInk=0, sumBg=0;
+  const bin=new Uint8Array(w*h);
+  for(let i=0;i<w*h;i++){
+    if(px[i]<thr){ bin[i]=1; nInk++; sumInk+=px[i]; } else sumBg+=px[i];
+  }
+  const frac=nInk/(w*h);
+  // ponytail: empty-cell heuristic — real pen ink is much darker than the printed
+  // light-grey guides; a faint pencil may be rejected (the tool says "dark pen").
+  if(frac<0.002 || frac>0.5 || sumInk/nInk > 0.65*(sumBg/(w*h-nInk))) return null;
+  let bx0=w, by0=h, bx1=0, by1=0;
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++) if(bin[y*w+x]){
+    if(x<bx0)bx0=x; if(x>bx1)bx1=x; if(y<by0)by0=y; if(y>by1)by1=y;
+  }
+  return {bin, w, h, box:{x0:bx0,y0:by0,x1:bx1,y1:by1}};
+}
+
+/* ---------- sheet processing ---------- */
+const samples = {}, sel = {};
+function processSheet(pts){
+  const rect = rectify(pts);
+  let added = 0;
+  for(let r=0;r<TPL.rows;r++) for(let c=0;c<TPL.cols;c++){
+    const s = extractCell(rect, c, r);
+    if(!s) continue;
+    const ch = CHARS[r*TPL.cols+c];
+    (samples[ch] = samples[ch] || []).push(s);
+    sel[ch] = samples[ch].length-1;
+    added++;
+  }
+  drawRectPreview(rect);
+  return added;
+}
+
+function drawRectPreview(rect){
+  const cv=$("rectCanvas"), scale=0.25;
+  cv.width=rect.W*scale; cv.height=rect.H*scale;
+  const ctx=cv.getContext("2d"), im=new ImageData(rect.W,rect.H);
+  for(let i=0;i<rect.gray.length;i++){ const g=rect.gray[i]; im.data[i*4]=im.data[i*4+1]=im.data[i*4+2]=g; im.data[i*4+3]=255; }
+  const tmp=document.createElement("canvas"); tmp.width=rect.W; tmp.height=rect.H;
+  tmp.getContext("2d").putImageData(im,0,0);
+  ctx.drawImage(tmp,0,0,cv.width,cv.height);
+  ctx.strokeStyle="rgba(209,125,92,.85)"; ctx.lineWidth=1;
+  const k=TPL.k*scale, off=rect.off*scale;
+  for(let r=0;r<TPL.rows;r++) for(let c=0;c<TPL.cols;c++)
+    ctx.strokeRect((TPL.gridX+c*TPL.cellW)*k+off,(TPL.gridY+r*TPL.cellH)*k+off,TPL.cellW*k,TPL.cellH*k);
+  $("rectWrap").style.display="block";
+}
+
+$("extractBtn").onclick = () => {
+  $("shootStatus").textContent = "Extracting…";
+  setTimeout(()=>{
+    const n = processSheet(tapPts);
+    $("shootStatus").textContent = n
+      ? `Captured ${n} letters from this sheet. Upload another, or scroll down.`
+      : "No letters found — check the rectified preview below and re-tap the corners.";
+    refreshGrid();
+  }, 20);
+};
+
+/* ---------- review grid ---------- */
+const tiles = {};
+function initGrid(){
+  const g=$("grid");
+  for(const ch of CHARS){
+    const t=document.createElement("div"); t.className="tile";
+    const cv=document.createElement("canvas"); cv.width=66; cv.height=72;
+    const lab=document.createElement("span"); lab.className="ch"; lab.textContent=ch;
+    const n=document.createElement("span"); n.className="n";
+    t.append(cv,lab,n); g.appendChild(t);
+    tiles[ch]={el:t,cv,n};
+    t.onclick=()=>{
+      const arr=samples[ch];
+      if(!arr || arr.length<2) return;
+      sel[ch]=(sel[ch]+1)%arr.length;
+      drawTile(ch);
+      invalidateFont();
+    };
+  }
+}
+function drawTile(ch){
+  const {el,cv,n}=tiles[ch], ctx=cv.getContext("2d");
+  ctx.fillStyle="#fff"; ctx.fillRect(0,0,cv.width,cv.height);
+  const arr=samples[ch];
+  el.classList.toggle("got", !!arr);
+  el.classList.toggle("multi", !!arr && arr.length>1);
+  if(!arr){ ctx.fillStyle="#ddd"; ctx.font="28px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(ch,cv.width/2,cv.height/2+4); return; }
+  const s=arr[sel[ch]];
+  n.textContent=(sel[ch]+1)+"/"+arr.length;
+  const sc=Math.min(cv.width/s.w, cv.height/s.h);
+  const im=new ImageData(s.w,s.h);
+  for(let i=0;i<s.bin.length;i++){ const v=s.bin[i]?0:255; im.data[i*4]=im.data[i*4+1]=im.data[i*4+2]=v; im.data[i*4+3]=255; }
+  const tmp=document.createElement("canvas"); tmp.width=s.w; tmp.height=s.h;
+  tmp.getContext("2d").putImageData(im,0,0);
+  const bl=((TPL.baseline*TPL.cellH-TPL.inset)*TPL.k)*sc + (cv.height-s.h*sc)/2;
+  ctx.strokeStyle="#eee"; ctx.beginPath(); ctx.moveTo(0,bl); ctx.lineTo(cv.width,bl); ctx.stroke();
+  ctx.imageSmoothingEnabled=true;
+  ctx.drawImage(tmp,(cv.width-s.w*sc)/2,(cv.height-s.h*sc)/2,s.w*sc,s.h*sc);
+}
+function refreshGrid(){
+  let got=0; const missing=[];
+  for(const ch of CHARS){ drawTile(ch); samples[ch]?got++:missing.push(ch); }
+  $("gridStatus").textContent = got
+    ? `${got} of ${CHARS.length} captured.` + (missing.length? ` Missing: ${missing.join(" ")}` : " Full set!")
+    : "Nothing captured yet — upload a photo above.";
+  $("buildBtn").disabled = !got;
+  invalidateFont();
+}
+initGrid();
+
+/* ---------- vectorize & build font ---------- */
+function traceContours(s){
+  if(s.contours) return s.contours;
+  const UP=3;
+  const a=document.createElement("canvas"); a.width=s.w; a.height=s.h;
+  const im=new ImageData(s.w,s.h);
+  for(let i=0;i<s.bin.length;i++){ const v=s.bin[i]?0:255; im.data[i*4]=im.data[i*4+1]=im.data[i*4+2]=v; im.data[i*4+3]=255; }
+  a.getContext("2d").putImageData(im,0,0);
+  const b=document.createElement("canvas"); b.width=s.w*UP; b.height=s.h*UP;
+  const bctx=b.getContext("2d");
+  bctx.imageSmoothingEnabled=true; bctx.imageSmoothingQuality="high";
+  bctx.drawImage(a,0,0,b.width,b.height);
+  const big=bctx.getImageData(0,0,b.width,b.height), d=big.data;
+  for(let i=0;i<d.length;i+=4){ const v=d[i]<128?0:255; d[i]=d[i+1]=d[i+2]=v; d[i+3]=255; }
+  const td=ImageTracer.imagedataToTracedata(big,{ltres:1,qtres:1,pathomit:8*UP,rightangleenhance:false,
+    colorsampling:0,numberofcolors:2,colorquantcycles:1,blurradius:0,linefilter:false});
+  const S=1/UP, out=[];
+  const conv=(p,rev)=>{
+    const segs=p.segments, c={start:null,cmds:[]};
+    if(!rev){
+      c.start=[segs[0].x1*S, segs[0].y1*S];
+      for(const g of segs) c.cmds.push(g.x3!==undefined ? {cx:g.x2*S,cy:g.y2*S,x:g.x3*S,y:g.y3*S} : {x:g.x2*S,y:g.y2*S});
+    }else{ // holes traced backwards so winding stays opposite to the outer contour
+      const L=segs[segs.length-1];
+      c.start = L.x3!==undefined ? [L.x3*S,L.y3*S] : [L.x2*S,L.y2*S];
+      for(let i=segs.length-1;i>=0;i--){ const g=segs[i];
+        c.cmds.push(g.x3!==undefined ? {cx:g.x2*S,cy:g.y2*S,x:g.x1*S,y:g.y1*S} : {x:g.x1*S,y:g.y1*S});
+      }
+    }
+    return c;
+  };
+  td.layers.forEach((layer,ln)=>{
+    const p=td.palette[ln];
+    if((p.r+p.g+p.b)/3 >= 128) return; // keep only the ink layer
+    layer.forEach(path=>{
+      if(path.isholepath) return;
+      out.push(conv(path,false));
+      for(const hi of path.holechildren) out.push(conv(layer[hi],true));
+    });
+  });
+  s.contours=out;
+  return out;
+}
+
+let font=null, fontBuf=null, previewN=0;
+function invalidateFont(){ font=null; fontBuf=null; $("downloadBtn").disabled=true; }
+
+function buildFont(){
+  const R=Math.round;
+  const mul=parseFloat($("glyphScale").value)||1;
+  const u=1000/(TPL.cellH*TPL.k)*mul;            // font units per rectified px
+  const bPx=(TPL.baseline*TPL.cellH-TPL.inset)*TPL.k; // baseline row in cell-crop px
+  const LSB=40;
+  const glyphs=[
+    new opentype.Glyph({name:".notdef",unicode:0,advanceWidth:600,path:new opentype.Path()}),
+    new opentype.Glyph({name:"space",unicode:32,advanceWidth:300,path:new opentype.Path()}),
+  ];
+  for(const ch of CHARS){
+    const arr=samples[ch]; if(!arr) continue;
+    const s=arr[sel[ch]], x0=s.box.x0;
+    const path=new opentype.Path();
+    for(const c of traceContours(s)){
+      path.moveTo(R((c.start[0]-x0)*u)+LSB, R((bPx-c.start[1])*u));
+      for(const m of c.cmds){
+        if(m.cx!==undefined) path.quadraticCurveTo(R((m.cx-x0)*u)+LSB,R((bPx-m.cy)*u),R((m.x-x0)*u)+LSB,R((bPx-m.y)*u));
+        else path.lineTo(R((m.x-x0)*u)+LSB,R((bPx-m.y)*u));
+      }
+      path.close();
+    }
+    glyphs.push(new opentype.Glyph({
+      name:"uni"+ch.codePointAt(0).toString(16).toUpperCase().padStart(4,"0"),
+      unicode:ch.codePointAt(0),
+      advanceWidth:R((s.box.x1-s.box.x0+1)*u)+2*LSB,
+      path,
+    }));
+  }
+  const fam=($("fontName").value.trim()||"My Handwriting").replace(/[^\x20-\x7E]/g,"").slice(0,40);
+  return new opentype.Font({familyName:fam,styleName:"Regular",unitsPerEm:1000,ascender:750,descender:-320,glyphs});
+}
+
+async function build(){
+  $("buildStatus").textContent="Building font…";
+  await new Promise(r=>setTimeout(r,20));
+  try{
+    font=buildFont();
+    fontBuf=font.toArrayBuffer();
+    const name="HandwritingPreview"+(++previewN);
+    const ff=new FontFace(name, fontBuf);
+    await ff.load(); document.fonts.add(ff);
+    const pv=$("preview");
+    pv.style.display="block";
+    pv.style.fontFamily=`"${name}", sans-serif`;
+    $("downloadBtn").disabled=false;
+    $("buildStatus").textContent=`Built ${font.glyphs.length-2} letters — edit the preview text below, then download.`;
+  }catch(err){
+    $("buildStatus").textContent="Build failed: "+err.message;
+  }
+}
+$("buildBtn").onclick=build;
+$("glyphScale").onchange=()=>{ if(fontBuf) build(); };
+$("fontName").onchange=invalidateFont;
+
+$("downloadBtn").onclick=()=>{
+  if(!fontBuf) return;
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([fontBuf],{type:"font/ttf"}));
+  a.download=($("fontName").value.trim()||"my-handwriting").toLowerCase().replace(/[^a-z0-9]+/g,"-")+".ttf";
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+};
+</script>
+</body>
+</html>

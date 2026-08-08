@@ -88,6 +88,7 @@ export const TOOLS: Tool[] = [
   t("noise-canvas", "Noise Canvas", "Hypnotic Perlin noise visualisation with frequency, octaves, speed controls. Screensaver mode.", "Fun & Visual"),
   t("snowfall", "Snowfall", "Falling snow particle system with wind control and seasonal colour modes.", "Fun & Visual"),
   t("odia-2048", "Odia 2048", "The 2048 sliding-tile game played entirely in Odia numerals (୦–୯). Touch and keyboard, dark/light mode.", "Fun & Visual"),
+  t("handwriting-font", "Handwriting Font Maker", "Print a template, write, snap a photo — get a TTF font of your own handwriting. Runs entirely in the browser.", "Fun & Visual"),
   // DevOps & Monitoring
   t("api-playground", "API Playground", "HTTP API testing tool with custom headers, methods, and response inspection.", "DevOps & Monitoring"),
   t("config-diff", "Config Diff", "Compare configuration files side-by-side with diff highlighting.", "DevOps & Monitoring"),
