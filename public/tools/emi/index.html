@@ -59,6 +59,7 @@ header p { color: var(--text-dim); font-size: .95rem; font-weight: 500; margin-t
 .top-row { display: flex; gap: 26px; flex-wrap: wrap; margin-bottom: 18px; padding-bottom: 18px; border-bottom: var(--bw) dashed var(--ink); }
 .field-group label, #scheme-label, #ratetype-label { display: block; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 7px; }
 select, input[type="month"] { font-family: var(--sans); font-weight: 700; font-size: .88rem; padding: 8px 10px; border: var(--bw) solid var(--ink); background: var(--surface); color: var(--text); cursor: pointer; box-shadow: 3px 3px 0 var(--ink); }
+select { max-width: 100%; min-width: 0; }
 select:focus, input:focus { outline: 3px solid var(--teal); outline-offset: 1px; }
 .scheme-opts { display: flex; gap: 14px; padding-top: 7px; }
 .radio { display: inline-flex; align-items: center; gap: 6px; font-size: .88rem; font-weight: 500; cursor: pointer; }
@@ -211,7 +212,10 @@ td.col-yr { text-align: left; font-weight: 700; }
 @keyframes bench-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 .bench-panel.just-added { animation: bench-in .22s ease-out both; }
 .chip .nm-edit { font-family: var(--display); font-size: .76rem; text-transform: uppercase; width: 108px; border: 2px solid var(--ink); background: var(--surface); color: var(--text); padding: 0 3px; }
-.chip .ed { position: absolute; top: -9px; right: 16px; width: 22px; height: 22px; border: 2px solid var(--ink); background: var(--yellow); color: #0d0d0d; font-size: .66rem; line-height: 1; cursor: pointer; padding: 0; }
+/* 44px apart, centre to centre: both controls expand their hit area to 44px below, and at the
+   old 25px spacing those regions overlapped by 19px — with remove painted last, a tap on the
+   right of the visible rename button deleted the scenario instead. */
+.chip .ed { position: absolute; top: -9px; right: 36px; width: 22px; height: 22px; border: 2px solid var(--ink); background: var(--yellow); color: #0d0d0d; font-size: .66rem; line-height: 1; cursor: pointer; padding: 0; }
 .chip .ed:focus-visible, .chip .rm:focus-visible { outline: 3px solid var(--teal); outline-offset: 1px; }
 /* same trick for the little chip controls — visually 22px, tappable at 44px */
 .chip .ed, .chip .rm { position: absolute; }
@@ -338,6 +342,7 @@ td.col-yr { text-align: left; font-weight: 700; }
     taxSlab: 0,                                 // marginal income-tax rate %, 0 = claim nothing
     propType: "self",                           // self (Sec 24 capped) | letout (uncapped)
     taxRegime: "old",                           // old (24b + 80C) | new (24b on let-out only)
+    moraPhase: "precon",                        // precon (before possession) | holiday (after)
   };
 
   // saved scenarios for the comparison bench — each a full snapshot of S. No cap: the matrix
@@ -346,7 +351,7 @@ td.col-yr { text-align: left; font-weight: 700; }
   // everything that changes a result; the bench stores exactly this and nothing view-related
   const SNAP_KEYS = ["mode", "currency", "amount", "rate", "tenure", "emi", "fees", "scheme",
     "rateType", "startY", "startM", "moraMonths", "moraType", "extraMonthly", "lumps", "rateSteps",
-    "prepayMode", "taxSlab", "propType", "taxRegime"];
+    "prepayMode", "taxSlab", "propType", "taxRegime", "closeAfter", "closeFeePct", "investReturn", "moraPhase"];
   const snapshot = () => {
     const o = {};
     for (const k of SNAP_KEYS) o[k] = Array.isArray(S[k]) ? S[k].map((x) => Object.assign({}, x)) : S[k];
@@ -518,7 +523,7 @@ td.col-yr { text-align: left; font-weight: 700; }
      would overstate their relief, and this figure is meant to be a ceiling already. */
   const nearestSlab = (v, regime) => SLABS[regime].reduce(
     (best, s) => (Math.abs(s - v) < Math.abs(best - v) ? s : best), SLABS[regime][0]);
-  function taxRelief(rows, slabPct, propType, borrowed, regime) {
+  function taxRelief(rows, slabPct, propType, borrowed, regime, preConstruction) {
     const letout = propType === "letout";
     /* Under the new regime 80C is gone and Sec 24 survives only for a let-out property — a
        new-regime landlord still deducts interest against rental income. Treating "new regime" as
@@ -527,11 +532,21 @@ td.col-yr { text-align: left; font-weight: 700; }
     const allow80C = slabPct > 0 && regime !== "new";
     if (!allow24 && !allow80C) return null;
     /* After a full moratorium the schedule amortises P + capitalised interest, and that
-       capitalised part has already been claimed as interest under Sec 24. Counting it again as
-       80C principal would grant two deductions on the same rupee, so principal repayments are
-       scaled by the share of the balance that is genuinely borrowed money. */
-    const amortised = rows.reduce((a, x) => a + x.principal + x.extra, 0);
-    const origShare = borrowed > 0 && amortised > borrowed ? borrowed / amortised : 1;
+       capitalised part has already been claimed as interest under Sec 24, so counting it again as
+       80C principal would relieve the same rupee twice.
+       Tracked as two running balances rather than one lifetime ratio: a lump paid in month 1 is
+       repaying a balance that has barely any capitalised interest in it yet, and a single ratio
+       charged it for interest that had not accrued. Each repayment is split by the mix of the
+       balance at that moment. */
+    let origBal = borrowed, capBal = 0;
+    const splitPrincipal = (amt) => {
+      const total = origBal + capBal;
+      if (!(total > 0) || !(amt > 0)) return 0;
+      const origPart = amt * (origBal / total);
+      origBal = Math.max(0, origBal - origPart);
+      capBal = Math.max(0, capBal - (amt - origPart));
+      return origPart;
+    };
     const fy = new Map();
     const fyKey = (x) => (x.m >= 3 ? x.y : x.y - 1);     // FY starts in April
     const bucket = (key) => {
@@ -548,9 +563,11 @@ td.col-yr { text-align: left; font-weight: 700; }
     let preCon = 0;
     rows.forEach((x, i) => {
       const g = bucket(fyKey(x));
-      if (x.mora) preCon += x.interest;
+      // a full holiday capitalises its interest, which enlarges the balance but is not principal
+      if (x.mora && x.emi === 0) capBal += x.interest;
+      if (x.mora && preConstruction) preCon += x.interest;
       else g.interest += x.interest;
-      g.principal += (x.principal + x.extra) * origShare;
+      g.principal += splitPrincipal(x.principal + x.extra);
       if (pays(x)) g.months.push(i);
     });
     const firstRepay = rows.find((x) => !x.mora);
@@ -572,7 +589,12 @@ td.col-yr { text-align: left; font-weight: 700; }
     const lastIdx = rows.length - 1;
     for (const [key, g] of fy) {
       // the ₹2L ceiling is a self-occupied rule; a let-out property deducts the full interest
-      const i24 = allow24 ? (letout ? g.interest : Math.min(g.interest, SEC24_CAP)) : 0;
+      /* The 2L ceiling is a self-occupied rule, but a let-out property only escapes it to the
+         extent it has rental income to absorb the interest; beyond that only 2L of house-property
+         loss sets off against other income each year. This tool collects no rent, so relieving
+         the full interest would report savings the borrower cannot reach. Capped either way, and
+         the explainer says so. */
+      const i24 = allow24 ? Math.min(g.interest, SEC24_CAP) : 0;
       const c80 = allow80C ? Math.min(g.principal, SEC80C_CAP) : 0;
       const yearI = i24 * slabPct / 100;
       saved += (i24 + c80) * slabPct / 100; savedInterest += yearI;
@@ -855,7 +877,13 @@ td.col-yr { text-align: left; font-weight: 700; }
                 <option value="full">Pay nothing (interest added to loan)</option>
               </select>
             </div>
-            <div class="adv-hint">Pre-EMI keeps the balance flat. Paying nothing capitalises the interest, so the EMI is re-struck on a bigger loan.</div>
+            <div class="adv-line" style="margin-top:8px">
+              <select id="mora-phase" aria-label="What this holiday represents">
+                <option value="precon">Before possession</option>
+                <option value="holiday">After possession</option>
+              </select>
+            </div>
+            <div class="adv-hint">Pre-EMI keeps the balance flat. Paying nothing capitalises the interest, so the EMI is re-struck on a bigger loan. Interest accrued <em>before possession</em> is deducted over five later years, so the distinction changes your tax relief.</div>
           </div>
         </div>
       </details>
@@ -1122,6 +1150,7 @@ EMI = (P + total interest) / n</code>
     if (idle("in-closefee")) $("in-closefee").value = S.closeFeePct;
     if (idle("in-invest")) $("in-invest").value = S.investReturn;
     $("mora-type").value = S.moraType;
+    $("mora-phase").value = S.moraPhase;
     $("prepay-mode").value = S.prepayMode;
     $("prepay-hint").textContent = S.prepayMode === "emi"
       ? "The end date holds and the instalment is re-struck each time. Frees up cash, saves less interest."
@@ -1218,7 +1247,8 @@ EMI = (P + total interest) / n</code>
         if (E * n < P - 0.5) return fail(`Total payments (${money(E * n)}) don't even repay the principal — no flat rate fits.`);
         // keep the exact rate for the schedule and round only what is displayed, or the entered
         // EMI (which matches the exact rate) leaves a residue after the last row
-        flatRate = (E * n - P) / P / (n / 12) * 100;
+        // the tolerance above admits a hair of shortfall; clamp so it reads as 0%, never negative
+        flatRate = Math.max(0, (E * n - P) / P / (n / 12) * 100);
         solved.rate = Math.round(flatRate * 100) / 100;
       }
       return { rows: flatSchedule(P, flatRate, n, E, st.startY, st.startM), P, E, emiLast: E, baseEmi: E,
@@ -1374,7 +1404,7 @@ EMI = (P + total interest) / n</code>
     }
 
     // ---- Indian home-loan tax relief ----
-    const relief = S.currency === "INR" ? taxRelief(rows, S.taxSlab, S.propType, P, S.taxRegime) : null;
+    const relief = S.currency === "INR" ? taxRelief(rows, S.taxSlab, S.propType, P, S.taxRegime, S.moraPhase === "precon") : null;
     if (relief) {
       $("stat-tax").style.display = ""; $("stat-post").style.display = "";
       $("st-tax").textContent = money(relief.saved);
@@ -1385,7 +1415,7 @@ EMI = (P + total interest) / n</code>
         while (netFlows.length < rows.length + k) netFlows.push(0);
         netFlows[rows.length + k - 1] = (netFlows[rows.length + k - 1] || 0) - amt;
       });
-      const post = irrMonthly(P - S.fees, netFlows, S.scheme) * 1200;
+      const post = irrMonthly(P - S.fees, netFlows, S.rateType === "flat" ? "arrears" : S.scheme) * 1200;
       $("st-post").textContent = isNaN(post) ? "—" : post.toFixed(2) + "% p.a.";
     } else {
       $("stat-tax").style.display = "none"; $("stat-post").style.display = "none";
@@ -1412,9 +1442,12 @@ EMI = (P + total interest) / n</code>
   };
 
   function prepayVsInvest(rows, n, baseMonths, baseEmi, baseRows) {
-    const g = S.investReturn / 1200;
+    /* The label reads "% p.a." and an expected equity return is quoted as an effective annual
+       figure, so convert it rather than dividing by 1200 — that treated 12% as a nominal rate and
+       silently modelled 12.68% a year. */
+    const g = Math.pow(1 + S.investReturn / 100, 1 / 12) - 1;
     const prepaid = rows.reduce((a, x) => a + x.extra, 0);
-    if (!(S.investReturn > 0) || prepaid <= 0 || !baseMonths || baseMonths <= n) return "";
+    if (!(S.investReturn > 0) || prepaid <= 0 || !baseMonths) return "";
     const { prepay, invest } = investCompare(rows, baseRows, baseMonths, baseEmi, S.extraMonthly, S.lumps, g);
     const win = prepay >= invest;
     return `
@@ -1476,7 +1509,8 @@ EMI = (P + total interest) / n</code>
     const apr = irrMonthly(r.P - st.fees, flows, st.rateType === "flat" ? "arrears" : st.scheme) * 1200;
     const last = r.rows[r.rows.length - 1];
     return {
-      emi: r.E, interest, fees: st.fees, months: r.rows.length,
+      emi: r.E, emiLast: r.emiLast, varies: Math.abs((r.emiLast ?? r.E) - r.E) > 1,
+      interest, fees: st.fees, months: r.rows.length,
       // r.P, not the summed schedule principal — see present(): that double-counts capitalised
       // moratorium interest and could crown the wrong scenario cheapest
       total: r.P + interest + st.fees,
@@ -1535,7 +1569,11 @@ EMI = (P + total interest) / n</code>
     const bad = res.some((r) => r.error);
     const val = (k) => res.map((r) => (r.error ? null : r[k]));
     const rows = [
-      ["Monthly EMI", val("emi"), true, money],
+      /* When any scenario's instalment moves over time, show the range and award no badge —
+         ranking a teaser rate on its opening payment would recommend the wrong loan. */
+      [res.some((r) => !r.error && r.varies) ? "Monthly EMI (start → end)" : "Monthly EMI",
+        val("emi"), res.some((r) => !r.error && r.varies) ? null : true,
+        (v, i) => (res[i] && res[i].varies ? `${money(v)} → ${money(res[i].emiLast)}` : money(v))],
       ["Total interest", val("interest"), true, money],
       ["Fees & charges", val("fees"), true, money],
       ["APR incl. fees", val("apr"), true, (v) => (v == null ? "—" : v.toFixed(2) + "%")],
@@ -1548,7 +1586,7 @@ EMI = (P + total interest) / n</code>
     for (const [label, vals, lower, fmt] of rows) {
       const bi = multi && lower !== null ? bestIndex(vals, lower) : -1;
       html += `<tr><td class="metric">${label}</td>` + vals.map((v, i) =>
-        `<td class="${i === bi ? "best" : ""}">${res[i].error ? "—" : fmt(v)}${i === bi ? '<span class="win-badge">Best</span>' : ""}</td>`).join("") + "</tr>";
+        `<td class="${i === bi ? "best" : ""}">${res[i].error ? "—" : fmt(v, i)}${i === bi ? '<span class="win-badge">Best</span>' : ""}</td>`).join("") + "</tr>";
     }
     const totals = val("total");
     const tb = multi ? bestIndex(totals, true) : -1;
@@ -1743,7 +1781,7 @@ Balance: ${money(g.balance)}</title>
   }
 
   // ---------- shareable URL ----------
-  const SHORT = { mode: "md", currency: "cu", amount: "a", rate: "r", tenure: "t", tenureUnit: "tu", emi: "e", fees: "f", scheme: "s", rateType: "rt", yearMode: "ym", moraMonths: "mm", moraType: "mt", extraMonthly: "x", closeAfter: "ca", closeFeePct: "cf", prepayMode: "pm", investReturn: "ir", taxSlab: "ts", propType: "pt", taxRegime: "tr" };
+  const SHORT = { mode: "md", currency: "cu", amount: "a", rate: "r", tenure: "t", tenureUnit: "tu", emi: "e", fees: "f", scheme: "s", rateType: "rt", yearMode: "ym", moraMonths: "mm", moraType: "mt", extraMonthly: "x", closeAfter: "ca", closeFeePct: "cf", prepayMode: "pm", investReturn: "ir", taxSlab: "ts", propType: "pt", taxRegime: "tr", moraPhase: "mp" };
   function writeURL() {
     const p = new URLSearchParams();
     for (const k in SHORT) p.set(SHORT[k], S[k]);
@@ -1776,6 +1814,7 @@ Balance: ${money(g.balance)}</title>
     if (!["tenure", "emi"].includes(S.prepayMode)) S.prepayMode = "tenure";
     if (!["self", "letout"].includes(S.propType)) S.propType = "self";
     if (!["old", "new"].includes(S.taxRegime)) S.taxRegime = "old";
+    if (!["precon", "holiday"].includes(S.moraPhase)) S.moraPhase = "precon";
     if (!SLABS[S.taxRegime].includes(S.taxSlab)) S.taxSlab = 0;
     S.investReturn = Math.min(100, Math.max(0, S.investReturn));
     if (!["yr", "mo"].includes(S.tenureUnit)) S.tenureUnit = "yr";
@@ -1821,6 +1860,7 @@ Balance: ${money(g.balance)}</title>
     $("tax-slab").addEventListener("change", (e) => { S.taxSlab = parseFloat(e.target.value) || 0; update(); });
     $("prop-type").addEventListener("change", (e) => { S.propType = e.target.value; update(); });
     $("tax-regime").addEventListener("change", (e) => { S.taxRegime = e.target.value; update(); });
+    $("mora-phase").addEventListener("change", (e) => { S.moraPhase = e.target.value; update(); });
     document.querySelectorAll(".unit-toggle button[data-unit]").forEach((b) =>
       b.addEventListener("click", () => { S.tenureUnit = b.dataset.unit; update(); }));
     document.querySelectorAll("#year-toggle button").forEach((b) =>

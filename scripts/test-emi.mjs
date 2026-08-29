@@ -87,7 +87,8 @@ function examples() {
   ok(tr.savedInterest < tr.saved, "the rate uses only the interest half of the relief");
   ok(taxRelief(plain.rows, 0, "self", 2.5e6, "old") === null, "no slab means no relief");
   // a let-out property has no Sec 24 cap, so it can never save less
-  ok(taxRelief(plain.rows, 30, "letout", 2.5e6, "old").saved >= tr.saved, "let-out relief is uncapped");
+  ok(taxRelief(plain.rows, 30, "letout", 2.5e6, "old").saved === tr.saved,
+    "let-out is capped too while rent is unknown");
 
   // prepay-vs-invest: at a 0% return, prepaying must win (it saves real interest)
   const slowRows = simulate(1207044, 14, 180, E14, "arrears", base).rows;
@@ -181,9 +182,12 @@ function examples() {
   // 80C must not also claim interest that was capitalised and already relieved under Sec 24
   const moraRows = simulate(2.5e6, 9, 240, E9, "arrears",
     Object.assign({ moraMonths: 12, moraType: "full" }, base)).rows;
-  const trMora = taxRelief(moraRows, 30, "self", 2.5e6, "old");
-  const trNaive = taxRelief(moraRows, 30, "self", 0, "old");   // 0 disables the scaling
-  ok(trMora.saved < trNaive.saved, "capitalised interest is not claimed twice");
+  const trMora = taxRelief(moraRows, 30, "self", 2.5e6, "old", true);
+  // 80C may only ever relieve the principal actually borrowed, never the capitalised interest
+  const amortisedMora = moraRows.reduce((a, x) => a + x.principal + x.extra, 0);
+  ok(amortisedMora > 2.5e6 + 1, "the holiday really did capitalise interest");
+  const principalRelief = trMora.saved - trMora.savedInterest;
+  ok(principalRelief <= 2.5e6 * 0.30 + 1, "80C never relieves more than the sum borrowed");
 
   // a renamed scenario cannot inject markup
   ok(esc('Bank "A" <b>') === "Bank &quot;A&quot; &lt;b&gt;", "scenario names are escaped");
@@ -243,15 +247,15 @@ function examples() {
   // pre-construction interest is deferred, then relieved over five years from completion
   const preConRows = simulate(2.5e6, 9, 240, E9, "arrears",
     Object.assign({ moraMonths: 24, moraType: "interest" }, base)).rows;
-  const trPre = taxRelief(preConRows, 30, "self", 2.5e6, "old");
+  const trPre = taxRelief(preConRows, 30, "self", 2.5e6, "old", true);
   const moraInterest = preConRows.filter((x) => x.mora).reduce((a, x) => a + x.interest, 0);
   ok(moraInterest > 0, "the holiday accrues interest to defer");
   // Aug 2026 - Mar 2027 is wholly pre-construction, so that FY must claim nothing at all
   ok(trPre.perMonthI.slice(0, 8).every((v) => v === 0),
     "no relief is claimed in a wholly pre-construction year");
   // deferring it past the 2L cap changes the total, so it must differ from claiming as accrued
-  const trPreNoDefer = taxRelief(preConRows.map((x) => Object.assign({}, x, { mora: false })),
-    30, "self", 2.5e6, "old");
+  // the same schedule treated as a post-possession payment holiday claims as it accrues
+  const trPreNoDefer = taxRelief(preConRows, 30, "self", 2.5e6, "old", false);
   ok(Math.abs(trPre.saved - trPreNoDefer.saved) > 1, "deferral changes the relief, as the caps imply");
 
   // new regime: nothing for a self-occupied home, but Sec 24 survives on a let-out one
@@ -266,7 +270,7 @@ function examples() {
   const shortE = emiFor(2.5e6, r9, 36, "arrears");
   const shortRows = simulate(2.5e6, 9, 36, shortE, "arrears",
     Object.assign({ moraMonths: 12, moraType: "interest" }, base)).rows;
-  const trShort = taxRelief(shortRows, 30, "self", 2.5e6, "old");
+  const trShort = taxRelief(shortRows, 30, "self", 2.5e6, "old", true);
   const inSchedule = trShort.perMonthI.reduce((a, x) => a + x, 0);
   const inTail = trShort.tail.reduce((a, x) => a + (x || 0), 0);
   ok(inTail > 0, "relief past the final instalment is carried in the tail");
@@ -278,6 +282,39 @@ function examples() {
   ok(!SLABS.old.includes(10) && !SLABS.old.includes(15), "10% and 15% are not old-regime slabs");
   ok(nearestSlab(15, "old") === 20, "switching to the old regime snaps to a real slab");
   ok(nearestSlab(25, "old") === 20, "an exact tie rounds down rather than flattering the relief");
+
+  // ---- PR #7 fifth review ----
+  // a hair of shortfall must read as 0%, never as a negative flat rate
+  const nearShort = solve(Object.assign({}, stBase, { mode: "rate", rateType: "flat",
+    amount: 100, tenure: 1, emi: 99.51 }));
+  ok(!nearShort.error, "a near-equal flat cash flow is accepted");
+  ok((nearShort.solved.rate ?? 0) >= 0, "and never yields a negative flat rate");
+  ok(nearShort.rows.every((x) => x.interest >= -1e-9), "nor a negative interest row");
+
+  // foreclosure terms and the investment assumption are part of a scenario's identity
+  const sigA = benchSig(Object.assign({}, stBase, { closeFeePct: 0, investReturn: 0 }));
+  ok(benchSig(Object.assign({}, stBase, { closeFeePct: 2, investReturn: 0 })) !== sigA,
+    "a different foreclosure charge is a different scenario");
+  ok(benchSig(Object.assign({}, stBase, { closeFeePct: 0, investReturn: 12 })) !== sigA,
+    "a different investment assumption is a different scenario");
+  ok(Object.keys(snapshot()).includes("moraPhase"), "the holiday's nature is snapshotted");
+
+  // a payment holiday after possession is claimed as it accrues; only pre-possession defers
+  const holidayRows = simulate(2.5e6, 9, 240, E9, "arrears",
+    Object.assign({ moraMonths: 24, moraType: "interest" }, base)).rows;
+  const asPrecon = taxRelief(holidayRows, 30, "self", 2.5e6, "old", true);
+  const asHoliday = taxRelief(holidayRows, 30, "self", 2.5e6, "old", false);
+  ok(Math.abs(asPrecon.saved - asHoliday.saved) > 1,
+    "deferring pre-construction interest changes the relief");
+  ok(asHoliday.perMonthI.slice(0, 8).some((v) => v > 0),
+    "a post-possession holiday claims relief in the year it accrues");
+
+  // 80C is split by the balance mix at the time of each repayment, not one lifetime ratio
+  const capRows = simulate(2.5e6, 9, 240, E9, "arrears",
+    Object.assign({ moraMonths: 12, moraType: "full", lumps: [{ month: 2, amount: 4e5 }] }, base)).rows;
+  const trEarly = taxRelief(capRows, 30, "self", 2.5e6, "old", true);
+  ok((trEarly.saved - trEarly.savedInterest) <= 2.5e6 * 0.30 + 1,
+    "80C still cannot exceed the sum borrowed with an early holiday lump");
 
   // the bench must agree with the main panel exactly — it runs the same solve()
   const snapA = Object.assign(snapshot(), { amount: 2.5e6, rate: 9, tenure: 240, fees: 0, mode: "emi",
@@ -434,7 +471,7 @@ function properties() {
 
     // 9. tax relief never exceeds the statutory ceilings, and its two halves reconcile
     for (const regime of ["old", "new"]) {
-      const tr = taxRelief(rows, 30, "self", r.P, regime);
+      const tr = taxRelief(rows, 30, "self", r.P, regime, st.moraMonths > 0);
       if (!tr) continue;
       const inSched = tr.perMonthI.reduce((a, x) => a + x, 0);
       const inTail = tr.tail.reduce((a, x) => a + (x || 0), 0);

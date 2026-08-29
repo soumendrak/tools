@@ -304,3 +304,33 @@ test.describe("touch", () => {
     await expect(page.locator("#in-amount")).toBeFocused();
   });
 });
+
+test("the rename and remove hit areas do not overlap", async ({ page }) => {
+  // both expand to 44px; at the old 25px spacing a tap near the rename button deleted the chip
+  await page.locator("#btn-compare").click();
+  await settle(page);
+  const boxes = await page.evaluate(() => {
+    const hit = (el) => {
+      const r = el.getBoundingClientRect();
+      const pb = getComputedStyle(el, "::before");
+      const w = Math.max(r.width, parseFloat(pb.width) || 0);
+      const cx = r.left + r.width / 2;
+      return { left: cx - w / 2, right: cx + w / 2 };
+    };
+    return { ed: hit(document.querySelector(".chip .ed")), rm: hit(document.querySelector(".chip .rm")) };
+  });
+  expect(boxes.ed.right, "rename hit area runs into remove").toBeLessThanOrEqual(boxes.rm.left + 0.5);
+});
+
+test("clicking the rename control renames rather than removes", async ({ page }) => {
+  await page.locator("#btn-compare").click();
+  await settle(page);
+  // aim at the right edge of the visible rename button, where the overlap used to bite.
+  // A locator click scrolls the chip into view first; raw mouse coordinates miss below the fold.
+  const ed = page.locator(".chip .ed").first();
+  const box = await ed.boundingBox();
+  await ed.click({ position: { x: box.width - 2, y: box.height / 2 } });
+  await settle(page);
+  expect(await page.locator(".nm-edit").count(), "should have opened the rename editor").toBe(1);
+  expect(await page.locator(".chip").count(), "chip must not have been deleted").toBe(1);
+});
