@@ -31,8 +31,8 @@ jobs:
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
 
-      # rendering, event wiring, URL state, and the CSS-dependent behaviour the Node suite
-      # cannot reach: hidden elements, 44px touch targets, horizontal overflow
+      # two suites: EMI's own UI regressions, plus a smoke pass over every vendored tool
+      # (loads without throwing, themes, fits a phone, has a canonical)
       - name: UI tests
         run: pnpm test:ui
 
