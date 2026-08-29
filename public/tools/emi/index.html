@@ -349,6 +349,18 @@ td.col-yr { text-align: left; font-weight: 700; }
   const snapshot = () => {
     const o = {};
     for (const k of SNAP_KEYS) o[k] = Array.isArray(S[k]) ? S[k].map((x) => Object.assign({}, x)) : S[k];
+    /* The flat branch of solve() ignores prepayments, holidays and rate steps. Carrying them into
+       a flat snapshot would label the chip with terms that change none of its numbers, and would
+       let two identical offers be saved as apparently distinct. */
+    if (o.rateType === "flat") {
+      o.extraMonthly = 0; o.lumps = []; o.rateSteps = []; o.moraMonths = 0; o.prepayMode = "tenure";
+    }
+    return o;
+  };
+  // restoring must hand S its own arrays, or editing an event afterwards rewrites the saved chip
+  const restore = (snap) => {
+    const o = {};
+    for (const k in snap) o[k] = Array.isArray(snap[k]) ? snap[k].map((x) => Object.assign({}, x)) : snap[k];
     return o;
   };
 
@@ -383,7 +395,11 @@ td.col-yr { text-align: left; font-weight: 700; }
      reshapes the payments. */
   function irrMonthly(net, flows, scheme) {
     if (!(net > 0) || !flows.length) return NaN;
-    if (flows.reduce((a, x) => a + x, 0) <= net) return NaN;   // never repaid: no rate fits
+    const paid = flows.reduce((a, x) => a + x, 0);
+    // paying back exactly what you received is a real answer — an interest-free loan is 0%,
+    // not "no rate fits". Only a genuine shortfall has no solution.
+    if (Math.abs(paid - net) <= Math.max(net * 1e-9, 0.5)) return 0;
+    if (paid < net) return NaN;
     const off = scheme === "advance" ? 0 : 1;
     const pv = (i) => flows.reduce((a, x, k) => a + x / Math.pow(1 + i, k + off), 0);
     let lo = 0, hi = 1;
@@ -460,7 +476,14 @@ td.col-yr { text-align: left; font-weight: 700; }
      Both end debt-free at nBase, so whichever pile of money is bigger wins. */
   function investCompare(nA, nBase, commitment, extraMonthly, lumps, g) {
     let a = 0, b = 0;
-    for (let i = nA; i < nBase; i++) a += commitment * Math.pow(1 + g, nBase - 1 - i);
+    for (let i = nA; i < nBase; i++) {
+      /* Once the loan is gone the prepayer invests the freed instalment — and also any lump they
+         had earmarked for a later month, which they no longer owe. Leaving those out handed the
+         investing path free money and could flip the verdict. */
+      let c = commitment;
+      for (const l of lumps) if (l.month === i + 1) c += l.amount;
+      a += c * Math.pow(1 + g, nBase - 1 - i);
+    }
     /* Path B's loan runs the full term, so its monthly contribution continues to nBase — reading
        the extras off path A's rows stopped them at the early payoff and understated B. */
     for (let i = 0; i < nBase; i++) {
@@ -1171,7 +1194,21 @@ EMI = (P + total interest) / n</code>
         baseMonths = base.rows.length;
       }
     }
-    return { rows: sim.rows, P, E: sim.emiUsed, emiLast: sim.emiLast, baseEmi: E, solved, baseInterest, baseMonths };
+
+    /* Prepay-vs-invest needs a different baseline from the savings box: the same loan with the
+       prepayments removed but the holiday and rate steps kept. Reusing the strip-everything
+       baseline compared against a loan the user never had, and a rate step could flip the verdict. */
+    let noPrepayMonths = null, noPrepayEmi = null;
+    if (st.extraMonthly > 0 || st.lumps.length) {
+      const np = simulate(P, rate, n, E, st.scheme,
+        Object.assign({}, opts, { extraMonthly: 0, lumps: [] }));
+      if (!np.negAm && np.rows.length < MAX_MONTHS) {
+        noPrepayMonths = np.rows.length;
+        noPrepayEmi = np.emiUsed;
+      }
+    }
+    return { rows: sim.rows, P, E: sim.emiUsed, emiLast: sim.emiLast, baseEmi: E, solved,
+      baseInterest, baseMonths, noPrepayMonths, noPrepayEmi };
   }
 
   function recalc() {
@@ -1183,7 +1220,7 @@ EMI = (P + total interest) / n</code>
   }
 
   function present(res) {
-    const { rows, P, E, emiLast, baseEmi, baseInterest, baseMonths } = res;
+    const { rows, P, E, emiLast, baseEmi, baseInterest, baseMonths, noPrepayMonths, noPrepayEmi } = res;
     const n = rows.length;
     const totalInterest = rows.reduce((a, x) => a + x.interest, 0);
     /* What the schedule amortises. Under a full moratorium the deferred interest is capitalised,
@@ -1244,7 +1281,7 @@ EMI = (P + total interest) / n</code>
       if (S.prepayMode === "emi" && Math.abs(emiLast - E) > 1) {
         html += `<div class="s-line"><span>EMI ${emiLast < E ? "falls" : "rises"} to</span><b>${money(emiLast)}</b></div>`;
       }
-      html += prepayVsInvest(rows, n, baseMonths, baseEmi);
+      html += prepayVsInvest(rows, n, noPrepayMonths, noPrepayEmi);
       $("savings").hidden = false;
       $("savings-body").innerHTML = html;
     } else {
@@ -1275,10 +1312,18 @@ EMI = (P + total interest) / n</code>
 
   /* "Should I prepay, or invest the same money?" — only meaningful once there is money being
      prepaid and a return to compare against. */
+  /* The month of payment number `offset` counted from a start month. Adding the payment count to
+     the start month names the anniversary, which is one month past the final instalment: 240
+     payments from Jan 2026 end in Dec 2045, not Jan 2046. */
+  const endLabel = (y, m, offset) => {
+    const d = new Date(y, m + offset, 1);
+    return MONTHS[d.getMonth()] + " " + d.getFullYear();
+  };
+
   function prepayVsInvest(rows, n, baseMonths, baseEmi) {
     const g = S.investReturn / 1200;
     const prepaid = rows.reduce((a, x) => a + x.extra, 0);
-    if (!(S.investReturn > 0) || prepaid <= 0 || baseMonths <= n) return "";
+    if (!(S.investReturn > 0) || prepaid <= 0 || !baseMonths || baseMonths <= n) return "";
     const { prepay, invest } = investCompare(n, baseMonths, baseEmi + S.extraMonthly, S.extraMonthly, S.lumps, g);
     const win = prepay >= invest;
     return `
@@ -1286,7 +1331,7 @@ EMI = (P + total interest) / n</code>
         <div class="s-line"><span>Prepay, then invest the freed EMI</span><b>${money(prepay)}</b></div>
         <div class="s-line"><span>Keep the loan, invest the extra</span><b>${money(invest)}</b></div>
         <div class="s-line s-verdict"><span>${win ? "Prepaying" : "Investing"} wins by</span><b>${money(Math.abs(prepay - invest))}</b></div>
-        <div class="adv-hint" style="margin:6px 0 0">Both paths put the same money in every month and are debt-free by ${MONTHS[rows[0].m]} ${rows[0].y + Math.floor((rows[0].m + baseMonths) / 12)}. Compared at ${S.investReturn}% a year.</div>
+        <div class="adv-hint" style="margin:6px 0 0">Both paths put the same money in every month and are debt-free by ${endLabel(rows[0].y, rows[0].m, baseMonths - 1)}. Compared at ${S.investReturn}% a year.</div>
       </div>`;
   }
 
@@ -1362,7 +1407,11 @@ EMI = (P + total interest) / n</code>
        scenarios. An absolute floor would be wrong here — 0.5 is nothing in rupees but an
        enormous gap in percentage points. */
     const w = vals[bi], tol = Math.max(Math.abs(w) * 1e-9, 1e-9);
-    return vals.every((v) => v != null && !isNaN(v) && Math.abs(v - w) <= tol) ? -1 : bi;
+    /* Any other scenario matching the best value means there is no single winner. Checking only
+       for an all-round tie crowned the first of two equally-good offers, e.g. fees [0, 0, 25000]
+       badged the first zero and not the second. */
+    const shared = vals.some((v, i) => i !== bi && v != null && !isNaN(v) && Math.abs(v - w) <= tol);
+    return shared ? -1 : bi;
   }
 
   function drawBench() {
@@ -1842,7 +1891,7 @@ Balance: ${money(g.balance)}</title>
       const ed = e.target.closest("[data-ed]");
       if (ed) { renameChip(+ed.dataset.ed); return; }
       const chip = e.target.closest(".chip-main[data-i]");
-      if (chip) { Object.assign(S, BENCH[+chip.dataset.i]); renderEventRows(); update(); }
+      if (chip) { Object.assign(S, restore(BENCH[+chip.dataset.i])); renderEventRows(); update(); }
     });
 
     // a shared link pasted into an already-open tab changes only the hash — no reload fires
@@ -2047,6 +2096,40 @@ Balance: ${money(g.balance)}</title>
 
     // a renamed scenario cannot inject markup
     ok(esc('Bank "A" <b>') === "Bank &quot;A&quot; &lt;b&gt;", "scenario names are escaped");
+
+    // ---- PR #7 second review ----
+    // a lump scheduled after the early payoff must be invested by the prepay path too
+    const lateLump = [{ month: 120, amount: 4e5 }];
+    const icLate = investCompare(96, 180, 20000, 0, lateLump, 0.10 / 12);
+    const icNoLate = investCompare(96, 180, 20000, 0, [], 0.10 / 12);
+    ok(icLate.prepay > icNoLate.prepay, "post-payoff lumps are invested on the prepay path");
+    // month 120 is index 119, so it compounds for (nBase - 1 - 119) = 60 periods
+    ok(Math.abs(icLate.prepay - icNoLate.prepay - 4e5 * Math.pow(1 + 0.10 / 12, 60)) < 1,
+      "and are compounded from their own month");
+
+    // an exact 0% cash flow is a 0% APR, not "no rate fits"
+    ok(irrMonthly(1e6, new Array(60).fill(1e6 / 60), "arrears") === 0, "a 0% loan has a 0% APR");
+    ok(isNaN(irrMonthly(1e6, new Array(60).fill(1e5 / 60), "arrears")), "a real shortfall still has none");
+
+    // a partial tie must not crown the first of two equally good offers
+    ok(bestIndex([0, 0, 25000], true) === -1, "a shared best value awards nobody");
+    ok(bestIndex([0, 12000, 25000], true) === 0, "a unique best value still wins");
+
+    // the final instalment, not the anniversary
+    ok(endLabel(2026, 0, 239) === "Dec 2045", "240 payments from Jan 2026 end in Dec 2045");
+
+    // the investment baseline keeps the holiday and rate steps, dropping only prepayments
+    const npBase = solve(Object.assign({}, stBase, { moraMonths: 12, moraType: "full",
+      extraMonthly: 5000, emi: 0 }));
+    const holidayOnly = solve(Object.assign({}, stBase, { moraMonths: 12, moraType: "full", emi: 0 }));
+    ok(npBase.noPrepayMonths === holidayOnly.rows.length,
+      "prepay-vs-invest baseline retains the moratorium");
+
+    // loading a saved chip must not alias its arrays
+    const savedChip = { lumps: [{ month: 6, amount: 1e5 }], rateSteps: [] };
+    const restored = restore(savedChip);
+    restored.lumps[0].amount = 9e9;
+    ok(savedChip.lumps[0].amount === 1e5, "restoring a chip clones its event arrays");
 
     // the bench must agree with the main panel exactly — it runs the same solve()
     const snapA = Object.assign(snapshot(), { amount: 2.5e6, rate: 9, tenure: 240, fees: 0, mode: "emi",
