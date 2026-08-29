@@ -498,6 +498,14 @@ td.col-yr { text-align: left; font-weight: 700; }
      Sec 24(b): interest, capped at ₹2L for a self-occupied property. Sec 80C: principal, capped
      at ₹1.5L (and shared with your other 80C investments, so this is an upper bound). */
   const SEC24_CAP = 2e5, SEC80C_CAP = 1.5e5, PRECON_YEARS = 5;
+  /* The regimes have different slabs, so one shared list was wrong both ways: it offered 10% and
+     15% to old-regime filers who have no such slab, and withheld the new regime's 25% band. */
+  const SLABS = { old: [0, 5, 20, 30], new: [0, 5, 10, 15, 20, 25, 30] };
+  /* Switching regime can strand the chosen rate (25% exists only in the new one). Snap to the
+     closest real slab, and on an exact tie take the lower — overstating someone's marginal rate
+     would overstate their relief, and this figure is meant to be a ceiling already. */
+  const nearestSlab = (v, regime) => SLABS[regime].reduce(
+    (best, s) => (Math.abs(s - v) < Math.abs(best - v) ? s : best), SLABS[regime][0]);
   function taxRelief(rows, slabPct, propType, borrowed, regime) {
     const letout = propType === "letout";
     /* Under the new regime 80C is gone and Sec 24 survives only for a let-out property — a
@@ -543,16 +551,30 @@ td.col-yr { text-align: left; font-weight: 700; }
        principal relief against the rate too would flatter it badly — and that deduction is usually
        already used up by EPF and insurance anyway. */
     const perMonthI = new Array(rows.length).fill(0);
-    for (const g of fy.values()) {
+    /* Relief that lands in a financial year with no instalments left — a deferred
+       pre-construction instalment on a loan that finished early — is still money you receive, so
+       it belongs in the effective rate too. Counting it in `saved` but dropping it from
+       `perMonthI` made "Tax saved" and "Effective rate after tax" disagree, so it is carried out
+       past the end of the schedule as a `tail` inflow instead. */
+    const tail = [];
+    const lastIdx = rows.length - 1;
+    for (const [key, g] of fy) {
       // the ₹2L ceiling is a self-occupied rule; a let-out property deducts the full interest
       const i24 = allow24 ? (letout ? g.interest : Math.min(g.interest, SEC24_CAP)) : 0;
       const c80 = allow80C ? Math.min(g.principal, SEC80C_CAP) : 0;
       const yearI = i24 * slabPct / 100;
       saved += (i24 + c80) * slabPct / 100; savedInterest += yearI;
-      // a pre-construction year can have no instalments of its own to carry the relief
-      if (g.months.length) g.months.forEach((mi) => (perMonthI[mi] += yearI / g.months.length));
+      if (g.months.length) {
+        g.months.forEach((mi) => (perMonthI[mi] += yearI / g.months.length));
+      } else if (yearI > 0 && rows.length) {
+        // place it at the March closing that financial year, measured from the loan's start
+        const start = rows[0];
+        const at = (key + 1) * 12 + 2 - (start.y * 12 + start.m);
+        const beyond = Math.max(0, at - lastIdx);
+        tail[beyond] = (tail[beyond] || 0) + yearI;
+      }
     }
-    return { saved, savedInterest, perMonthI };
+    return { saved, savedInterest, perMonthI, tail };
   }
 
   /* Flat-rate schedule. Interest is charged on the original principal, so the monthly interest is
@@ -827,12 +849,8 @@ td.col-yr { text-align: left; font-weight: 700; }
           <div class="adv-row">
             <div class="lbl"><label for="tax-slab">Your income-tax slab</label><span class="info tip-r" tabindex="0" data-tip="Your marginal rate — the rate the last rupee of your income is taxed at. Set it to 'Claim nothing' to switch the whole panel off.">?</span></div>
             <div class="adv-line">
-              <select id="tax-slab" aria-label="Marginal income tax rate">
-                <option value="0">Claim nothing</option>
-                <option value="5">5%</option><option value="10">10%</option>
-                <option value="15">15%</option><option value="20">20%</option>
-                <option value="30">30%</option>
-              </select>
+              <!-- options are rebuilt per regime: the two have different slabs -->
+              <select id="tax-slab" aria-label="Marginal income tax rate"></select>
               <select id="tax-regime" aria-label="Tax regime">
                 <option value="old">Old regime</option>
                 <option value="new">New regime</option>
@@ -1093,6 +1111,15 @@ EMI = (P + total interest) / n</code>
       : "The EMI holds and the loan simply ends sooner. Saves the most interest — the usual advice.";
     // tax relief is Indian law, so only offer it on rupee loans
     $("tax").hidden = S.currency !== "INR";
+    // rebuild the slab list when the regime changes, keeping the nearest valid rate
+    const wantSlabs = SLABS[S.taxRegime].join(",");
+    const slabSel = $("tax-slab");
+    if (slabSel.dataset.built !== wantSlabs) {
+      slabSel.dataset.built = wantSlabs;
+      slabSel.innerHTML = SLABS[S.taxRegime]
+        .map((v) => `<option value="${v}">${v === 0 ? "Claim nothing" : v + "%"}</option>`).join("");
+    }
+    if (!SLABS[S.taxRegime].includes(S.taxSlab)) S.taxSlab = nearestSlab(S.taxSlab, S.taxRegime);
     $("tax-slab").value = S.taxSlab;
     $("prop-type").value = S.propType;
     $("tax-regime").value = S.taxRegime;
@@ -1334,7 +1361,13 @@ EMI = (P + total interest) / n</code>
     if (relief) {
       $("stat-tax").style.display = ""; $("stat-post").style.display = "";
       $("st-tax").textContent = money(relief.saved);
+      // relief arriving after the last instalment shows up as a negative flow in those months
       const netFlows = rows.map((x, i) => x.emi + x.extra - relief.perMonthI[i]);
+      relief.tail.forEach((amt, k) => {
+        if (!amt) return;
+        while (netFlows.length < rows.length + k) netFlows.push(0);
+        netFlows[rows.length + k - 1] = (netFlows[rows.length + k - 1] || 0) - amt;
+      });
       const post = irrMonthly(P - S.fees, netFlows, S.scheme) * 1200;
       $("st-post").textContent = isNaN(post) ? "—" : post.toFixed(2) + "% p.a.";
     } else {
@@ -1726,7 +1759,7 @@ Balance: ${money(g.balance)}</title>
     if (!["tenure", "emi"].includes(S.prepayMode)) S.prepayMode = "tenure";
     if (!["self", "letout"].includes(S.propType)) S.propType = "self";
     if (!["old", "new"].includes(S.taxRegime)) S.taxRegime = "old";
-    if (![0, 5, 10, 15, 20, 30].includes(S.taxSlab)) S.taxSlab = 0;
+    if (!SLABS[S.taxRegime].includes(S.taxSlab)) S.taxSlab = 0;
     S.investReturn = Math.min(100, Math.max(0, S.investReturn));
     if (!["yr", "mo"].includes(S.tenureUnit)) S.tenureUnit = "yr";
     S.startM = Math.min(11, Math.max(0, S.startM));
@@ -2215,6 +2248,25 @@ Balance: ${money(g.balance)}</title>
     const trNewLet = taxRelief(plain.rows, 30, "letout", 2.5e6, "new");
     ok(trNewLet && trNewLet.savedInterest > 0, "new regime still relieves let-out interest");
     ok(Math.abs(trNewLet.saved - trNewLet.savedInterest) < 1, "and grants no 80C on top of it");
+
+    // ---- PR #7 fourth review ----
+    /* A short loan after a holiday cannot claim all five pre-construction instalments within its
+       own schedule. Those years must still reach the effective rate, via the tail. */
+    const shortE = emiFor(2.5e6, r9, 36, "arrears");
+    const shortRows = simulate(2.5e6, 9, 36, shortE, "arrears",
+      Object.assign({ moraMonths: 12, moraType: "interest" }, base)).rows;
+    const trShort = taxRelief(shortRows, 30, "self", 2.5e6, "old");
+    const inSchedule = trShort.perMonthI.reduce((a, x) => a + x, 0);
+    const inTail = trShort.tail.reduce((a, x) => a + (x || 0), 0);
+    ok(inTail > 0, "relief past the final instalment is carried in the tail");
+    ok(Math.abs(inSchedule + inTail - trShort.savedInterest) < 1,
+      "schedule plus tail accounts for every rupee of interest relief");
+
+    // each regime offers its own slabs, and only its own
+    ok(SLABS.new.includes(25) && !SLABS.old.includes(25), "25% exists in the new regime only");
+    ok(!SLABS.old.includes(10) && !SLABS.old.includes(15), "10% and 15% are not old-regime slabs");
+    ok(nearestSlab(15, "old") === 20, "switching to the old regime snaps to a real slab");
+    ok(nearestSlab(25, "old") === 20, "an exact tie rounds down rather than flattering the relief");
 
     // the bench must agree with the main panel exactly — it runs the same solve()
     const snapA = Object.assign(snapshot(), { amount: 2.5e6, rate: 9, tenure: 240, fees: 0, mode: "emi",
