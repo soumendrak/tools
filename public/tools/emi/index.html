@@ -337,6 +337,7 @@ td.col-yr { text-align: left; font-weight: 700; }
     investReturn: 0,                            // % p.a. — compare prepaying against investing the same money
     taxSlab: 0,                                 // marginal income-tax rate %, 0 = claim nothing
     propType: "self",                           // self (Sec 24 capped) | letout (uncapped)
+    taxRegime: "old",                           // old (24b + 80C) | new (24b on let-out only)
   };
 
   // saved scenarios for the comparison bench — each a full snapshot of S. No cap: the matrix
@@ -345,7 +346,7 @@ td.col-yr { text-align: left; font-weight: 700; }
   // everything that changes a result; the bench stores exactly this and nothing view-related
   const SNAP_KEYS = ["mode", "currency", "amount", "rate", "tenure", "emi", "fees", "scheme",
     "rateType", "startY", "startM", "moraMonths", "moraType", "extraMonthly", "lumps", "rateSteps",
-    "prepayMode", "taxSlab", "propType"];
+    "prepayMode", "taxSlab", "propType", "taxRegime"];
   const snapshot = () => {
     const o = {};
     for (const k of SNAP_KEYS) o[k] = Array.isArray(S[k]) ? S[k].map((x) => Object.assign({}, x)) : S[k];
@@ -474,22 +475,21 @@ td.col-yr { text-align: left; font-weight: 700; }
      A) prepay, clear the loan at nA, then invest the freed instalment until the original end date;
      B) keep the loan to its original end and invest the extra payments as they would have been made.
      Both end debt-free at nBase, so whichever pile of money is bigger wins. */
-  function investCompare(nA, nBase, commitment, extraMonthly, lumps, g) {
+  /* Both paths are handed the same budget every month: the baseline instalment plus whatever
+     prepayment was planned for that month. Whatever a path does not hand to the lender, it
+     invests. Expressing it as "budget minus actually paid" is what makes the comparison honest —
+     it automatically picks up the part-payment in a final month, a lump the schedule had to clamp,
+     and months (a moratorium) where a prepayment was never applied at all. Earlier versions
+     assumed every non-final month spent the whole budget, which quietly gifted one side cash. */
+  function investCompare(rowsA, rowsB, nBase, baseEmi, extraMonthly, lumps, g) {
+    const lumpAt = (i) => lumps.reduce((a, l) => a + (l.month === i + 1 ? l.amount : 0), 0);
+    const paid = (rows, i) => (i < rows.length ? rows[i].emi + rows[i].extra : 0);
     let a = 0, b = 0;
-    for (let i = nA; i < nBase; i++) {
-      /* Once the loan is gone the prepayer invests the freed instalment — and also any lump they
-         had earmarked for a later month, which they no longer owe. Leaving those out handed the
-         investing path free money and could flip the verdict. */
-      let c = commitment;
-      for (const l of lumps) if (l.month === i + 1) c += l.amount;
-      a += c * Math.pow(1 + g, nBase - 1 - i);
-    }
-    /* Path B's loan runs the full term, so its monthly contribution continues to nBase — reading
-       the extras off path A's rows stopped them at the early payoff and understated B. */
     for (let i = 0; i < nBase; i++) {
-      let c = extraMonthly;
-      for (const l of lumps) if (l.month === i + 1) c += l.amount;
-      if (c > 0) b += c * Math.pow(1 + g, nBase - 1 - i);
+      const budget = baseEmi + extraMonthly + lumpAt(i);
+      const fv = Math.pow(1 + g, nBase - 1 - i);
+      a += Math.max(0, budget - paid(rowsA, i)) * fv;
+      b += Math.max(0, budget - paid(rowsB, i)) * fv;
     }
     return { prepay: a, invest: b };
   }
@@ -497,9 +497,15 @@ td.col-yr { text-align: left; font-weight: 700; }
   /* Indian home-loan tax relief, by financial year (Apr–Mar).
      Sec 24(b): interest, capped at ₹2L for a self-occupied property. Sec 80C: principal, capped
      at ₹1.5L (and shared with your other 80C investments, so this is an upper bound). */
-  const SEC24_CAP = 2e5, SEC80C_CAP = 1.5e5;
-  function taxRelief(rows, slabPct, propType, borrowed) {
-    if (!(slabPct > 0)) return null;
+  const SEC24_CAP = 2e5, SEC80C_CAP = 1.5e5, PRECON_YEARS = 5;
+  function taxRelief(rows, slabPct, propType, borrowed, regime) {
+    const letout = propType === "letout";
+    /* Under the new regime 80C is gone and Sec 24 survives only for a let-out property — a
+       new-regime landlord still deducts interest against rental income. Treating "new regime" as
+       "claim nothing" understated their relief. */
+    const allow24 = slabPct > 0 && (regime !== "new" || letout);
+    const allow80C = slabPct > 0 && regime !== "new";
+    if (!allow24 && !allow80C) return null;
     /* After a full moratorium the schedule amortises P + capitalised interest, and that
        capitalised part has already been claimed as interest under Sec 24. Counting it again as
        80C principal would grant two deductions on the same rupee, so principal repayments are
@@ -507,23 +513,44 @@ td.col-yr { text-align: left; font-weight: 700; }
     const amortised = rows.reduce((a, x) => a + x.principal + x.extra, 0);
     const origShare = borrowed > 0 && amortised > borrowed ? borrowed / amortised : 1;
     const fy = new Map();
-    rows.forEach((x, i) => {
-      const key = x.m >= 3 ? x.y : x.y - 1;              // FY starts in April
+    const fyKey = (x) => (x.m >= 3 ? x.y : x.y - 1);     // FY starts in April
+    const bucket = (key) => {
       if (!fy.has(key)) fy.set(key, { interest: 0, principal: 0, months: [] });
-      const g = fy.get(key);
-      g.interest += x.interest; g.principal += (x.principal + x.extra) * origShare; g.months.push(i);
+      return fy.get(key);
+    };
+    // relief is netted off real cash flows for the post-tax rate, so only months that actually
+    // pay something can carry it — a full-moratorium month hands over nothing
+    const pays = (x) => x.emi + x.extra > 0;
+    /* Interest accrued before possession is "pre-construction interest": it is not deductible in
+       the year it arises, but in five equal instalments from the year the property is completed.
+       The moratorium is this tool's stand-in for that period, which is exactly the
+       under-construction case the panel advertises. */
+    let preCon = 0;
+    rows.forEach((x, i) => {
+      const g = bucket(fyKey(x));
+      if (x.mora) preCon += x.interest;
+      else g.interest += x.interest;
+      g.principal += (x.principal + x.extra) * origShare;
+      if (pays(x)) g.months.push(i);
     });
+    const firstRepay = rows.find((x) => !x.mora);
+    if (preCon > 0 && firstRepay) {
+      const startFy = fyKey(firstRepay);
+      for (let k = 0; k < PRECON_YEARS; k++) bucket(startFy + k).interest += preCon / PRECON_YEARS;
+    }
     let saved = 0, savedInterest = 0;
     /* Only the Sec 24 interest relief belongs in the effective borrowing rate. Crediting the 80C
        principal relief against the rate too would flatter it badly — and that deduction is usually
        already used up by EPF and insurance anyway. */
     const perMonthI = new Array(rows.length).fill(0);
     for (const g of fy.values()) {
-      const i24 = propType === "self" ? Math.min(g.interest, SEC24_CAP) : g.interest;
-      const c80 = Math.min(g.principal, SEC80C_CAP);
+      // the ₹2L ceiling is a self-occupied rule; a let-out property deducts the full interest
+      const i24 = allow24 ? (letout ? g.interest : Math.min(g.interest, SEC24_CAP)) : 0;
+      const c80 = allow80C ? Math.min(g.principal, SEC80C_CAP) : 0;
       const yearI = i24 * slabPct / 100;
       saved += (i24 + c80) * slabPct / 100; savedInterest += yearI;
-      g.months.forEach((mi) => (perMonthI[mi] = yearI / g.months.length));
+      // a pre-construction year can have no instalments of its own to carry the relief
+      if (g.months.length) g.months.forEach((mi) => (perMonthI[mi] += yearI / g.months.length));
     }
     return { saved, savedInterest, perMonthI };
   }
@@ -798,20 +825,24 @@ td.col-yr { text-align: left; font-weight: 700; }
         <summary><span>Home-loan tax benefit (India)</span><span class="adv-badge" id="tax-badge" hidden>ON</span></summary>
         <div class="adv-body">
           <div class="adv-row">
-            <div class="lbl"><label for="tax-slab">Your income-tax slab</label><span class="info tip-r" tabindex="0" data-tip="Your marginal rate — the rate the last rupee of your income is taxed at. Deductions only exist under the old regime; pick 'Claim nothing' if you are on the new regime.">?</span></div>
+            <div class="lbl"><label for="tax-slab">Your income-tax slab</label><span class="info tip-r" tabindex="0" data-tip="Your marginal rate — the rate the last rupee of your income is taxed at. Set it to 'Claim nothing' to switch the whole panel off.">?</span></div>
             <div class="adv-line">
               <select id="tax-slab" aria-label="Marginal income tax rate">
-                <option value="0">Claim nothing / new regime</option>
+                <option value="0">Claim nothing</option>
                 <option value="5">5%</option><option value="10">10%</option>
                 <option value="15">15%</option><option value="20">20%</option>
                 <option value="30">30%</option>
+              </select>
+              <select id="tax-regime" aria-label="Tax regime">
+                <option value="old">Old regime</option>
+                <option value="new">New regime</option>
               </select>
               <select id="prop-type" aria-label="Property type">
                 <option value="self">Self-occupied</option>
                 <option value="letout">Let out / rented</option>
               </select>
             </div>
-            <div class="adv-hint">Section 24(b) covers interest — capped at ₹2,00,000 a year for a self-occupied home. Section 80C covers principal, capped at ₹1,50,000 and shared with your other 80C investments, so treat this as an upper bound.</div>
+            <div class="adv-hint" id="tax-hint"></div>
           </div>
         </div>
       </details>
@@ -966,7 +997,10 @@ EMI = (P + total interest) / n</code>
         <summary>Prepay or invest? And what the tax relief is really worth</summary>
         <div class="a-body">
           <p>Prepaying earns you a guaranteed, tax-free return equal to your loan rate. Investing might earn more, but might not. The comparison is only honest if both paths cost the same each month, which is how this calculator does it: <strong>prepay</strong> clears the loan early and then invests the freed instalment until the original end date, while <strong>invest</strong> keeps the loan running and invests the extra as it goes. Both finish debt-free on the same date, so the bigger pile wins.</p>
-          <p>For an Indian home loan the rate to beat is not the headline rate but the <strong>rate after tax relief</strong>. Section 24(b) allows up to ₹2,00,000 of interest a year on a self-occupied home (uncapped if it is let out), and Section 80C up to ₹1,50,000 of principal — though 80C is shared with your EPF, ELSS and insurance, so treat the figure here as a ceiling rather than a promise. Deductions apply under the old regime only.</p>
+          <p>For an Indian home loan the rate to beat is not the headline rate but the <strong>rate after tax relief</strong>. Section 24(b) allows up to ₹2,00,000 of interest a year on a self-occupied home (uncapped if it is let out), and Section 80C up to ₹1,50,000 of principal — though 80C is shared with your EPF, ELSS and insurance, so treat that half as a ceiling rather than a promise.</p>
+          <p>Under the <strong>new regime</strong> 80C is gone and a self-occupied home gets nothing, but a <strong>let-out property still deducts its interest</strong> under Section 24(b) against rental income — so a landlord on the new regime is not claiming zero.</p>
+          <p>Interest that accrues <strong>before possession</strong> is not deductible in the year it arises. It is held back and released in five equal yearly instalments starting when the property is completed, which is why a moratorium here defers its interest rather than claiming it. That deferral can lower your total relief, because bunching five years of interest against the same ₹2,00,000 ceiling wastes part of it.</p>
+          <p>One simplification worth knowing: the cap on setting a house-property loss against your other income is not modelled, so a large let-out interest figure may be relieved here more generously than a return would allow.</p>
           <p>Both of these are estimates of the <em>past</em>, not forecasts. An expected return is an assumption; the interest you save by prepaying is arithmetic.</p>
         </div>
       </details>
@@ -1061,6 +1095,12 @@ EMI = (P + total interest) / n</code>
     $("tax").hidden = S.currency !== "INR";
     $("tax-slab").value = S.taxSlab;
     $("prop-type").value = S.propType;
+    $("tax-regime").value = S.taxRegime;
+    $("tax-hint").textContent = S.taxRegime === "new"
+      ? (S.propType === "letout"
+          ? "New regime: Section 24(b) interest is still deductible against rental income on a let-out property. Section 80C is not available."
+          : "New regime: neither Section 24(b) nor 80C applies to a self-occupied home.")
+      : "Section 24(b) covers interest — capped at ₹2,00,000 a year for a self-occupied home, uncapped if let out. Section 80C covers principal, capped at ₹1,50,000 and shared with your other 80C investments, so treat that half as an upper bound.";
     $("tax-badge").hidden = !(S.taxSlab > 0);
     $("start-month").value = monthValue(S.startY, S.startM);
     const cd = indexToMonth(S.closeAfter);
@@ -1198,17 +1238,18 @@ EMI = (P + total interest) / n</code>
     /* Prepay-vs-invest needs a different baseline from the savings box: the same loan with the
        prepayments removed but the holiday and rate steps kept. Reusing the strip-everything
        baseline compared against a loan the user never had, and a rate step could flip the verdict. */
-    let noPrepayMonths = null, noPrepayEmi = null;
+    let noPrepayMonths = null, noPrepayEmi = null, noPrepayRows = null;
     if (st.extraMonthly > 0 || st.lumps.length) {
       const np = simulate(P, rate, n, E, st.scheme,
         Object.assign({}, opts, { extraMonthly: 0, lumps: [] }));
       if (!np.negAm && np.rows.length < MAX_MONTHS) {
         noPrepayMonths = np.rows.length;
         noPrepayEmi = np.emiUsed;
+        noPrepayRows = np.rows;
       }
     }
     return { rows: sim.rows, P, E: sim.emiUsed, emiLast: sim.emiLast, baseEmi: E, solved,
-      baseInterest, baseMonths, noPrepayMonths, noPrepayEmi };
+      baseInterest, baseMonths, noPrepayMonths, noPrepayEmi, noPrepayRows };
   }
 
   function recalc() {
@@ -1220,7 +1261,7 @@ EMI = (P + total interest) / n</code>
   }
 
   function present(res) {
-    const { rows, P, E, emiLast, baseEmi, baseInterest, baseMonths, noPrepayMonths, noPrepayEmi } = res;
+    const { rows, P, E, emiLast, baseEmi, baseInterest, baseMonths, noPrepayMonths, noPrepayEmi, noPrepayRows } = res;
     const n = rows.length;
     const totalInterest = rows.reduce((a, x) => a + x.interest, 0);
     /* What the schedule amortises. Under a full moratorium the deferred interest is capitalised,
@@ -1281,7 +1322,7 @@ EMI = (P + total interest) / n</code>
       if (S.prepayMode === "emi" && Math.abs(emiLast - E) > 1) {
         html += `<div class="s-line"><span>EMI ${emiLast < E ? "falls" : "rises"} to</span><b>${money(emiLast)}</b></div>`;
       }
-      html += prepayVsInvest(rows, n, noPrepayMonths, noPrepayEmi);
+      html += prepayVsInvest(rows, n, noPrepayMonths, noPrepayEmi, noPrepayRows);
       $("savings").hidden = false;
       $("savings-body").innerHTML = html;
     } else {
@@ -1289,7 +1330,7 @@ EMI = (P + total interest) / n</code>
     }
 
     // ---- Indian home-loan tax relief ----
-    const relief = S.currency === "INR" ? taxRelief(rows, S.taxSlab, S.propType, P) : null;
+    const relief = S.currency === "INR" ? taxRelief(rows, S.taxSlab, S.propType, P, S.taxRegime) : null;
     if (relief) {
       $("stat-tax").style.display = ""; $("stat-post").style.display = "";
       $("st-tax").textContent = money(relief.saved);
@@ -1320,11 +1361,11 @@ EMI = (P + total interest) / n</code>
     return MONTHS[d.getMonth()] + " " + d.getFullYear();
   };
 
-  function prepayVsInvest(rows, n, baseMonths, baseEmi) {
+  function prepayVsInvest(rows, n, baseMonths, baseEmi, baseRows) {
     const g = S.investReturn / 1200;
     const prepaid = rows.reduce((a, x) => a + x.extra, 0);
     if (!(S.investReturn > 0) || prepaid <= 0 || !baseMonths || baseMonths <= n) return "";
-    const { prepay, invest } = investCompare(n, baseMonths, baseEmi + S.extraMonthly, S.extraMonthly, S.lumps, g);
+    const { prepay, invest } = investCompare(rows, baseRows, baseMonths, baseEmi, S.extraMonthly, S.lumps, g);
     const win = prepay >= invest;
     return `
       <div class="s-split">
@@ -1652,7 +1693,7 @@ Balance: ${money(g.balance)}</title>
   }
 
   // ---------- shareable URL ----------
-  const SHORT = { mode: "md", currency: "cu", amount: "a", rate: "r", tenure: "t", tenureUnit: "tu", emi: "e", fees: "f", scheme: "s", rateType: "rt", yearMode: "ym", moraMonths: "mm", moraType: "mt", extraMonthly: "x", closeAfter: "ca", closeFeePct: "cf", prepayMode: "pm", investReturn: "ir", taxSlab: "ts", propType: "pt" };
+  const SHORT = { mode: "md", currency: "cu", amount: "a", rate: "r", tenure: "t", tenureUnit: "tu", emi: "e", fees: "f", scheme: "s", rateType: "rt", yearMode: "ym", moraMonths: "mm", moraType: "mt", extraMonthly: "x", closeAfter: "ca", closeFeePct: "cf", prepayMode: "pm", investReturn: "ir", taxSlab: "ts", propType: "pt", taxRegime: "tr" };
   function writeURL() {
     const p = new URLSearchParams();
     for (const k in SHORT) p.set(SHORT[k], S[k]);
@@ -1684,6 +1725,7 @@ Balance: ${money(g.balance)}</title>
     if (!["cal", "fy"].includes(S.yearMode)) S.yearMode = "cal";
     if (!["tenure", "emi"].includes(S.prepayMode)) S.prepayMode = "tenure";
     if (!["self", "letout"].includes(S.propType)) S.propType = "self";
+    if (!["old", "new"].includes(S.taxRegime)) S.taxRegime = "old";
     if (![0, 5, 10, 15, 20, 30].includes(S.taxSlab)) S.taxSlab = 0;
     S.investReturn = Math.min(100, Math.max(0, S.investReturn));
     if (!["yr", "mo"].includes(S.tenureUnit)) S.tenureUnit = "yr";
@@ -1728,6 +1770,7 @@ Balance: ${money(g.balance)}</title>
     $("prepay-mode").addEventListener("change", (e) => { S.prepayMode = e.target.value; update(); });
     $("tax-slab").addEventListener("change", (e) => { S.taxSlab = parseFloat(e.target.value) || 0; update(); });
     $("prop-type").addEventListener("change", (e) => { S.propType = e.target.value; update(); });
+    $("tax-regime").addEventListener("change", (e) => { S.taxRegime = e.target.value; update(); });
     document.querySelectorAll(".unit-toggle button[data-unit]").forEach((b) =>
       b.addEventListener("click", () => { S.tenureUnit = b.dataset.unit; update(); }));
     document.querySelectorAll("#year-toggle button").forEach((b) =>
@@ -1994,19 +2037,20 @@ Balance: ${money(g.balance)}</title>
     ok(keep.rows.reduce((a, x) => a + x.interest, 0) > cut, "finishing early beats a lower EMI on interest");
 
     // tax relief: a 30% payer on a self-occupied home caps at 2L interest + 1.5L principal a year
-    const tr = taxRelief(plain.rows, 30, "self", 2.5e6);
+    const tr = taxRelief(plain.rows, 30, "self", 2.5e6, "old");
     ok(tr.saved > 0 && tr.saved < 3.5e5 * 0.3 * 21, "tax relief stays inside the yearly caps");
     ok(Math.abs(tr.perMonthI.reduce((a, x) => a + x, 0) - tr.savedInterest) < 1, "monthly relief sums to the Sec 24 total");
     ok(tr.savedInterest < tr.saved, "the rate uses only the interest half of the relief");
-    ok(taxRelief(plain.rows, 0, "self", 2.5e6) === null, "no slab means no relief");
+    ok(taxRelief(plain.rows, 0, "self", 2.5e6, "old") === null, "no slab means no relief");
     // a let-out property has no Sec 24 cap, so it can never save less
-    ok(taxRelief(plain.rows, 30, "letout", 2.5e6).saved >= tr.saved, "let-out relief is uncapped");
+    ok(taxRelief(plain.rows, 30, "letout", 2.5e6, "old").saved >= tr.saved, "let-out relief is uncapped");
 
     // prepay-vs-invest: at a 0% return, prepaying must win (it saves real interest)
-    const ic0 = investCompare(fast.rows.length, 180, E14 + 5000, 5000, [], 0);
+    const slowRows = simulate(1207044, 14, 180, E14, "arrears", base).rows;
+    const ic0 = investCompare(fast.rows, slowRows, 180, E14, 5000, [], 0);
     ok(ic0.prepay > ic0.invest, "at 0% return, prepaying wins");
     // at a high enough return the ranking has to flip
-    const ic20 = investCompare(fast.rows.length, 180, E14 + 5000, 5000, [], 0.20 / 12);
+    const ic20 = investCompare(fast.rows, slowRows, 180, E14, 5000, [], 0.20 / 12);
     ok(ic20.invest / ic20.prepay > ic0.invest / ic0.prepay, "a higher return favours investing");
 
     /* Totals must equal the cash that actually leaves your pocket. Under a full moratorium the
@@ -2062,7 +2106,10 @@ Balance: ${money(g.balance)}</title>
       lumps: [], rateSteps: [], prepayMode: "tenure", amount: 2.5e6, rate: 9, tenure: 240, emi: 0 };
 
     // the invest path keeps contributing to the original end date, not to the early payoff
-    const icShort = investCompare(96, 180, 20000, 5000, [], 0.10 / 12);
+    // with the budget model, path B invests its extra every month to the original end date
+    const rowsB180 = new Array(180).fill(0).map(() => ({ emi: 20000, extra: 0 }));
+    const rowsA96 = new Array(96).fill(0).map(() => ({ emi: 20000, extra: 5000 }));
+    const icShort = investCompare(rowsA96, rowsB180, 180, 20000, 5000, [], 0.10 / 12);
     let manualB = 0;
     for (let i = 0; i < 180; i++) manualB += 5000 * Math.pow(1 + 0.10 / 12, 179 - i);
     ok(Math.abs(icShort.invest - manualB) < 1, "invest path runs to the original end date");
@@ -2090,8 +2137,8 @@ Balance: ${money(g.balance)}</title>
     // 80C must not also claim interest that was capitalised and already relieved under Sec 24
     const moraRows = simulate(2.5e6, 9, 240, E9, "arrears",
       Object.assign({ moraMonths: 12, moraType: "full" }, base)).rows;
-    const trMora = taxRelief(moraRows, 30, "self", 2.5e6);
-    const trNaive = taxRelief(moraRows, 30, "self", 0);   // 0 disables the scaling
+    const trMora = taxRelief(moraRows, 30, "self", 2.5e6, "old");
+    const trNaive = taxRelief(moraRows, 30, "self", 0, "old");   // 0 disables the scaling
     ok(trMora.saved < trNaive.saved, "capitalised interest is not claimed twice");
 
     // a renamed scenario cannot inject markup
@@ -2100,8 +2147,8 @@ Balance: ${money(g.balance)}</title>
     // ---- PR #7 second review ----
     // a lump scheduled after the early payoff must be invested by the prepay path too
     const lateLump = [{ month: 120, amount: 4e5 }];
-    const icLate = investCompare(96, 180, 20000, 0, lateLump, 0.10 / 12);
-    const icNoLate = investCompare(96, 180, 20000, 0, [], 0.10 / 12);
+    const icLate = investCompare(rowsA96, rowsB180, 180, 20000, 0, lateLump, 0.10 / 12);
+    const icNoLate = investCompare(rowsA96, rowsB180, 180, 20000, 0, [], 0.10 / 12);
     ok(icLate.prepay > icNoLate.prepay, "post-payoff lumps are invested on the prepay path");
     // month 120 is index 119, so it compounds for (nBase - 1 - 119) = 60 periods
     ok(Math.abs(icLate.prepay - icNoLate.prepay - 4e5 * Math.pow(1 + 0.10 / 12, 60)) < 1,
@@ -2130,6 +2177,44 @@ Balance: ${money(g.balance)}</title>
     const restored = restore(savedChip);
     restored.lumps[0].amount = 9e9;
     ok(savedChip.lumps[0].amount === 1e5, "restoring a chip clones its event arrays");
+
+    // ---- PR #7 third review ----
+    /* A part-payment in the payoff month leaves budget unspent, and that surplus belongs to the
+       prepayer. Path A here pays only 1,000 in its final month against a 20,000 budget. */
+    const rowsAshort = new Array(96).fill(0).map((_, i) =>
+      i === 95 ? { emi: 1000, extra: 0 } : { emi: 20000, extra: 0 });
+    const icSurplus = investCompare(rowsAshort, rowsB180, 180, 20000, 0, [], 0);
+    ok(Math.abs(icSurplus.prepay - (19000 + 20000 * 84)) < 1, "payoff-month surplus is invested");
+
+    /* A moratorium never applies extraMonthly, so both paths leave it unspent in those months and
+       must be credited identically — previously only the investing path got it. */
+    const moraA = [{ emi: 0, extra: 0 }, { emi: 0, extra: 0 }].concat(
+      new Array(10).fill(0).map(() => ({ emi: 20000, extra: 5000 })));
+    const moraB = [{ emi: 0, extra: 0 }, { emi: 0, extra: 0 }].concat(
+      new Array(10).fill(0).map(() => ({ emi: 20000, extra: 0 })));
+    const icMora = investCompare(moraA, moraB, 12, 20000, 5000, [], 0);
+    ok(Math.abs(icMora.prepay - icMora.invest - (-5000 * 10)) < 1,
+      "holiday months credit both paths the same");
+
+    // pre-construction interest is deferred, then relieved over five years from completion
+    const preConRows = simulate(2.5e6, 9, 240, E9, "arrears",
+      Object.assign({ moraMonths: 24, moraType: "interest" }, base)).rows;
+    const trPre = taxRelief(preConRows, 30, "self", 2.5e6, "old");
+    const moraInterest = preConRows.filter((x) => x.mora).reduce((a, x) => a + x.interest, 0);
+    ok(moraInterest > 0, "the holiday accrues interest to defer");
+    // Aug 2026 - Mar 2027 is wholly pre-construction, so that FY must claim nothing at all
+    ok(trPre.perMonthI.slice(0, 8).every((v) => v === 0),
+      "no relief is claimed in a wholly pre-construction year");
+    // deferring it past the 2L cap changes the total, so it must differ from claiming as accrued
+    const trPreNoDefer = taxRelief(preConRows.map((x) => Object.assign({}, x, { mora: false })),
+      30, "self", 2.5e6, "old");
+    ok(Math.abs(trPre.saved - trPreNoDefer.saved) > 1, "deferral changes the relief, as the caps imply");
+
+    // new regime: nothing for a self-occupied home, but Sec 24 survives on a let-out one
+    ok(taxRelief(plain.rows, 30, "self", 2.5e6, "new") === null, "new regime gives a self-occupied home nothing");
+    const trNewLet = taxRelief(plain.rows, 30, "letout", 2.5e6, "new");
+    ok(trNewLet && trNewLet.savedInterest > 0, "new regime still relieves let-out interest");
+    ok(Math.abs(trNewLet.saved - trNewLet.savedInterest) < 1, "and grants no 80C on top of it");
 
     // the bench must agree with the main panel exactly — it runs the same solve()
     const snapA = Object.assign(snapshot(), { amount: 2.5e6, rate: 9, tenure: 240, fees: 0, mode: "emi",
