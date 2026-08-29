@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EMI Calculator</title>
+<meta name="description" content="Solve for EMI, loan amount, tenure, or interest rate — with prepayments, moratorium, floating rates, flat-rate loans, foreclosure, charts and a full amortization schedule.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #fff6e5; --surface: #ffffff; --text: #0d0d0d; --text-dim: #4a4a4a;
+  --ink: var(--text); --ink-dim: var(--text-dim);
+  --yellow: #ffdb58; --red: #ff6b6b; --teal: #4ecdc4; --purple: #a78bfa;
+  --chart-principal: #4ecdc4; --chart-interest: #ff6b6b; --chart-fees: #a78bfa; --chart-balance: #0d0d0d;
+  --chart-extra: #a78bfa;
+  --grid-line: rgba(13,13,13,.13);
+  --bw: 3px; --shadow: 5px 5px 0 var(--ink);
+  --sans: "Space Grotesk", system-ui, sans-serif;
+  --display: "Archivo Black", var(--sans);
+}
+:root[data-theme="dark"] { --chart-balance: #f2ebe0; --grid-line: rgba(242,235,224,.15); }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: var(--sans); background: var(--bg); color: var(--text); line-height: 1.5; min-height: 100vh;
+  background-image: radial-gradient(color-mix(in srgb, var(--ink) 7%, transparent) 1.2px, transparent 1.2px); background-size: 22px 22px; }
+/* ponytail: hover tooltips are absolutely positioned and can reach past a narrow viewport.
+   Clip on the root rather than chase each one — every genuinely wide block (chart, table)
+   scrolls in its own container, so nothing real is lost. Must be on html, not body: an
+   overflow set on body propagates to the viewport and leaves body itself visible. */
+html { overflow-x: hidden; }
+header { padding: 42px 24px 8px; text-align: center; }
+header h1 { font-family: var(--display); font-size: 2.3rem; text-transform: uppercase; letter-spacing: .01em; }
+header h1 mark { background: var(--yellow); color: #0d0d0d; padding: 0 8px; box-shadow: var(--shadow); border: var(--bw) solid var(--ink); }
+header p { color: var(--text-dim); font-size: .95rem; font-weight: 500; margin-top: 12px; }
+.wrap { max-width: 1080px; margin: 0 auto; padding: 30px 20px 72px; }
+.layout { display: grid; grid-template-columns: 1.25fr .95fr; gap: 24px; }
+.chart-panel, .table-panel, .about-panel { grid-column: 1 / -1; }
+.layout > .panel { min-width: 0; }
+@media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+
+.panel { background: var(--surface); border: var(--bw) solid var(--ink); box-shadow: var(--shadow); padding: 24px; }
+.panel h2 { font-family: var(--display); font-size: 1rem; text-transform: uppercase; margin-bottom: 16px; }
+.panel-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+.panel-head h2 { margin-bottom: 0; }
+.table-note { font-family: var(--sans); font-size: .78rem; font-weight: 500; color: var(--text-dim); text-transform: none; }
+
+/* tabs */
+.mode-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 22px; }
+.tab { font-family: var(--sans); font-size: .8rem; font-weight: 700; text-transform: uppercase; padding: 10px 4px; background: var(--surface); border: var(--bw) solid var(--ink); color: var(--text); cursor: pointer; box-shadow: 3px 3px 0 var(--ink); transition: transform .12s, box-shadow .12s; }
+.tab:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--ink); }
+.tab:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+.tab.on { background: var(--yellow); color: #0d0d0d; }
+@media (max-width: 480px) {
+  .mode-tabs { grid-template-columns: repeat(2, 1fr); }
+  .mode-tabs .tab:nth-child(odd)::after { left: 0; right: auto; transform: none; }
+  .mode-tabs .tab:nth-child(even)::after { left: auto; right: 0; transform: none; }
+}
+
+.top-row { display: flex; gap: 26px; flex-wrap: wrap; margin-bottom: 18px; padding-bottom: 18px; border-bottom: var(--bw) dashed var(--ink); }
+.field-group label, #scheme-label, #ratetype-label { display: block; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 7px; }
+select, input[type="month"] { font-family: var(--sans); font-weight: 700; font-size: .88rem; padding: 8px 10px; border: var(--bw) solid var(--ink); background: var(--surface); color: var(--text); cursor: pointer; box-shadow: 3px 3px 0 var(--ink); }
+select:focus, input:focus { outline: 3px solid var(--teal); outline-offset: 1px; }
+.scheme-opts { display: flex; gap: 14px; padding-top: 7px; }
+.radio { display: inline-flex; align-items: center; gap: 6px; font-size: .88rem; font-weight: 500; cursor: pointer; }
+.radio input { accent-color: var(--ink); width: 16px; height: 16px; cursor: pointer; }
+
+/* controls */
+.ctrl { padding: 16px 0 12px; border-bottom: var(--bw) dashed color-mix(in srgb, var(--ink) 20%, transparent); }
+.ctrl:last-child { border-bottom: none; }
+.ctrl-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.ctrl-head label { font-size: .92rem; font-weight: 700; text-transform: uppercase; }
+.field { display: inline-flex; align-items: center; gap: 6px; border: var(--bw) solid var(--ink); padding: 6px 10px; background: var(--surface); box-shadow: 3px 3px 0 var(--ink); }
+.field:focus-within { outline: 3px solid var(--teal); outline-offset: 1px; }
+.field .affix { font-size: .85rem; font-weight: 700; }
+.field input { font-family: var(--sans); font-size: .98rem; font-weight: 700; border: none; background: none; color: var(--text); width: 118px; text-align: right; font-variant-numeric: tabular-nums; }
+.field input:focus { outline: none; }
+.field.sm input { width: 84px; }
+.tenure-right { display: flex; gap: 10px; align-items: center; }
+.unit-toggle { display: inline-flex; border: var(--bw) solid var(--ink); box-shadow: 3px 3px 0 var(--ink); }
+.unit-toggle button { font-family: var(--sans); font-size: .78rem; font-weight: 700; padding: 8px 12px; border: none; background: var(--surface); color: var(--text); cursor: pointer; }
+.unit-toggle button.on { background: var(--yellow); color: #0d0d0d; }
+
+.slider { -webkit-appearance: none; appearance: none; width: 100%; height: 10px; background: var(--surface); border: 2px solid var(--ink); cursor: pointer; }
+.slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 0; background: var(--yellow); border: var(--bw) solid var(--ink); box-shadow: 2px 2px 0 var(--ink); cursor: grab; }
+.slider::-moz-range-thumb { width: 18px; height: 18px; border-radius: 0; background: var(--yellow); border: var(--bw) solid var(--ink); cursor: grab; }
+.scale { display: flex; justify-content: space-between; font-size: .68rem; font-weight: 500; color: var(--text-dim); margin-top: 7px; }
+
+/* buttons */
+.btn { font-family: var(--sans); font-size: .76rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 8px 12px; border: var(--bw) solid var(--ink); background: var(--surface); color: var(--text); cursor: pointer; box-shadow: 3px 3px 0 var(--ink); transition: transform .12s, box-shadow .12s; }
+.btn:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--ink); }
+.btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+.btn.accent { background: var(--yellow); color: #0d0d0d; }
+.btn.x { padding: 6px 9px; box-shadow: 2px 2px 0 var(--ink); background: var(--red); color: #0d0d0d; }
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* advanced section */
+.adv { margin-top: 18px; border: var(--bw) solid var(--ink); box-shadow: 3px 3px 0 var(--ink); background: var(--surface); }
+.adv > summary { font-family: var(--display); font-size: .82rem; text-transform: uppercase; padding: 12px 14px; cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.adv > summary::-webkit-details-marker { display: none; }
+.adv > summary::after { content: "+"; font-family: var(--sans); font-weight: 700; font-size: 1.1rem; }
+.adv[open] > summary { background: var(--yellow); color: #0d0d0d; border-bottom: var(--bw) solid var(--ink); }
+.adv[open] > summary::after { content: "–"; }
+.adv .adv-body { padding: 4px 14px 16px; }
+.adv-badge { font-family: var(--sans); font-size: .64rem; font-weight: 700; background: var(--teal); color: #0d0d0d; border: 2px solid var(--ink); padding: 1px 7px; letter-spacing: .06em; margin-left: auto; margin-right: 8px; }
+.adv-row { padding: 14px 0; border-bottom: 2px dashed color-mix(in srgb, var(--ink) 20%, transparent); }
+.adv-row:last-child { border-bottom: none; }
+.adv-row > .lbl { margin-bottom: 9px; }
+.adv-row > .lbl label, .adv-row > .lbl span.h { font-size: .74rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.adv-line { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.adv-hint { font-size: .74rem; font-weight: 500; color: var(--text-dim); margin-top: 8px; }
+.ev-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.ev-row .ev-lead { font-size: .78rem; font-weight: 700; color: var(--text-dim); }
+input[type="month"] { padding: 7px 8px; box-shadow: 2px 2px 0 var(--ink); font-size: .82rem; }
+
+/* results */
+.result-hero { text-align: center; padding: 4px 0 20px; border-bottom: var(--bw) solid var(--ink); }
+.result-label { display: inline-block; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; background: var(--teal); color: #0d0d0d; border: 2px solid var(--ink); padding: 3px 10px; transform: rotate(-1deg); }
+.result-value { font-family: var(--display); font-size: 2.5rem; margin-top: 12px; font-variant-numeric: tabular-nums; }
+.result-sub { font-size: .86rem; font-weight: 500; color: var(--text-dim); margin-top: 4px; }
+.msg { margin: 14px 0; padding: 12px 14px; border: var(--bw) solid var(--ink); background: var(--yellow); color: #0d0d0d; box-shadow: var(--shadow); font-size: .88rem; font-weight: 500; }
+.savings { margin: 16px 0 4px; padding: 12px 14px; border: var(--bw) solid var(--ink); background: var(--teal); color: #0d0d0d; box-shadow: var(--shadow); }
+.savings h3 { font-family: var(--display); font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+.savings .s-line { display: flex; justify-content: space-between; gap: 12px; font-size: .86rem; font-weight: 500; padding: 3px 0; }
+.savings .s-line b { font-variant-numeric: tabular-nums; }
+.stats { padding: 8px 0; }
+.stat { display: flex; justify-content: space-between; padding: 10px 2px; border-bottom: 2px dashed color-mix(in srgb, var(--ink) 20%, transparent); font-size: .92rem; gap: 12px; }
+.stat-label { font-weight: 500; color: var(--text-dim); display: flex; align-items: center; }
+.stat-value { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.stat.total { border-bottom: none; }
+.stat.total .stat-label { color: var(--text); font-weight: 700; text-transform: uppercase; }
+.stat.total .stat-value { background: var(--yellow); color: #0d0d0d; border: 2px solid var(--ink); padding: 1px 8px; box-shadow: 2px 2px 0 var(--ink); }
+
+.donut-wrap { display: flex; align-items: center; gap: 18px; margin-top: 12px; flex-wrap: wrap; justify-content: center; }
+#donut { width: 172px; height: 172px; flex-shrink: 0; }
+.donut-big { font-family: var(--display); font-size: 26px; fill: var(--text); }
+.donut-small { font-family: var(--sans); font-size: 12px; font-weight: 700; fill: var(--text-dim); }
+.legend { display: flex; flex-direction: column; gap: 9px; font-size: .84rem; font-weight: 500; }
+.legend .item { display: inline-flex; align-items: center; gap: 8px; }
+.legend em { color: var(--text-dim); font-style: normal; }
+.swatch { width: 13px; height: 13px; border: 2px solid var(--ink); flex-shrink: 0; }
+.swatch.line { height: 4px; border-width: 1px; }
+.chart-panel .legend { flex-direction: row; gap: 20px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
+.chart-scroll { overflow-x: auto; }
+#barchart { width: 100%; min-width: 620px; height: auto; }
+.grid { stroke: var(--grid-line); stroke-width: 1; stroke-dasharray: 3 3; }
+.axis { font-family: var(--sans); font-size: 11px; font-weight: 500; fill: var(--text-dim); }
+.bar-g rect { stroke: var(--ink); stroke-width: 1.5; }
+.bar-g rect:hover { opacity: .85; }
+
+/* table */
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .88rem; min-width: 620px; border: var(--bw) solid var(--ink); }
+th { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; text-align: right; padding: 10px 12px; background: var(--ink); color: var(--bg); }
+th.col-yr { text-align: left; }
+td { text-align: right; padding: 9px 12px; border-bottom: 2px solid color-mix(in srgb, var(--ink) 13%, transparent); font-variant-numeric: tabular-nums; font-weight: 500; }
+td.col-yr { text-align: left; font-weight: 700; }
+.yr-row { cursor: pointer; transition: background .12s; }
+.yr-row:hover, .yr-row:focus-visible { background: var(--yellow); color: #0d0d0d; }
+.yr-row:focus-visible { outline: 3px solid var(--teal); outline-offset: -3px; }
+.chev { display: inline-block; width: 0; height: 0; border: 5px solid transparent; border-left: 7px solid currentColor; margin-right: 8px; transition: transform .15s; vertical-align: 0; }
+.yr-row.open .chev { transform: rotate(90deg) translateX(1px); }
+.mo-row { background: color-mix(in srgb, var(--ink) 4%, transparent); color: var(--text-dim); }
+.mo-row td.col-yr { padding-left: 32px; font-weight: 500; }
+.mo-row.is-mora td.col-yr::after { content: " · moratorium"; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; }
+.tag-extra { background: var(--purple); color: #0d0d0d; border: 1px solid var(--ink); padding: 0 5px; font-size: .74rem; font-weight: 700; }
+
+/* pre-closure */
+.closure { margin-top: 18px; padding: 14px; border: var(--bw) solid var(--ink); background: color-mix(in srgb, var(--yellow) 35%, var(--surface)); }
+.closure h3 { font-family: var(--display); font-size: .78rem; text-transform: uppercase; margin-bottom: 10px; }
+.closure .c-out { margin-top: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.closure .c-cell { border: 2px solid var(--ink); background: var(--surface); padding: 9px 11px; min-width: 0; }
+.closure .c-cell b { display: block; font-family: var(--display); font-size: 1.05rem; font-variant-numeric: tabular-nums; margin-top: 3px; overflow-wrap: anywhere; }
+.closure .c-cell span { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-dim); }
+
+/* about / formulas */
+.about-panel details { border-bottom: 2px dashed color-mix(in srgb, var(--ink) 20%, transparent); }
+.about-panel details:last-child { border-bottom: none; }
+.about-panel summary { font-weight: 700; font-size: .92rem; padding: 12px 2px; cursor: pointer; }
+.about-panel summary:focus-visible { outline: 3px solid var(--teal); }
+.about-panel .a-body { padding: 0 2px 16px; font-size: .88rem; font-weight: 500; color: var(--text-dim); }
+.about-panel .a-body p { margin-bottom: 10px; }
+.about-panel .a-body ul { margin: 0 0 10px 18px; }
+.about-panel .a-body li { margin-bottom: 6px; }
+.about-panel code, .formula { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+.formula { display: block; white-space: pre; background: color-mix(in srgb, var(--ink) 6%, transparent); border-left: var(--bw) solid var(--ink); padding: 10px 12px; margin: 10px 0; font-size: .86rem; color: var(--text); overflow-x: auto; }
+
+/* tooltips */
+[data-tip] { position: relative; }
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute; left: 50%; bottom: calc(100% + 10px); transform: translateX(-50%);
+  width: max-content; max-width: 210px;
+  background: var(--ink); color: var(--bg);
+  font-family: var(--sans); font-size: .72rem; font-weight: 500; line-height: 1.45;
+  text-transform: none; letter-spacing: 0; text-align: left; white-space: normal;
+  padding: 7px 10px; box-shadow: 3px 3px 0 color-mix(in srgb, var(--ink) 30%, transparent);
+  opacity: 0; visibility: hidden; transition: opacity .15s ease .12s; pointer-events: none; z-index: 60;
+}
+[data-tip]:hover::after, [data-tip]:focus-visible::after, .info[data-tip]:focus::after { opacity: 1; visibility: visible; }
+.tip-l::after { left: 0; transform: none; }
+.tip-r::after { left: auto; right: 0; transform: none; }
+.lbl { display: flex; align-items: center; }
+.field-group .lbl { margin-bottom: 7px; }
+.field-group .lbl label { margin-bottom: 0; }
+.info { display: inline-flex; align-items: center; justify-content: center; width: 17px; height: 17px; border: 2px solid var(--ink); background: var(--surface); color: var(--text); font-size: .68rem; font-weight: 700; margin-left: 7px; cursor: help; flex-shrink: 0; }
+.info:focus { outline: 3px solid var(--teal); outline-offset: 1px; }
+/* ponytail: below ~620px a 210px hover popup can't sit anywhere near its icon without running
+   off one edge or the other, and anchoring them one by one just moved the overflow around.
+   Drop the popup there — the icons keep their aria-label for screen readers, and every hint is
+   also written out longhand in the "How this is calculated" panel. Must come after the
+   [data-tip]::after rule above: same specificity, so source order decides. */
+@media (max-width: 620px) { [data-tip]::after { content: none; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+<link id="site-canonical" rel="canonical" href="https://tools.soumendrak.com/t/emi">
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--card:#2d251f;--card2:#38302a;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--card:#ffffff;--card2:#efe6d8;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<header>
+  <h1><mark>EMI</mark> Calculator</h1>
+  <p>Solve for EMI, amount, tenure or rate — with prepayments, moratorium, floating &amp; flat rates.</p>
+</header>
+<div class="wrap"><div id="app"></div></div>
+<script>
+/* EMI calculator engine. Chart colors come from CSS vars:
+   --chart-principal, --chart-interest, --chart-fees, --chart-extra, --chart-balance */
+(function () {
+  "use strict";
+
+  const CURRENCIES = {
+    INR: { sym: "₹", locale: "en-IN", amtMax: 5e7, amtStep: 1e5, amtDef: 2.5e6, emiMax: 5e5, emiStep: 1e3, emiDef: 25e3, feesMax: 1e6, feesStep: 5e3 },
+    USD: { sym: "$", locale: "en-US", amtMax: 1e6, amtStep: 5e3, amtDef: 25e4, emiMax: 1e4, emiStep: 100, emiDef: 2200, feesMax: 25e3, feesStep: 250 },
+    EUR: { sym: "€", locale: "de-DE", amtMax: 1e6, amtStep: 5e3, amtDef: 25e4, emiMax: 1e4, emiStep: 100, emiDef: 2200, feesMax: 25e3, feesStep: 250 },
+    GBP: { sym: "£", locale: "en-GB", amtMax: 1e6, amtStep: 5e3, amtDef: 25e4, emiMax: 1e4, emiStep: 100, emiDef: 2200, feesMax: 25e3, feesStep: 250 },
+  };
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const MAX_MONTHS = 1200; // 100 years — hard stop so a bad input can't spin forever
+
+  const today = new Date();
+  const S = {
+    mode: "emi", currency: "INR", amount: 2.5e6, rate: 9, tenure: 240, tenureUnit: "yr",
+    emi: 22493, fees: 0, scheme: "arrears",
+    rateType: "reducing",                       // reducing | flat
+    startY: today.getFullYear(), startM: today.getMonth(),
+    yearMode: "cal",                            // cal | fy
+    moraMonths: 0, moraType: "interest",        // interest (Pre-EMI) | full (deferred, capitalised)
+    extraMonthly: 0,
+    lumps: [],                                  // [{ month: 1-based payment no., amount }]
+    rateSteps: [],                              // [{ month: 1-based payment no., rate: annual % }]
+    closeAfter: 12, closeFeePct: 0,
+  };
+
+  // ---------- math ----------
+  const emiArrears = (P, r, n) => (r === 0 ? P / n : (P * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1));
+  const emiFor = (P, r, n, scheme) => { const e = emiArrears(P, r, n); return scheme === "advance" ? e / (1 + r) : e; };
+  function amountFor(E, r, n, scheme) {
+    const Ee = scheme === "advance" ? E * (1 + r) : E;
+    return r === 0 ? Ee * n : (Ee * (1 - Math.pow(1 + r, -n))) / r;
+  }
+  function tenureFor(P, E, r, scheme) {
+    const Ee = scheme === "advance" ? E * (1 + r) : E;
+    if (r === 0) return P / Ee;
+    if (Ee <= P * r) return Infinity;
+    return Math.log(Ee / (Ee - P * r)) / Math.log(1 + r);
+  }
+  function rateFor(P, E, n, scheme) {
+    if (E * n < P) return NaN;
+    let lo = 0, hi = 1;
+    for (let i = 0; i < 100; i++) {
+      const mid = (lo + hi) / 2;
+      emiFor(P, mid, n, scheme) > E ? (hi = mid) : (lo = mid);
+    }
+    return (lo + hi) / 2;
+  }
+  // Flat ("fixed") rate loans: interest charged on the original principal for the whole tenure.
+  const flatEmi = (P, flatPct, n) => (P + (P * flatPct / 100) * (n / 12)) / n;
+
+  /* Monthly IRR of the real cash flow: the rate at which the payments actually made discount
+     back to the money actually received. Used for APR (net of fees) and for the true cost of a
+     flat-rate loan. A level-payment formula can't do this once a moratorium or a prepayment
+     reshapes the payments. */
+  function irrMonthly(net, flows, scheme) {
+    if (!(net > 0) || !flows.length) return NaN;
+    if (flows.reduce((a, x) => a + x, 0) <= net) return NaN;   // never repaid: no rate fits
+    const off = scheme === "advance" ? 0 : 1;
+    const pv = (i) => flows.reduce((a, x, k) => a + x / Math.pow(1 + i, k + off), 0);
+    let lo = 0, hi = 1;
+    for (let k = 0; k < 40 && pv(hi) > net; k++) { lo = hi; hi *= 2; }
+    for (let k = 0; k < 80; k++) {
+      const mid = (lo + hi) / 2;
+      pv(mid) > net ? (lo = mid) : (hi = mid);   // pv falls as the rate rises
+    }
+    return (lo + hi) / 2;
+  }
+
+  /* Month-by-month simulator. Handles moratorium, floating rate steps and prepayments.
+     opts: { startY, startM, moraMonths, moraType, extraMonthly, lumps, rateSteps }
+     Returns { rows, emiUsed, negAm }; rows carry {y,m,emi,principal,interest,extra,balance,mora}. */
+  function simulate(P, annualRate, n, E, scheme, o) {
+    const steps = (o.rateSteps || []).slice().sort((a, b) => a.month - b.month);
+    const rateAt = (idx) => {                       // idx: 0-based month over the whole life
+      let a = annualRate;
+      for (const s of steps) if (idx + 1 >= s.month) a = s.rate;
+      return a / 1200;
+    };
+    const rows = [];
+    let bal = P, y = o.startY, m = o.startM, idx = 0;
+    const step = () => { m++; if (m > 11) { m = 0; y++; } idx++; };
+
+    for (let k = 0; k < (o.moraMonths || 0); k++) {
+      const interest = bal * rateAt(idx);
+      let paid = 0;
+      if (o.moraType === "full") bal += interest;   // deferred: interest capitalises
+      else paid = interest;                          // Pre-EMI: interest serviced monthly
+      rows.push({ y, m, emi: paid, principal: 0, interest, extra: 0, balance: bal, mora: true });
+      step();
+    }
+
+    // After a full moratorium the balance has grown, so the EMI is re-struck over the agreed tenure.
+    let emi = E;
+    if (o.moraMonths > 0 && o.moraType === "full") emi = emiFor(bal, rateAt(idx), n, scheme);
+
+    const lumps = o.lumps || [];
+    let negAm = false;
+    while (bal > 0.5 && rows.length < MAX_MONTHS) {
+      const r = rateAt(idx);
+      const interest = scheme === "advance" ? Math.max(0, (bal - emi) * r) : bal * r;
+      let extra = o.extraMonthly || 0;
+      for (const l of lumps) if (l.month === idx + 1) extra += l.amount;
+      if (emi + extra <= interest) { negAm = true; break; }  // payment never touches the principal
+      let principal = Math.max(0, emi - interest);
+      if (principal >= bal) { principal = bal; extra = 0; }
+      else if (principal + extra > bal) extra = bal - principal;
+      bal -= principal + extra;
+      // the last instalment is usually a part payment, so record what was actually paid, not the level EMI
+      rows.push({ y, m, emi: interest + principal, principal, interest, extra, balance: Math.max(bal, 0), mora: false });
+      step();
+    }
+    return { rows, emiUsed: emi, negAm };
+  }
+
+  // Flat-rate schedule: equal principal and equal interest every month.
+  function flatSchedule(P, flatPct, n, startY, startM) {
+    const perP = P / n, perI = (P * flatPct / 100) * (n / 12) / n;
+    const rows = [];
+    let y = startY, m = startM;
+    for (let i = 0; i < n; i++) {
+      rows.push({ y, m, emi: perP + perI, principal: perP, interest: perI, extra: 0, balance: Math.max(0, P - perP * (i + 1)), mora: false });
+      m++; if (m > 11) { m = 0; y++; }
+    }
+    return rows;
+  }
+
+  const anyAdvanced = () =>
+    S.moraMonths > 0 || S.extraMonthly > 0 || S.lumps.length > 0 || S.rateSteps.length > 0;
+
+  // ---------- formatting ----------
+  const cur = () => CURRENCIES[S.currency];
+  const fmt = (v) => new Intl.NumberFormat(cur().locale, { maximumFractionDigits: 0 }).format(Math.round(v));
+  const money = (v) => cur().sym + fmt(v);
+  function short(v) {
+    if (S.currency === "INR") {
+      if (v >= 1e7) return trim(v / 1e7) + "Cr";
+      if (v >= 1e5) return trim(v / 1e5) + "L";
+      if (v >= 1e3) return trim(v / 1e3) + "k";
+    } else {
+      if (v >= 1e6) return trim(v / 1e6) + "M";
+      if (v >= 1e3) return trim(v / 1e3) + "k";
+    }
+    return String(Math.round(v));
+  }
+  const trim = (x) => (Math.round(x * 10) / 10).toString().replace(/\.0$/, "");
+  const parseNum = (s) => parseFloat(String(s).replace(/[^0-9.]/g, "")) || 0;
+  const cssVar = (name, fb) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fb;
+  const tenureLabel = (months) => {
+    const y = Math.floor(months / 12), mo = months % 12;
+    return (y ? y + " yr " : "") + (mo || !y ? mo + " mo" : "");
+  };
+  const monthValue = (y, m) => y + "-" + String(m + 1).padStart(2, "0");
+  const parseMonthValue = (v) => {
+    const mt = /^(\d{4})-(\d{2})$/.exec(v || "");
+    return mt ? { y: +mt[1], m: +mt[2] - 1 } : null;
+  };
+  // payment number (1-based) for a given calendar month, relative to the loan start
+  const monthToIndex = (y, m) => (y - S.startY) * 12 + (m - S.startM) + 1;
+  const indexToMonth = (i) => {
+    const t = S.startM + (i - 1);
+    return { y: S.startY + Math.floor(t / 12), m: ((t % 12) + 12) % 12 };
+  };
+  const indexLabel = (i) => { const d = indexToMonth(i); return MONTHS[d.m] + " " + d.y; };
+
+  // Group rows into calendar or financial (Apr–Mar) years.
+  function groupRows(rows) {
+    const out = [];
+    for (const r of rows) {
+      const key = S.yearMode === "fy" ? (r.m >= 3 ? r.y : r.y - 1) : r.y;
+      let g = out[out.length - 1];
+      if (!g || g.key !== key) {
+        g = {
+          key, rows: [], principal: 0, interest: 0, extra: 0, balance: 0,
+          label: S.yearMode === "fy" ? "FY " + key + "-" + String(key + 1).slice(2) : String(key),
+          brief: S.yearMode === "fy" ? "FY" + String(key + 1).slice(2) : String(key),
+        };
+        out.push(g);
+      }
+      g.principal += r.principal; g.interest += r.interest; g.extra += r.extra;
+      g.balance = r.balance; g.rows.push(r);
+    }
+    return out;
+  }
+
+  // ---------- markup ----------
+  const APP_HTML = `
+  <div class="layout">
+    <section class="panel controls-panel">
+      <div class="mode-tabs" role="tablist" aria-label="What do you want to calculate?">
+        <button class="tab tip-l" data-mode="emi" role="tab" data-tip="Given loan amount, rate &amp; tenure — find the fixed monthly payment (EMI).">EMI</button>
+        <button class="tab" data-mode="amount" role="tab" data-tip="Given EMI, rate &amp; tenure — find how much you can borrow.">Loan Amount</button>
+        <button class="tab" data-mode="tenure" role="tab" data-tip="Given loan amount, EMI &amp; rate — find how long repayment takes.">Tenure</button>
+        <button class="tab tip-r" data-mode="rate" role="tab" data-tip="Given loan amount, EMI &amp; tenure — find the implied interest rate.">Interest Rate</button>
+      </div>
+      <div class="top-row">
+        <div class="field-group">
+          <div class="lbl"><label for="currency">Currency</label><span class="info tip-l" tabindex="0" data-tip="Sets the symbol and number format — INR uses lakh (L) and crore (Cr) grouping.">?</span></div>
+          <select id="currency">
+            <option value="INR">₹ INR</option><option value="USD">$ USD</option>
+            <option value="EUR">€ EUR</option><option value="GBP">£ GBP</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <div class="lbl"><label for="start-month">Loan Starts</label><span class="info tip-l" tabindex="0" data-tip="Month of the first instalment. The schedule, the yearly chart and the financial-year view all key off this.">?</span></div>
+          <input type="month" id="start-month" aria-label="Loan start month">
+        </div>
+        <div class="field-group">
+          <div class="lbl"><label id="ratetype-label">Interest Type</label><span class="info tip-l" tabindex="0" data-tip="Reducing balance: interest on what you still owe (home &amp; personal loans). Flat: interest on the full original amount for the whole tenure — many vehicle and consumer loans. A flat rate costs nearly double the same number quoted as reducing.">?</span></div>
+          <div class="scheme-opts" role="radiogroup" aria-labelledby="ratetype-label">
+            <label class="radio"><input type="radio" name="ratetype" value="reducing" checked><span>Reducing</span></label>
+            <label class="radio"><input type="radio" name="ratetype" value="flat"><span>Flat</span></label>
+          </div>
+        </div>
+        <div class="field-group" id="scheme-group">
+          <div class="lbl"><label id="scheme-label">EMI Scheme</label><span class="info tip-l" tabindex="0" data-tip="Arrears: EMI due at the end of each month — the standard scheme, used by every loan except some car loans. Advance: EMI due at the start of each month, so the EMI is slightly lower.">?</span></div>
+          <div class="scheme-opts" role="radiogroup" aria-labelledby="scheme-label">
+            <label class="radio"><input type="radio" name="scheme" value="arrears" checked><span>Arrears</span></label>
+            <label class="radio"><input type="radio" name="scheme" value="advance"><span>Advance</span></label>
+          </div>
+        </div>
+      </div>
+      <div class="ctrl" data-ctrl="amount">
+        <div class="ctrl-head">
+          <div class="lbl"><label for="in-amount">Loan Amount</label><span class="info tip-l" tabindex="0" data-tip="The principal — the amount you borrow, before interest and fees.">?</span></div>
+          <div class="field"><span class="affix cursym">₹</span><input id="in-amount" inputmode="numeric" aria-label="Loan amount"></div>
+        </div>
+        <input type="range" class="slider" id="sl-amount" aria-label="Loan amount slider">
+        <div class="scale" id="sc-amount"></div>
+      </div>
+      <div class="ctrl" data-ctrl="emi">
+        <div class="ctrl-head">
+          <div class="lbl"><label for="in-emi">Monthly EMI</label><span class="info tip-l" tabindex="0" data-tip="Equated Monthly Instalment — the fixed monthly payment covering that month's interest plus part of the principal.">?</span></div>
+          <div class="field"><span class="affix cursym">₹</span><input id="in-emi" inputmode="numeric" aria-label="Monthly EMI"></div>
+        </div>
+        <input type="range" class="slider" id="sl-emi" aria-label="EMI slider">
+        <div class="scale" id="sc-emi"></div>
+      </div>
+      <div class="ctrl" data-ctrl="rate">
+        <div class="ctrl-head">
+          <div class="lbl"><label for="in-rate">Interest Rate</label><span class="info tip-l" tabindex="0" data-tip="Yearly rate. On a reducing balance you pay (annual rate ÷ 12) each month on what's still owed.">?</span></div>
+          <div class="field"><input id="in-rate" inputmode="decimal" aria-label="Interest rate"><span class="affix">% p.a.</span></div>
+        </div>
+        <input type="range" class="slider" id="sl-rate" min="0.5" max="20" step="0.25" aria-label="Interest rate slider">
+        <div class="scale" id="sc-rate"></div>
+      </div>
+      <div class="ctrl" data-ctrl="tenure">
+        <div class="ctrl-head">
+          <div class="lbl"><label for="in-tenure">Loan Tenure</label><span class="info tip-l" tabindex="0" data-tip="Total repayment period. Longer tenure lowers the EMI but increases total interest paid.">?</span></div>
+          <div class="tenure-right">
+            <div class="field"><input id="in-tenure" inputmode="numeric" aria-label="Loan tenure"></div>
+            <div class="unit-toggle">
+              <button type="button" data-unit="yr" class="on tip-r" data-tip="Enter tenure in years">Yr</button><button type="button" data-unit="mo" class="tip-r" data-tip="Enter tenure in months">Mo</button>
+            </div>
+          </div>
+        </div>
+        <input type="range" class="slider" id="sl-tenure" aria-label="Loan tenure slider">
+        <div class="scale" id="sc-tenure"></div>
+      </div>
+      <div class="ctrl" data-ctrl="fees">
+        <div class="ctrl-head">
+          <div class="lbl"><label for="in-fees">Fees &amp; Charges</label><span class="info tip-l" tabindex="0" data-tip="One-time costs like processing fees, insurance or GST. They don't change the EMI, but they do raise your true borrowing cost — see the APR below.">?</span></div>
+          <div class="field"><span class="affix cursym">₹</span><input id="in-fees" inputmode="numeric" aria-label="Fees and charges"></div>
+        </div>
+        <input type="range" class="slider" id="sl-fees" aria-label="Fees slider">
+        <div class="scale" id="sc-fees"></div>
+      </div>
+
+      <details class="adv" id="adv">
+        <summary><span>Prepayment, moratorium &amp; rate changes</span><span class="adv-badge" id="adv-badge" hidden>ON</span></summary>
+        <div class="adv-body" id="adv-body">
+          <div class="adv-row">
+            <div class="lbl"><label for="in-extra">Extra payment every month</label><span class="info tip-r" tabindex="0" data-tip="Paid on top of the EMI, straight against the principal. Financially the same as raising your EMI by this much — but you keep the flexibility to stop.">?</span></div>
+            <div class="adv-line">
+              <div class="field sm"><span class="affix cursym">₹</span><input id="in-extra" inputmode="numeric" aria-label="Extra payment every month"></div>
+              <span class="adv-hint" style="margin:0">on top of the EMI, every month</span>
+            </div>
+          </div>
+
+          <div class="adv-row">
+            <div class="lbl"><span class="h">One-time prepayments</span><span class="info tip-r" tabindex="0" data-tip="A lump sum paid in one particular month — a bonus, or the advance EMIs some lenders adjust against the principal. Goes entirely against the principal.">?</span></div>
+            <div id="lump-rows"></div>
+            <button type="button" class="btn" id="add-lump">+ Add lump sum</button>
+          </div>
+
+          <div class="adv-row">
+            <div class="lbl"><span class="h">Interest rate changes</span><span class="info tip-r" tabindex="0" data-tip="For floating-rate loans, or teaser rates that step up after a few years. Add one row per change.">?</span></div>
+            <div id="step-rows"></div>
+            <button type="button" class="btn" id="add-step">+ Add rate change</button>
+            <div class="adv-hint">The EMI is held constant and the tenure moves instead — the default at most banks.</div>
+          </div>
+
+          <div class="adv-row">
+            <div class="lbl"><label for="in-mora">Moratorium / holiday period</label><span class="info tip-r" tabindex="0" data-tip="A break before full EMIs start — common on under-construction property and education loans.">?</span></div>
+            <div class="adv-line">
+              <div class="field sm"><input id="in-mora" inputmode="numeric" aria-label="Moratorium months"><span class="affix">months</span></div>
+              <select id="mora-type" aria-label="Moratorium type">
+                <option value="interest">Pay interest only (Pre-EMI)</option>
+                <option value="full">Pay nothing (interest added to loan)</option>
+              </select>
+            </div>
+            <div class="adv-hint">Pre-EMI keeps the balance flat. Paying nothing capitalises the interest, so the EMI is re-struck on a bigger loan.</div>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel results-panel">
+      <div class="result-hero">
+        <div class="result-label" id="result-label">Monthly EMI</div>
+        <div class="result-value" id="result-value">—</div>
+        <div class="result-sub" id="result-sub"></div>
+      </div>
+      <div class="msg" id="msg" hidden></div>
+      <div class="savings" id="savings" hidden>
+        <h3>Effect of your changes</h3>
+        <div id="savings-body"></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><span class="stat-label">Principal</span><span class="stat-value" id="st-principal">—</span></div>
+        <div class="stat"><span class="stat-label">Total Interest</span><span class="stat-value" id="st-interest">—</span></div>
+        <div class="stat" id="stat-fees"><span class="stat-label">Fees &amp; Charges</span><span class="stat-value" id="st-fees">—</span></div>
+        <div class="stat" id="stat-apr">
+          <span class="stat-label">APR (incl. fees) <span class="info tip-r" tabindex="0" data-tip="The true yearly cost of the loan. It folds the fees, insurance and GST into the rate, so two offers with different fees can be compared honestly.">?</span></span>
+          <span class="stat-value" id="st-apr">—</span>
+        </div>
+        <div class="stat" id="stat-eff">
+          <span class="stat-label">Effective rate (reducing) <span class="info tip-r" tabindex="0" data-tip="What this flat-rate loan actually costs, quoted the way a home loan is quoted. It is roughly double the flat rate.">?</span></span>
+          <span class="stat-value" id="st-eff">—</span>
+        </div>
+        <div class="stat total"><span class="stat-label">Total Payment</span><span class="stat-value" id="st-total">—</span></div>
+      </div>
+      <div class="donut-wrap">
+        <svg id="donut" viewBox="0 0 200 200" role="img" aria-label="Breakup of total payment"></svg>
+        <div class="legend" id="donut-legend"></div>
+      </div>
+      <div class="btn-row" style="margin-top:18px">
+        <button type="button" class="btn accent" id="btn-share">Copy share link</button>
+        <button type="button" class="btn" id="btn-reset">Reset</button>
+      </div>
+    </section>
+
+    <section class="panel chart-panel">
+      <div class="panel-head">
+        <h2>Payment Breakup by Year</h2>
+        <div class="unit-toggle" id="year-toggle">
+          <button type="button" data-year="cal" class="on">Calendar yr</button><button type="button" data-year="fy">Financial yr</button>
+        </div>
+      </div>
+      <div class="chart-scroll"><svg id="barchart" viewBox="0 0 860 340" role="img" aria-label="Yearly principal and interest payments"></svg></div>
+      <div class="legend" id="bar-legend"></div>
+    </section>
+
+    <section class="panel table-panel">
+      <div class="panel-head">
+        <h2>Amortization Schedule <span class="table-note" id="table-note"></span></h2>
+        <div class="btn-row">
+          <button type="button" class="btn" id="btn-copy">Copy table</button>
+          <button type="button" class="btn" id="btn-csv">Download CSV</button>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table id="sched">
+          <thead><tr>
+            <th class="col-yr" title="Click a year to see month-by-month detail">Year</th>
+            <th title="The part of that year's payments that repays the loan itself">Principal (A)</th>
+            <th title="Interest paid during that year">Interest (B)</th>
+            <th class="col-extra" title="Prepayments made that year, over and above the EMI">Prepaid (C)</th>
+            <th title="Total paid that year">Total</th>
+            <th title="Loan still outstanding at the end of the year">Balance</th>
+            <th class="col-paid" title="Cumulative share of the principal repaid so far. Nothing to do with the interest rate or the APR.">Loan Paid</th>
+          </tr></thead>
+          <tbody id="sched-body"></tbody>
+        </table>
+      </div>
+
+      <div class="closure">
+        <h3>Pre-closure / foreclosure</h3>
+        <div class="adv-line">
+          <label class="adv-hint" style="margin:0" for="close-month">Close the loan after</label>
+          <input type="month" id="close-month" aria-label="Foreclosure month">
+          <label class="adv-hint" style="margin:0" for="in-closefee">Foreclosure charge</label>
+          <div class="field sm"><input id="in-closefee" inputmode="decimal" aria-label="Foreclosure charge percent"><span class="affix">% of balance</span></div>
+        </div>
+        <div class="c-out" id="closure-out"></div>
+      </div>
+    </section>
+
+    <section class="panel about-panel">
+      <h2>How this is calculated</h2>
+      <details>
+        <summary>The EMI formula, and the three inversions of it</summary>
+        <div class="a-body">
+          <p>On a reducing balance, with <code>P</code> = principal, <code>r</code> = monthly rate (annual ÷ 12 ÷ 100) and <code>n</code> = number of months:</p>
+          <code class="formula">EMI = P × r × (1+r)^n / ((1+r)^n − 1)</code>
+          <p>Rearranged, the same equation gives two of the other three answers:</p>
+          <code class="formula">P = EMI × (1 − (1+r)^−n) / r
+n = ln( EMI / (EMI − P×r) ) / ln(1+r)</code>
+          <p>There is no closed form for <code>r</code> — this calculator finds it by bisection, halving the range 100 times until it converges. That is also why a hand calculation and a calculator can disagree: rounding the rate to a couple of decimals moves the EMI by a few units.</p>
+          <p>On an <em>EMI in advance</em> loan the instalment is paid at the <em>start</em> of the month, so it is discounted by one month: <code>EMI_advance = EMI_arrears / (1+r)</code>.</p>
+        </div>
+      </details>
+      <details>
+        <summary>Flat rate vs reducing rate — why an 8% car loan isn't 8%</summary>
+        <div class="a-body">
+          <p>A <strong>flat rate</strong> charges interest on the whole original amount for the whole tenure, even though you owe less every month:</p>
+          <code class="formula">Total interest = P × flat rate × years
+EMI = (P + total interest) / n</code>
+          <p>A <strong>reducing rate</strong> charges only on what is still outstanding. A flat rate is worth roughly <em>1.8–2×</em> its number in reducing terms — an 8% flat car loan is around 15% reducing. Switch Interest Type to Flat and the calculator shows both numbers.</p>
+        </div>
+      </details>
+      <details>
+        <summary>Prepayment, moratorium and floating rates</summary>
+        <div class="a-body">
+          <ul>
+            <li><strong>Extra every month</strong> and <strong>lump sums</strong> go entirely against the principal, so every unit stops earning the lender interest for the rest of the loan. Keeping the EMI and paying extra is usually better than raising the EMI — the maths is identical, but you keep the option to stop.</li>
+            <li><strong>Pre-EMI moratorium</strong>: you pay only the interest, the balance stands still, and the tenure grows by the length of the holiday.</li>
+            <li><strong>Full moratorium</strong>: you pay nothing, the interest is added to the loan, and the EMI is re-struck on that larger balance.</li>
+            <li><strong>Rate change</strong>: the EMI is held and the tenure moves — the default at most banks. If you want the EMI cut instead of the tenure, you have to ask the bank in writing.</li>
+          </ul>
+        </div>
+      </details>
+      <details>
+        <summary>APR, fees, and what "Loan Paid" means</summary>
+        <div class="a-body">
+          <p><strong>APR</strong> is the rate that makes the payments you actually make equal the money you actually receive. Fees, insurance and GST come out of what you receive, so a loan with a 9% headline rate and a 2% fee has an APR above 9%. Comparing two offers on APR is the only fair comparison.</p>
+          <p><strong>Loan Paid</strong> in the schedule is the share of the <em>principal</em> repaid so far. It has nothing to do with the interest rate or the APR — early on you can be years in and still show a small percentage, because most of each EMI is interest.</p>
+        </div>
+      </details>
+    </section>
+  </div>`;
+
+  // ---------- rendering ----------
+  const $ = (id) => document.getElementById(id);
+  const LAST = { rows: [], groups: [], P: 0, totalInterest: 0 };
+
+  function setSlider(id, min, max, step, val) {
+    const el = $(id); el.min = min; el.max = max; el.step = step; el.value = val;
+  }
+  function scale(el, min, max, isMoney) {
+    const ticks = 6, out = [];
+    for (let i = 0; i < ticks; i++) {
+      const v = min + ((max - min) * i) / (ticks - 1);
+      out.push(`<span>${isMoney ? short(v) : trim(v)}</span>`);
+    }
+    el.innerHTML = out.join("");
+  }
+
+  /* Prepayment / rate-change rows are rebuilt only on add, remove or currency change —
+     never while typing, or the input would lose focus mid-keystroke. */
+  function renderEventRows() {
+    $("lump-rows").innerHTML = S.lumps.map((l, i) => {
+      const d = indexToMonth(l.month);
+      return `<div class="ev-row" data-i="${i}">
+        <span class="ev-lead">Pay</span>
+        <div class="field sm"><span class="affix cursym">${cur().sym}</span><input class="lump-amt" inputmode="numeric" value="${fmt(l.amount)}" aria-label="Lump sum amount"></div>
+        <span class="ev-lead">in</span>
+        <input type="month" class="lump-when" value="${monthValue(d.y, d.m)}" aria-label="Lump sum month">
+        <button type="button" class="btn x rm-lump" aria-label="Remove this lump sum">✕</button>
+      </div>`;
+    }).join("");
+    $("step-rows").innerHTML = S.rateSteps.map((s, i) => {
+      const d = indexToMonth(s.month);
+      return `<div class="ev-row" data-i="${i}">
+        <span class="ev-lead">From</span>
+        <input type="month" class="step-when" value="${monthValue(d.y, d.m)}" aria-label="Rate change month">
+        <span class="ev-lead">rate becomes</span>
+        <div class="field sm"><input class="step-rate" inputmode="decimal" value="${s.rate}" aria-label="New interest rate"><span class="affix">%</span></div>
+        <button type="button" class="btn x rm-step" aria-label="Remove this rate change">✕</button>
+      </div>`;
+    }).join("");
+  }
+
+  function syncControls() {
+    const c = cur();
+    document.querySelectorAll(".cursym").forEach((el) => (el.textContent = c.sym));
+    setSlider("sl-amount", 0, c.amtMax, c.amtStep, Math.min(S.amount, c.amtMax));
+    setSlider("sl-emi", 0, c.emiMax, c.emiStep, Math.min(S.emi, c.emiMax));
+    setSlider("sl-fees", 0, c.feesMax, c.feesStep, Math.min(S.fees, c.feesMax));
+    $("sl-rate").value = S.rate;
+    if (S.tenureUnit === "yr") setSlider("sl-tenure", 1, 30, 1, Math.min(Math.round(S.tenure / 12), 30));
+    else setSlider("sl-tenure", 6, 360, 6, Math.min(S.tenure, 360));
+    scale($("sc-amount"), 0, c.amtMax, true);
+    scale($("sc-emi"), 0, c.emiMax, true);
+    scale($("sc-fees"), 0, c.feesMax, true);
+    scale($("sc-rate"), 0.5, 20, false);
+    scale($("sc-tenure"), S.tenureUnit === "yr" ? 1 : 6, S.tenureUnit === "yr" ? 30 : 360, false);
+    const idle = (id) => document.activeElement !== $(id);
+    if (idle("in-amount")) $("in-amount").value = fmt(S.amount);
+    if (idle("in-emi")) $("in-emi").value = fmt(S.emi);
+    if (idle("in-fees")) $("in-fees").value = fmt(S.fees);
+    if (idle("in-rate")) $("in-rate").value = S.rate;
+    if (idle("in-tenure")) $("in-tenure").value = S.tenureUnit === "yr" ? Math.round(S.tenure / 12) : S.tenure;
+    if (idle("in-extra")) $("in-extra").value = fmt(S.extraMonthly);
+    if (idle("in-mora")) $("in-mora").value = S.moraMonths;
+    if (idle("in-closefee")) $("in-closefee").value = S.closeFeePct;
+    $("mora-type").value = S.moraType;
+    $("start-month").value = monthValue(S.startY, S.startM);
+    const cd = indexToMonth(S.closeAfter);
+    $("close-month").value = monthValue(cd.y, cd.m);
+    $("currency").value = S.currency;
+    document.querySelectorAll('input[name="scheme"]').forEach((r) => (r.checked = r.value === S.scheme));
+    document.querySelectorAll('input[name="ratetype"]').forEach((r) => (r.checked = r.value === S.rateType));
+    document.querySelectorAll(".unit-toggle button[data-unit]").forEach((b) => b.classList.toggle("on", b.dataset.unit === S.tenureUnit));
+    document.querySelectorAll("#year-toggle button").forEach((b) => b.classList.toggle("on", b.dataset.year === S.yearMode));
+    document.querySelectorAll(".tab").forEach((b) => {
+      const on = b.dataset.mode === S.mode;
+      b.classList.toggle("on", on); b.setAttribute("aria-selected", on);
+    });
+    // hide the control being solved for
+    document.querySelectorAll(".ctrl[data-ctrl]").forEach((el) => {
+      el.hidden = el.dataset.ctrl === S.mode;
+    });
+    // a flat-rate loan has no reducing balance, so none of the advanced options apply to it
+    const flat = S.rateType === "flat";
+    $("adv").hidden = flat;
+    $("scheme-group").hidden = flat;
+    $("adv-badge").hidden = flat || !anyAdvanced();
+    $("stat-eff").style.display = flat ? "" : "none";
+  }
+
+  function showError(text) {
+    const msg = $("msg"); msg.hidden = false; msg.textContent = text;
+    $("result-value").textContent = "—"; $("result-sub").textContent = "";
+    $("savings").hidden = true;
+    ["st-principal", "st-interest", "st-fees", "st-apr", "st-eff", "st-total"].forEach((id) => ($(id).textContent = "—"));
+    $("donut").innerHTML = ""; $("donut-legend").innerHTML = "";
+    $("barchart").innerHTML = ""; $("bar-legend").innerHTML = ""; $("sched-body").innerHTML = "";
+    $("closure-out").innerHTML = "";
+    LAST.rows = []; LAST.groups = [];
+  }
+
+  function recalc() {
+    $("msg").hidden = true;
+    let P = S.amount, n = S.tenure, E = S.emi, r = S.rate / 1200;
+    if (S.mode !== "amount" && P <= 0) return showError("Enter a loan amount greater than zero.");
+    if (S.mode !== "tenure" && n <= 0) return showError("Enter a loan tenure greater than zero.");
+    if (S.mode !== "tenure" && n > MAX_MONTHS) return showError("Tenure is capped at 100 years.");
+
+    // ---- flat / fixed rate loans (vehicle & consumer finance) ----
+    if (S.rateType === "flat") {
+      if (S.mode === "emi") { E = flatEmi(P, S.rate, n); S.emi = Math.round(E); }
+      else if (S.mode === "amount") {
+        if (E <= 0) return showError("Enter a monthly EMI greater than zero.");
+        P = (E * n) / (1 + (S.rate / 100) * (n / 12)); S.amount = Math.round(P);
+      } else if (S.mode === "tenure") {
+        if (E <= 0) return showError("Enter a monthly EMI greater than zero.");
+        // E = (P + P·f·n/12)/n   =>   n = P / (E − P·f/12)
+        const monthlyFlatInterest = (P * S.rate / 100) / 12;
+        if (E <= monthlyFlatInterest) return showError(`An EMI of ${money(E)} never covers the flat interest of ${money(monthlyFlatInterest)} a month. Raise the EMI or lower the rate.`);
+        n = Math.ceil(P / (E - monthlyFlatInterest));
+        if (n > MAX_MONTHS) return showError("That EMI would take over 100 years. Raise the EMI.");
+        S.tenure = n;
+      } else {
+        if (E <= 0) return showError("Enter a monthly EMI greater than zero.");
+        if (E * n <= P) return showError(`Total payments (${money(E * n)}) don't even repay the principal — no flat rate fits.`);
+        S.rate = Math.round(((E * n - P) / P / (n / 12)) * 10000) / 100;
+      }
+      return present({ rows: flatSchedule(P, S.rate, n, S.startY, S.startM), P, E, baseInterest: null, baseMonths: null });
+    }
+
+    // ---- reducing balance ----
+    if (S.mode === "emi") {
+      E = emiFor(P, r, n, S.scheme); S.emi = Math.round(E);
+    } else if (S.mode === "amount") {
+      if (E <= 0) return showError("Enter a monthly EMI greater than zero.");
+      P = amountFor(E, r, n, S.scheme); S.amount = Math.round(P);
+    } else if (S.mode === "tenure") {
+      if (E <= 0) return showError("Enter a monthly EMI greater than zero.");
+      const nx = tenureFor(P, E, r, S.scheme);
+      if (!isFinite(nx)) return showError(`EMI of ${money(E)} doesn't even cover the monthly interest — the loan would never be repaid. Increase the EMI or lower the rate.`);
+      n = Math.ceil(nx - 1e-9);
+      if (n > MAX_MONTHS) return showError("That EMI would take over 100 years to clear the loan. Increase the EMI.");
+      S.tenure = n;
+    } else if (S.mode === "rate") {
+      if (E <= 0) return showError("Enter a monthly EMI greater than zero.");
+      const rx = rateFor(P, E, n, S.scheme);
+      if (isNaN(rx)) return showError(`Total payments (${money(E * n)}) are less than the principal — no interest rate fits. Increase the EMI or the tenure.`);
+      if (rx * 1200 > 100) return showError("The implied interest rate is over 100% p.a. — check the inputs.");
+      r = rx; S.rate = Math.round(r * 1200 * 100) / 100;
+    }
+
+    const opts = {
+      startY: S.startY, startM: S.startM, moraMonths: S.moraMonths, moraType: S.moraType,
+      extraMonthly: S.extraMonthly, lumps: S.lumps, rateSteps: S.rateSteps,
+    };
+    const sim = simulate(P, S.rate, n, E, S.scheme, opts);
+    if (sim.negAm) return showError(`An EMI of ${money(sim.emiUsed)} never covers the monthly interest at this rate, so the loan would never be repaid. Increase the EMI or lower the rate.`);
+    if (sim.rows.length >= MAX_MONTHS) return showError("This loan takes over 100 years to clear. Check the EMI and the rate.");
+
+    // baseline with no moratorium, prepayment or rate change — for the savings comparison
+    let baseInterest = null, baseMonths = null;
+    if (anyAdvanced()) {
+      const base = simulate(P, S.rate, n, E, S.scheme, { startY: S.startY, startM: S.startM });
+      if (!base.negAm && base.rows.length < MAX_MONTHS) {
+        baseInterest = base.rows.reduce((a, x) => a + x.interest, 0);
+        baseMonths = base.rows.length;
+      }
+    }
+    present({ rows: sim.rows, P, E: sim.emiUsed, baseInterest, baseMonths });
+  }
+
+  function present(res) {
+    const { rows, P, E, baseInterest, baseMonths } = res;
+    const n = rows.length;
+    const totalInterest = rows.reduce((a, x) => a + x.interest, 0);
+    const totalPrincipal = rows.reduce((a, x) => a + x.principal + x.extra, 0);
+    const totalPay = totalPrincipal + totalInterest + S.fees;
+    LAST.rows = rows; LAST.groups = groupRows(rows); LAST.P = P; LAST.totalInterest = totalInterest;
+
+    const lastStep = S.rateType === "reducing" && S.rateSteps.length
+      ? S.rateSteps.slice().sort((a, b) => a.month - b.month).pop() : null;
+    const rateTxt = S.rate + "% p.a." + (S.rateType === "flat" ? " flat" : "")
+      + (lastStep ? " → " + lastStep.rate + "%" : "");
+    const heroes = {
+      emi: ["Monthly EMI", money(E), `${tenureLabel(n)} at ${rateTxt}`],
+      amount: ["Loan Amount", money(S.amount), `EMI ${money(E)} · ${tenureLabel(n)} at ${rateTxt}`],
+      tenure: ["Loan Tenure", tenureLabel(n), `EMI ${money(E)} at ${rateTxt} · ${n} payments`],
+      rate: ["Interest Rate", rateTxt, `EMI ${money(E)} · ${tenureLabel(n)}`],
+    }[S.mode];
+    $("result-label").textContent = heroes[0];
+    $("result-value").textContent = heroes[1];
+    $("result-sub").textContent = heroes[2] + (n ? " · ends " + MONTHS[rows[n - 1].m] + " " + rows[n - 1].y : "");
+
+    $("st-principal").textContent = money(totalPrincipal);
+    $("st-interest").textContent = money(totalInterest);
+    $("st-fees").textContent = money(S.fees);
+    $("stat-fees").style.display = S.fees > 0 ? "" : "none";
+    $("st-total").textContent = money(totalPay);
+
+    // APR: the rate that equates the payments actually made to the cash actually received.
+    const flows = rows.map((x) => x.emi + x.extra);
+    if (S.fees > 0) {
+      const apr = irrMonthly(P - S.fees, flows, S.scheme) * 1200;
+      $("stat-apr").style.display = "";
+      $("st-apr").textContent = isNaN(apr) ? "—" : apr.toFixed(2) + "% p.a.";
+    } else {
+      $("stat-apr").style.display = "none";
+    }
+    if (S.rateType === "flat") {
+      const eff = irrMonthly(P, flows, "arrears") * 1200;
+      $("st-eff").textContent = isNaN(eff) ? "—" : eff.toFixed(2) + "% p.a.";
+    }
+
+    if (baseInterest != null) {
+      const dI = baseInterest - totalInterest, dN = baseMonths - n;
+      $("savings").hidden = false;
+      $("savings-body").innerHTML = `
+        <div class="s-line"><span>Interest without these changes</span><b>${money(baseInterest)}</b></div>
+        <div class="s-line"><span>Interest now</span><b>${money(totalInterest)}</b></div>
+        <div class="s-line"><span>${dI >= 0 ? "Interest saved" : "Extra interest"}</span><b>${money(Math.abs(dI))}</b></div>
+        <div class="s-line"><span>${dN >= 0 ? "Loan clears earlier by" : "Loan takes longer by"}</span><b>${tenureLabel(Math.abs(dN))}</b></div>`;
+    } else {
+      $("savings").hidden = true;
+    }
+
+    drawDonut(totalPrincipal, totalInterest, S.fees, totalPay);
+    drawBars(LAST.groups, P);
+    drawTable(LAST.groups, totalPrincipal);
+    drawClosure(rows, totalInterest);
+    $("table-note").textContent = `· ${n} payments from ${MONTHS[S.startM]} ${S.startY}`;
+  }
+
+  function drawDonut(pr, int, fees, total) {
+    const C = 2 * Math.PI * 80;
+    const segs = [
+      { v: pr, color: cssVar("--chart-principal", "#4caf50"), label: "Principal" },
+      { v: int, color: cssVar("--chart-interest", "#ff9800"), label: "Interest" },
+    ];
+    if (fees > 0) segs.push({ v: fees, color: cssVar("--chart-fees", "#9c27b0"), label: "Fees & Charges" });
+    let off = 0, parts = "";
+    for (const s of segs) {
+      const frac = total ? s.v / total : 0;
+      parts += `<circle cx="100" cy="100" r="80" fill="none" stroke="${s.color}" stroke-width="34"
+        stroke-dasharray="${(frac * C).toFixed(2)} ${C.toFixed(2)}" stroke-dashoffset="${(-off * C).toFixed(2)}"
+        transform="rotate(-90 100 100)"><title>${s.label}: ${money(s.v)} (${(frac * 100).toFixed(1)}%)</title></circle>`;
+      off += frac;
+    }
+    const intPct = total ? ((int / total) * 100).toFixed(1) : 0;
+    parts += `<text x="100" y="94" text-anchor="middle" class="donut-big">${intPct}%</text>
+      <text x="100" y="114" text-anchor="middle" class="donut-small">interest</text>`;
+    $("donut").innerHTML = parts;
+    $("donut-legend").innerHTML = segs
+      .map((s) => `<span class="item"><span class="swatch" style="background:${s.color}"></span>${s.label} · ${money(s.v)} <em>(${total ? ((s.v / total) * 100).toFixed(1) : "0"}%)</em></span>`)
+      .join("");
+  }
+
+  function drawBars(byYear, P) {
+    if (!byYear.length) { $("barchart").innerHTML = ""; $("bar-legend").innerHTML = ""; return; }
+    const W = 860, H = 340, padL = 64, padR = 64, padT = 16, padB = 44;
+    const iw = W - padL - padR, ih = H - padT - padB;
+    const maxPay = Math.max(...byYear.map((g) => g.principal + g.interest + g.extra)) || 1;
+    const maxBal = Math.max(P, ...byYear.map((g) => g.balance)) || 1;
+    const cp = cssVar("--chart-principal", "#4caf50"), ci = cssVar("--chart-interest", "#ff9800"),
+      cx = cssVar("--chart-extra", "#9c27b0"), cb = cssVar("--chart-balance", "#4fc3f7");
+    const n = byYear.length, bw = Math.min(40, (iw / n) * 0.62);
+    const hasExtra = byYear.some((g) => g.extra > 0);
+    let out = "";
+    for (let i = 0; i <= 4; i++) {
+      const v = (maxPay * i) / 4, y = padT + ih - (ih * i) / 4;
+      out += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" class="grid"/>
+        <text x="${padL - 8}" y="${y + 4}" text-anchor="end" class="axis">${short(v)}</text>`;
+    }
+    for (let i = 0; i <= 4; i++) {
+      const v = (maxBal * i) / 4, y = padT + ih - (ih * i) / 4;
+      out += `<text x="${W - padR + 8}" y="${y + 4}" text-anchor="start" class="axis axis-r">${short(v)}</text>`;
+    }
+    const xc = (i) => padL + (iw * (i + 0.5)) / n;
+    byYear.forEach((g, i) => {
+      const hP = (g.principal / maxPay) * ih, hI = (g.interest / maxPay) * ih, hX = (g.extra / maxPay) * ih;
+      const x = xc(i) - bw / 2, yI = padT + ih - hI, yP = yI - hP, yX = yP - hX;
+      out += `<g class="bar-g"><title>${g.label}
+Principal: ${money(g.principal)}${g.extra ? "\nPrepaid: " + money(g.extra) : ""}
+Interest: ${money(g.interest)}
+Balance: ${money(g.balance)}</title>
+        ${hX > 0 ? `<rect x="${x}" y="${yX}" width="${bw}" height="${hX}" fill="${cx}" rx="2"/>` : ""}
+        <rect x="${x}" y="${yP}" width="${bw}" height="${hP}" fill="${cp}" rx="2"/>
+        <rect x="${x}" y="${yI}" width="${bw}" height="${hI}" fill="${ci}" rx="2"/></g>`;
+      const every = Math.ceil(n / 12);
+      if (i % every === 0) out += `<text x="${xc(i)}" y="${H - padB + 20}" text-anchor="middle" class="axis">${g.brief}</text>`;
+    });
+    const pts = byYear.map((g, i) => `${xc(i)},${padT + ih - (g.balance / maxBal) * ih}`).join(" ");
+    out += `<polyline points="${pts}" fill="none" stroke="${cb}" stroke-width="2.5" stroke-linejoin="round"/>`;
+    byYear.forEach((g, i) => {
+      out += `<circle cx="${xc(i)}" cy="${padT + ih - (g.balance / maxBal) * ih}" r="3.5" fill="${cb}"><title>Balance end ${g.label}: ${money(g.balance)}</title></circle>`;
+    });
+    $("barchart").innerHTML = out;
+    $("bar-legend").innerHTML =
+      `<span class="item"><span class="swatch" style="background:${cp}"></span>Principal</span>
+       ${hasExtra ? `<span class="item"><span class="swatch" style="background:${cx}"></span>Prepaid</span>` : ""}
+       <span class="item"><span class="swatch" style="background:${ci}"></span>Interest</span>
+       <span class="item"><span class="swatch line" style="background:${cb}"></span>Outstanding balance</span>`;
+  }
+
+  function drawTable(byYear, totalPrincipal) {
+    const showExtra = byYear.some((g) => g.extra > 0);
+    document.querySelectorAll("#sched .col-extra").forEach((el) => (el.hidden = !showExtra));
+    const hide = showExtra ? "" : " hidden";
+    let cum = 0, html = "";
+    for (const g of byYear) {
+      const paid = g.principal + g.extra;
+      cum += paid;
+      html += `<tr class="yr-row" data-year="${g.key}" tabindex="0" role="button" aria-expanded="false">
+        <td class="col-yr"><span class="chev" aria-hidden="true"></span>${g.label}</td>
+        <td>${money(g.principal)}</td><td>${money(g.interest)}</td>
+        <td class="col-extra"${hide}>${g.extra ? money(g.extra) : "—"}</td>
+        <td>${money(paid + g.interest)}</td>
+        <td>${money(g.balance)}</td><td class="col-paid">${((cum / totalPrincipal) * 100).toFixed(1)}%</td></tr>`;
+      let mcum = cum - paid;
+      for (const r of g.rows) {
+        mcum += r.principal + r.extra;
+        html += `<tr class="mo-row${r.mora ? " is-mora" : ""}" data-of="${g.key}" hidden>
+          <td class="col-yr">${MONTHS[r.m]} ${r.y}</td>
+          <td>${money(r.principal)}</td><td>${money(r.interest)}</td>
+          <td class="col-extra"${hide}>${r.extra ? `<span class="tag-extra">${money(r.extra)}</span>` : "—"}</td>
+          <td>${money(r.principal + r.extra + r.interest)}</td><td>${money(r.balance)}</td>
+          <td class="col-paid">${((mcum / totalPrincipal) * 100).toFixed(1)}%</td></tr>`;
+      }
+    }
+    $("sched-body").innerHTML = html;
+  }
+
+  function drawClosure(rows, totalInterest) {
+    if (!rows.length) { $("closure-out").innerHTML = ""; return; }
+    const i = Math.min(Math.max(1, S.closeAfter), rows.length);
+    const row = rows[i - 1];
+    const paidInterest = rows.slice(0, i).reduce((a, x) => a + x.interest, 0);
+    const paidOut = rows.slice(0, i).reduce((a, x) => a + x.emi + x.extra, 0);
+    const charge = row.balance * (S.closeFeePct / 100);
+    const cell = (label, value, tip) =>
+      `<div class="c-cell"${tip ? ` title="${tip}"` : ""}><span>${label}</span><b>${value}</b></div>`;
+    $("closure-out").innerHTML =
+      cell("Outstanding after " + indexLabel(i), money(row.balance), "Principal still owed once that month's EMI is paid") +
+      (S.closeFeePct > 0 ? cell("Foreclosure charge", money(charge)) : "") +
+      cell("Pay to close", money(row.balance + charge), "What you hand the lender on that day") +
+      cell("Paid so far", money(paidOut), "Every EMI and prepayment up to and including that month") +
+      cell("Interest already paid", money(paidInterest)) +
+      cell("Interest you'd save", money(Math.max(0, totalInterest - paidInterest)), "Interest you would otherwise have paid over the rest of the tenure");
+  }
+
+  // ---------- export ----------
+  /* Plain numbers, no currency symbol — spreadsheets read the column as a number, not as text. */
+  function tableRows() {
+    const out = [["Month", "EMI", "Principal", "Interest", "Prepaid", "Total Paid", "Balance"]];
+    for (const r of LAST.rows) {
+      out.push([
+        MONTHS[r.m] + " " + r.y,
+        r.emi.toFixed(2), r.principal.toFixed(2), r.interest.toFixed(2),
+        r.extra.toFixed(2), (r.emi + r.extra).toFixed(2), r.balance.toFixed(2),
+      ]);
+    }
+    return out;
+  }
+  const toCSV = () => tableRows().map((r) => r.map((c) => (/[",]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(",")).join("\n");
+  const toTSV = () => tableRows().map((r) => r.join("\t")).join("\n");
+
+  function flash(btn, text) {
+    const old = btn.dataset.label || btn.textContent;
+    btn.dataset.label = old;
+    btn.textContent = text;
+    setTimeout(() => (btn.textContent = old), 1600);
+  }
+  function copyText(text, btn, ok) {
+    if (!navigator.clipboard) return flash(btn, "Copy unavailable");
+    navigator.clipboard.writeText(text).then(() => flash(btn, ok), () => flash(btn, "Copy failed"));
+  }
+
+  // ---------- shareable URL ----------
+  const SHORT = { mode: "md", currency: "cu", amount: "a", rate: "r", tenure: "t", tenureUnit: "tu", emi: "e", fees: "f", scheme: "s", rateType: "rt", yearMode: "ym", moraMonths: "mm", moraType: "mt", extraMonthly: "x", closeAfter: "ca", closeFeePct: "cf" };
+  function writeURL() {
+    const p = new URLSearchParams();
+    for (const k in SHORT) p.set(SHORT[k], S[k]);
+    p.set("sd", monthValue(S.startY, S.startM));
+    if (S.lumps.length) p.set("l", S.lumps.map((l) => l.month + ":" + l.amount).join(","));
+    if (S.rateSteps.length) p.set("rs", S.rateSteps.map((s) => s.month + ":" + s.rate).join(","));
+    history.replaceState(null, "", location.pathname + location.search + "#" + p.toString());
+  }
+  function readURL() {
+    const h = location.hash.slice(1);
+    if (!h) return;
+    const p = new URLSearchParams(h);
+    for (const k in SHORT) {
+      const v = p.get(SHORT[k]);
+      if (v == null) continue;
+      S[k] = typeof S[k] === "number" ? (parseFloat(v) || 0) : v;
+    }
+    const sd = parseMonthValue(p.get("sd"));
+    if (sd) { S.startY = sd.y; S.startM = sd.m; }
+    const pairs = (str) => (str || "").split(",").filter(Boolean).map((x) => x.split(":").map(Number));
+    S.lumps = pairs(p.get("l")).filter((x) => x[0] >= 1 && x[1] > 0).map((x) => ({ month: x[0], amount: x[1] }));
+    S.rateSteps = pairs(p.get("rs")).filter((x) => x[0] >= 1 && x[1] >= 0).map((x) => ({ month: x[0], rate: x[1] }));
+    // anything hand-edited into the URL still has to be a value the UI can show
+    if (!CURRENCIES[S.currency]) S.currency = "INR";
+    if (!["emi", "amount", "tenure", "rate"].includes(S.mode)) S.mode = "emi";
+    if (!["arrears", "advance"].includes(S.scheme)) S.scheme = "arrears";
+    if (!["reducing", "flat"].includes(S.rateType)) S.rateType = "reducing";
+    if (!["interest", "full"].includes(S.moraType)) S.moraType = "interest";
+    if (!["cal", "fy"].includes(S.yearMode)) S.yearMode = "cal";
+    if (!["yr", "mo"].includes(S.tenureUnit)) S.tenureUnit = "yr";
+    S.startM = Math.min(11, Math.max(0, S.startM));
+    S.moraMonths = Math.min(120, Math.max(0, Math.round(S.moraMonths)));
+    S.closeAfter = Math.max(1, Math.round(S.closeAfter) || 1);
+  }
+
+  // ---------- events ----------
+  function bind() {
+    document.querySelectorAll(".tab").forEach((b) =>
+      b.addEventListener("click", () => { S.mode = b.dataset.mode; update(); }));
+    $("currency").addEventListener("change", (e) => {
+      S.currency = e.target.value;
+      const c = cur();
+      // ponytail: money fields reset on currency switch — values aren't convertible anyway
+      S.amount = c.amtDef; S.emi = c.emiDef; S.fees = 0; S.extraMonthly = 0; S.lumps = [];
+      renderEventRows(); update();
+    });
+    document.querySelectorAll('input[name="scheme"]').forEach((r) =>
+      r.addEventListener("change", (e) => { S.scheme = e.target.value; update(); }));
+    document.querySelectorAll('input[name="ratetype"]').forEach((r) =>
+      r.addEventListener("change", (e) => { S.rateType = e.target.value; update(); }));
+    document.querySelectorAll(".unit-toggle button[data-unit]").forEach((b) =>
+      b.addEventListener("click", () => { S.tenureUnit = b.dataset.unit; update(); }));
+    document.querySelectorAll("#year-toggle button").forEach((b) =>
+      b.addEventListener("click", () => { S.yearMode = b.dataset.year; update(); }));
+    $("start-month").addEventListener("change", (e) => {
+      const d = parseMonthValue(e.target.value);
+      if (d) {
+        // keep prepayments and rate steps on the same calendar months they were set for
+        const shift = (d.y - S.startY) * 12 + (d.m - S.startM);
+        S.lumps.forEach((l) => (l.month = Math.max(1, l.month - shift)));
+        S.rateSteps.forEach((s) => (s.month = Math.max(1, s.month - shift)));
+        S.startY = d.y; S.startM = d.m;
+        renderEventRows();
+      }
+      update();
+    });
+
+    const link = (slId, inId, set) => {
+      $(slId).addEventListener("input", () => { set(parseFloat($(slId).value)); update(); });
+      $(inId).addEventListener("change", () => { set(parseNum($(inId).value)); update(); });
+    };
+    link("sl-amount", "in-amount", (v) => (S.amount = Math.max(0, v)));
+    link("sl-emi", "in-emi", (v) => (S.emi = Math.max(0, v)));
+    link("sl-fees", "in-fees", (v) => (S.fees = Math.max(0, v)));
+    link("sl-rate", "in-rate", (v) => (S.rate = Math.min(100, Math.max(0, v))));
+    link("sl-tenure", "in-tenure",
+      (v) => (S.tenure = Math.max(1, Math.round(S.tenureUnit === "yr" ? v * 12 : v))));
+
+    $("in-extra").addEventListener("change", (e) => { S.extraMonthly = Math.max(0, parseNum(e.target.value)); update(); });
+    $("in-mora").addEventListener("change", (e) => { S.moraMonths = Math.min(120, Math.max(0, Math.round(parseNum(e.target.value)))); update(); });
+    $("mora-type").addEventListener("change", (e) => { S.moraType = e.target.value; update(); });
+    $("in-closefee").addEventListener("change", (e) => { S.closeFeePct = Math.min(100, Math.max(0, parseNum(e.target.value))); update(); });
+    $("close-month").addEventListener("change", (e) => {
+      const d = parseMonthValue(e.target.value);
+      if (d) S.closeAfter = Math.max(1, monthToIndex(d.y, d.m));
+      update();
+    });
+
+    $("add-lump").addEventListener("click", () => {
+      S.lumps.push({ month: Math.min(12, S.tenure), amount: Math.round(cur().amtDef / 25) });
+      renderEventRows(); update();
+    });
+    $("add-step").addEventListener("click", () => {
+      S.rateSteps.push({ month: Math.min(25, S.tenure), rate: S.rate });
+      renderEventRows(); update();
+    });
+    $("adv-body").addEventListener("change", (e) => {
+      const row = e.target.closest(".ev-row");
+      if (!row) return;
+      const i = +row.dataset.i, t = e.target, d = parseMonthValue(t.value);
+      if (t.classList.contains("lump-amt")) S.lumps[i].amount = Math.max(0, parseNum(t.value));
+      else if (t.classList.contains("lump-when")) { if (d) S.lumps[i].month = Math.max(1, monthToIndex(d.y, d.m)); }
+      else if (t.classList.contains("step-rate")) S.rateSteps[i].rate = Math.min(100, Math.max(0, parseNum(t.value)));
+      else if (t.classList.contains("step-when")) { if (d) S.rateSteps[i].month = Math.max(1, monthToIndex(d.y, d.m)); }
+      else return;
+      update();
+    });
+    $("adv-body").addEventListener("click", (e) => {
+      const row = e.target.closest(".ev-row");
+      if (!row) return;
+      if (e.target.classList.contains("rm-lump")) S.lumps.splice(+row.dataset.i, 1);
+      else if (e.target.classList.contains("rm-step")) S.rateSteps.splice(+row.dataset.i, 1);
+      else return;
+      renderEventRows(); update();
+    });
+
+    $("btn-copy").addEventListener("click", (e) => copyText(toTSV(), e.currentTarget, "Copied ✓"));
+    $("btn-csv").addEventListener("click", () => {
+      const blob = new Blob([toCSV()], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `amortization-${S.currency}-${Math.round(S.amount)}.csv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+    $("btn-share").addEventListener("click", (e) => { writeURL(); copyText(location.href, e.currentTarget, "Link copied ✓"); });
+    $("btn-reset").addEventListener("click", () => {
+      history.replaceState(null, "", location.pathname + location.search);
+      location.reload();
+    });
+
+    $("sched-body").addEventListener("click", (e) => {
+      const tr = e.target.closest("tr.yr-row");
+      if (tr) toggleYear(tr);
+    });
+    $("sched-body").addEventListener("keydown", (e) => {
+      if ((e.key === "Enter" || e.key === " ") && e.target.classList.contains("yr-row")) {
+        e.preventDefault(); toggleYear(e.target);
+      }
+    });
+
+    // a shared link pasted into an already-open tab changes only the hash — no reload fires
+    addEventListener("hashchange", () => { readURL(); renderEventRows(); update(); });
+
+    // redraw charts when the site toggles light/dark (colors are baked into the SVG)
+    new MutationObserver(() => update()).observe(document.documentElement, {
+      attributes: true, attributeFilter: ["data-theme"],
+    });
+  }
+  function toggleYear(tr) {
+    const open = tr.classList.toggle("open");
+    tr.setAttribute("aria-expanded", open);
+    document.querySelectorAll(`tr.mo-row[data-of="${tr.dataset.year}"]`).forEach((r) => (r.hidden = !open));
+  }
+
+  let urlTimer;
+  function update() {
+    syncControls();
+    recalc();
+    clearTimeout(urlTimer);
+    urlTimer = setTimeout(writeURL, 400);   // one history entry rewrite per pause, not per slider tick
+  }
+
+  $("app").innerHTML = APP_HTML;
+  document.querySelectorAll(".info[data-tip]").forEach((el) => {
+    el.setAttribute("role", "note"); el.setAttribute("aria-label", el.dataset.tip);
+  });
+  readURL();
+  renderEventRows();
+  bind();
+  update();
+
+  // ---- self-checks: the math that matters. Console only. ----
+  (function selfCheck() {
+    const ok = (cond, name) => console.assert(cond, name + " failed");
+    const r9 = 0.09 / 12, base = { startY: 2026, startM: 0 };
+    const E9 = emiFor(2.5e6, r9, 240, "arrears");
+    ok(Math.abs(E9 - 22493.13) < 1, "EMI formula");
+    ok(Math.abs(amountFor(E9, r9, 240, "arrears") - 2.5e6) < 100, "amount inverse");
+    ok(Math.abs(tenureFor(2.5e6, E9, r9, "arrears") - 240) < 0.5, "tenure inverse");
+    ok(Math.abs(rateFor(2.5e6, E9, 240, "arrears") * 1200 - 9) < 0.01, "rate inverse");
+
+    // a plain schedule closes out in exactly n months, and its interest matches EMI×n − P
+    const plain = simulate(2.5e6, 9, 240, E9, "arrears", base);
+    ok(plain.rows.length === 240, "plain schedule length");
+    ok(Math.abs(plain.rows.reduce((a, x) => a + x.interest, 0) - (E9 * 240 - 2.5e6)) < 5, "plain total interest");
+    ok(plain.rows[239].balance < 1, "plain closes to zero");
+    ok(plain.rows[0].m === 0 && plain.rows[12].y === 2027, "schedule starts at the loan start month");
+
+    // MANISH KUMAR's case: 12,07,044 at 14% over 180 months, +5000/month -> around 96 months
+    const E14 = emiFor(1207044, 0.14 / 12, 180, "arrears");
+    const fast = simulate(1207044, 14, 180, E14, "arrears", Object.assign({ extraMonthly: 5000 }, base));
+    ok(fast.rows.length > 90 && fast.rows.length < 105, "extra monthly shortens tenure to ~96");
+    ok(fast.rows[fast.rows.length - 1].balance < 1, "prepaid loan closes to zero");
+
+    // a lump sum lands only in its own month, and shortens the loan
+    const lump = simulate(2.5e6, 9, 240, E9, "arrears", Object.assign({ lumps: [{ month: 13, amount: 5e5 }] }, base));
+    ok(lump.rows[12].extra === 5e5 && lump.rows[11].extra === 0, "lump sum lands on its month");
+    ok(lump.rows.length < 240, "lump sum shortens the tenure");
+
+    // Pre-EMI moratorium: the balance is untouched and the tenure grows by the holiday
+    const mora = simulate(2.5e6, 9, 240, E9, "arrears", Object.assign({ moraMonths: 12, moraType: "interest" }, base));
+    ok(Math.abs(mora.rows[11].balance - 2.5e6) < 1, "Pre-EMI leaves the principal alone");
+    ok(mora.rows.length === 252, "Pre-EMI adds the holiday to the tenure");
+
+    // full moratorium capitalises the interest, so the re-struck EMI is larger
+    const defer = simulate(2.5e6, 9, 240, E9, "arrears", Object.assign({ moraMonths: 12, moraType: "full" }, base));
+    ok(defer.rows[11].balance > 2.5e6, "deferred interest capitalises");
+    ok(defer.emiUsed > E9, "EMI re-struck after a full moratorium");
+    ok(defer.rows.length === 252, "full moratorium keeps the agreed tenure after the holiday");
+
+    // Sudharsanan's case: rate drops 8.6 -> 6.9 after 24 months, EMI held, so the loan ends sooner
+    const E86 = emiFor(2.5e6, 0.086 / 12, 240, "arrears");
+    const drop = simulate(2.5e6, 8.6, 240, E86, "arrears", Object.assign({ rateSteps: [{ month: 25, rate: 6.9 }] }, base));
+    ok(drop.rows.length < 240, "a rate cut shortens the tenure");
+    ok(Math.abs(drop.rows[23].interest - (drop.rows[23].balance + drop.rows[23].principal) * 0.086 / 12) < 1, "old rate applies before the step");
+    ok(Math.abs(drop.rows[24].interest - (drop.rows[24].balance + drop.rows[24].principal) * 0.069 / 12) < 1, "new rate applies from the step");
+
+    // flat-rate loan: total repayment is P + P·f·years, and it is far dearer than the same reducing rate
+    const fe = flatEmi(1e6, 8, 60);
+    ok(Math.abs(fe * 60 - (1e6 + 1e6 * 0.08 * 5)) < 1, "flat total repayment");
+    const fs = flatSchedule(1e6, 8, 60, 2026, 0);
+    ok(fs.length === 60 && fs[59].balance < 1e-6, "flat schedule closes to zero");
+    ok(irrMonthly(1e6, fs.map((x) => x.emi), "arrears") * 1200 > 14, "flat 8% is over 14% reducing");
+
+    // IRR agrees with the nominal rate when there are no fees, whatever reshapes the payments
+    const flowsOf = (s) => s.rows.map((x) => x.emi + x.extra);
+    ok(Math.abs(irrMonthly(2.5e6, flowsOf(plain), "arrears") * 1200 - 9) < 0.01, "IRR of a plain loan is the nominal rate");
+    ok(Math.abs(irrMonthly(2.5e6, flowsOf(lump), "arrears") * 1200 - 9) < 0.01, "prepayment doesn't change the IRR");
+    ok(Math.abs(irrMonthly(2.5e6, flowsOf(mora), "arrears") * 1200 - 9) < 0.01, "a Pre-EMI holiday doesn't change the IRR");
+    // fees are money you never receive, so they push the APR above the headline rate
+    ok(irrMonthly(2.5e6 - 5e4, flowsOf(plain), "arrears") * 1200 > 9.1, "fees lift the APR above the nominal rate");
+    ok(isNaN(irrMonthly(2.5e6, [100, 100], "arrears")), "no rate fits payments that never repay the principal");
+
+    // negative amortisation is caught rather than looped on
+    ok(simulate(1e6, 12, 240, 100, "arrears", base).negAm, "negative amortisation detected");
+  })();
+})();
+</script>
+</body>
+</html>

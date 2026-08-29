@@ -30,6 +30,7 @@ export const TOOL_DATES: Record<string, { added: string; updated: string }> = {
   "noise-canvas": { added: "2026-06-02", updated: "2026-07-30" },
   "snowfall": { added: "2026-06-02", updated: "2026-07-30" },
   "odia-2048": { added: "2026-05-19", updated: "2026-07-30" },
+  "handwriting-font": { added: "2026-08-08", updated: "2026-08-08" },
   "api-playground": { added: "2026-06-02", updated: "2026-07-30" },
   "config-diff": { added: "2026-06-02", updated: "2026-07-30" },
   "webhook-inspector": { added: "2026-06-03", updated: "2026-07-30" },
