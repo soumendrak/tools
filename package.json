@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "python3 scripts/tool-dates.py || true",
+    "prebuild": "python3 scripts/tool-dates.py || true && node scripts/test-emi.mjs",
     "build": "next build",
     "start": "npx --yes serve out",
     "preview": "npx --yes serve out",
@@ -13,7 +13,8 @@
     "postinstall": "git config core.hooksPath .githooks || true",
     "skin:tools": "python3 scripts/skin-tools.py",
     "check:tools": "python3 scripts/check-tools.py",
-    "tool-dates": "python3 scripts/tool-dates.py"
+    "tool-dates": "python3 scripts/tool-dates.py",
+    "test": "node scripts/test-emi.mjs"
   },
   "dependencies": {
     "next": "16.2.12",

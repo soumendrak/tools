@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # runs the real engine out of the shipped HTML: example assertions plus a sweep over
+      # feature combinations. A failure here fails the build.
+      - name: Engine tests
+        run: pnpm test
+
+      - name: Tools catalog standard
+        run: python3 scripts/check-tools.py
+
+      - name: Build
+        run: pnpm build
