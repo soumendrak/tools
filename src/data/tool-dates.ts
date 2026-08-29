@@ -39,6 +39,7 @@ export const TOOL_DATES: Record<string, { added: string; updated: string }> = {
   "cost-tracker": { added: "2026-06-02", updated: "2026-07-30" },
   "coolify-dashboard-widget": { added: "2026-06-02", updated: "2026-07-30" },
   "env-var-manager": { added: "2026-06-02", updated: "2026-07-30" },
+  "emi": { added: "2026-08-29", updated: "2026-08-29" },
   "portfolio-tracker": { added: "2026-06-02", updated: "2026-07-30" },
   "sip-calculator": { added: "2026-06-02", updated: "2026-07-30" },
   "call-log-explorer": { added: "2026-06-02", updated: "2026-07-30" },
