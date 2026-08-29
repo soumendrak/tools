@@ -99,7 +99,7 @@ export const TOOLS: Tool[] = [
   t("coolify-dashboard-widget", "Coolify Dashboard", "Single-file HTML dashboard for Coolify: deployment status, container health, resource usage.", "DevOps & Monitoring"),
   t("env-var-manager", "Env Var Manager", "AES-GCM encrypted environment variable manager with 3 envs and diff viewer.", "DevOps & Monitoring"),
   // Finance
-  t("emi", "EMI Calculator", "Solves for EMI, loan amount, tenure or rate — with prepayments, moratorium, floating and flat rates, APR, foreclosure and a full amortization schedule.", "Finance"),
+  t("emi", "EMI Calculator", "Solves for EMI, loan amount, tenure or rate — compare any number of offers side by side, prepay to finish early or cut the EMI, prepay-vs-invest, Section 24/80C tax relief, moratorium, floating and flat rates, APR, foreclosure and a full amortization schedule.", "Finance"),
   t("portfolio-tracker", "Portfolio Tracker", "Track stock portfolio, dividends, and financial goals.", "Finance"),
   t("sip-calculator", "SIP Calculator", "SIP and investment calculator with wealth projections and comparisons.", "Finance"),
   // Telephony

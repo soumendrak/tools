@@ -1,6 +1,10 @@
+# sharp and unrs-resolver ship postinstall build scripts. This site is a static export, so
+# neither is needed at build time — declining them keeps installs quick and, more importantly,
+# resolves the "undecided" state that made every `pnpm build` / `pnpm test` fail its dependency
+# check until it was re-run with --config.verify-deps-before-run=false.
 allowBuilds:
-  sharp: set this to true or false
-  unrs-resolver: set this to true or false
+  sharp: false
+  unrs-resolver: false
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver

@@ -302,8 +302,13 @@ function canvasClick(e) {
 // ---- Rendering ----
 function render() {
   const canvas = document.getElementById('canvas');
+  // the empty state lives inside the canvas, so clearing it destroys the element; keep the node
+  // and put it back rather than moving it out, which would change what its absolute centring
+  // is measured against
+  const emptyState = document.getElementById('emptyState');
   canvas.innerHTML = '';
-  document.getElementById('emptyState').style.display = nodes.length ? 'none' : 'block';
+  if (emptyState) canvas.appendChild(emptyState);
+  emptyState.style.display = nodes.length ? 'none' : 'block';
   document.getElementById('nodeCount').textContent = nodes.length;
   nodes.forEach(node => {
     const el = document.createElement('div');
