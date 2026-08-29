@@ -28,6 +28,14 @@ jobs:
       - name: Engine tests
         run: pnpm test
 
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      # rendering, event wiring, URL state, and the CSS-dependent behaviour the Node suite
+      # cannot reach: hidden elements, 44px touch targets, horizontal overflow
+      - name: UI tests
+        run: pnpm test:ui
+
       - name: Tools catalog standard
         run: python3 scripts/check-tools.py
 

@@ -14,7 +14,9 @@
     "skin:tools": "python3 scripts/skin-tools.py",
     "check:tools": "python3 scripts/check-tools.py",
     "tool-dates": "python3 scripts/tool-dates.py",
-    "test": "node scripts/test-emi.mjs"
+    "test": "node scripts/test-emi.mjs",
+    "test:ui": "playwright test",
+    "test:all": "pnpm test && pnpm test:ui"
   },
   "dependencies": {
     "next": "16.2.12",
@@ -22,6 +24,7 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
