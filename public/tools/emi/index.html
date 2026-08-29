@@ -458,10 +458,16 @@ td.col-yr { text-align: left; font-weight: 700; }
      A) prepay, clear the loan at nA, then invest the freed instalment until the original end date;
      B) keep the loan to its original end and invest the extra payments as they would have been made.
      Both end debt-free at nBase, so whichever pile of money is bigger wins. */
-  function investCompare(rows, nA, nBase, commitment, g) {
+  function investCompare(nA, nBase, commitment, extraMonthly, lumps, g) {
     let a = 0, b = 0;
     for (let i = nA; i < nBase; i++) a += commitment * Math.pow(1 + g, nBase - 1 - i);
-    rows.forEach((x, i) => { if (x.extra > 0) b += x.extra * Math.pow(1 + g, nBase - 1 - i); });
+    /* Path B's loan runs the full term, so its monthly contribution continues to nBase — reading
+       the extras off path A's rows stopped them at the early payoff and understated B. */
+    for (let i = 0; i < nBase; i++) {
+      let c = extraMonthly;
+      for (const l of lumps) if (l.month === i + 1) c += l.amount;
+      if (c > 0) b += c * Math.pow(1 + g, nBase - 1 - i);
+    }
     return { prepay: a, invest: b };
   }
 
@@ -469,14 +475,20 @@ td.col-yr { text-align: left; font-weight: 700; }
      Sec 24(b): interest, capped at ₹2L for a self-occupied property. Sec 80C: principal, capped
      at ₹1.5L (and shared with your other 80C investments, so this is an upper bound). */
   const SEC24_CAP = 2e5, SEC80C_CAP = 1.5e5;
-  function taxRelief(rows, slabPct, propType) {
+  function taxRelief(rows, slabPct, propType, borrowed) {
     if (!(slabPct > 0)) return null;
+    /* After a full moratorium the schedule amortises P + capitalised interest, and that
+       capitalised part has already been claimed as interest under Sec 24. Counting it again as
+       80C principal would grant two deductions on the same rupee, so principal repayments are
+       scaled by the share of the balance that is genuinely borrowed money. */
+    const amortised = rows.reduce((a, x) => a + x.principal + x.extra, 0);
+    const origShare = borrowed > 0 && amortised > borrowed ? borrowed / amortised : 1;
     const fy = new Map();
     rows.forEach((x, i) => {
       const key = x.m >= 3 ? x.y : x.y - 1;              // FY starts in April
       if (!fy.has(key)) fy.set(key, { interest: 0, principal: 0, months: [] });
       const g = fy.get(key);
-      g.interest += x.interest; g.principal += x.principal + x.extra; g.months.push(i);
+      g.interest += x.interest; g.principal += (x.principal + x.extra) * origShare; g.months.push(i);
     });
     let saved = 0, savedInterest = 0;
     /* Only the Sec 24 interest relief belongs in the effective borrowing rate. Crediting the 80C
@@ -514,16 +526,28 @@ td.col-yr { text-align: left; font-weight: 700; }
   /* How much a full moratorium multiplies the balance before repayment starts. Pre-EMI holidays
      service the interest so the balance is untouched, giving a factor of 1. Rate steps inside the
      holiday are respected, so this matches what simulate() will actually do. */
-  function moraGrowth(st) {
-    if (!(st.moraMonths > 0) || st.moraType !== "full" || st.rateType === "flat") return 1;
+  /* The balance a holiday hands to the repayment phase, expressed as
+     `factor · P − lumpFV`, so the loan-amount inversion can be solved for P.
+     A lump paid in the holiday keeps compounding out of the balance for the months that follow,
+     which is why it needs its own future value rather than a flat subtraction. */
+  function moraEffect(st) {
+    const none = { factor: 1, lumpFV: 0 };
+    if (!(st.moraMonths > 0) || st.rateType === "flat") return none;
     const steps = (st.rateSteps || []).slice().sort((a, b) => a.month - b.month);
-    let f = 1;
-    for (let i = 0; i < st.moraMonths; i++) {
+    const capitalising = st.moraType === "full";
+    const rateAt = (i) => {
       let a = st.rate;
       for (const s of steps) if (i + 1 >= s.month) a = s.rate;
-      f *= 1 + a / 1200;
+      return a / 1200;
+    };
+    let factor = 1, lumpFV = 0;
+    for (let i = 0; i < st.moraMonths; i++) {
+      const grow = capitalising ? 1 + rateAt(i) : 1;   // Pre-EMI services the interest, so no growth
+      factor *= grow;
+      lumpFV *= grow;
+      for (const l of st.lumps || []) if (l.month === i + 1) lumpFV += l.amount;
     }
-    return f;
+    return { factor, lumpFV };
   }
 
   const advanced = (st) =>
@@ -1023,7 +1047,7 @@ EMI = (P + total interest) / n</code>
     document.querySelectorAll('input[name="ratetype"]').forEach((r) => (r.checked = r.value === S.rateType));
     document.querySelectorAll(".unit-toggle button[data-unit]").forEach((b) => b.classList.toggle("on", b.dataset.unit === S.tenureUnit));
     document.querySelectorAll("#year-toggle button").forEach((b) => b.classList.toggle("on", b.dataset.year === S.yearMode));
-    document.querySelectorAll(".tab").forEach((b) => {
+    document.querySelectorAll("#mode-tabs .tab").forEach((b) => {
       const on = b.dataset.mode === S.mode;
       b.classList.toggle("on", on); b.setAttribute("aria-selected", on);
       // roving tabindex: one Tab stop for the whole group, arrows move within it
@@ -1045,7 +1069,10 @@ EMI = (P + total interest) / n</code>
     const msg = $("msg"); msg.hidden = false; msg.textContent = text;
     $("result-value").textContent = "—"; $("result-sub").textContent = "";
     $("savings").hidden = true;
-    ["st-principal", "st-interest", "st-fees", "st-apr", "st-eff", "st-total"].forEach((id) => ($(id).textContent = "—"));
+    // tax rows included, or an invalid input leaves the previous loan's relief on screen
+    ["st-principal", "st-interest", "st-fees", "st-apr", "st-eff", "st-tax", "st-post", "st-total"]
+      .forEach((id) => ($(id).textContent = "—"));
+    $("stat-tax").style.display = "none"; $("stat-post").style.display = "none";
     $("donut").innerHTML = ""; $("donut-legend").innerHTML = "";
     $("barchart").innerHTML = ""; $("bar-legend").innerHTML = ""; $("sched-body").innerHTML = "";
     $("closure-out").innerHTML = "";
@@ -1082,8 +1109,10 @@ EMI = (P + total interest) / n</code>
         if (E <= 0) return fail("Enter a monthly EMI greater than zero.");
         // E·n === P is a perfectly good answer: a 0% promotional loan. Only a shortfall is an error.
         if (E * n < P - 0.5) return fail(`Total payments (${money(E * n)}) don't even repay the principal — no flat rate fits.`);
-        flatRate = Math.round(((E * n - P) / P / (n / 12)) * 10000) / 100;
-        solved.rate = flatRate;
+        // keep the exact rate for the schedule and round only what is displayed, or the entered
+        // EMI (which matches the exact rate) leaves a residue after the last row
+        flatRate = (E * n - P) / P / (n / 12) * 100;
+        solved.rate = Math.round(flatRate * 100) / 100;
       }
       return { rows: flatSchedule(P, flatRate, n, E, st.startY, st.startM), P, E, emiLast: E, baseEmi: E,
         solved, baseInterest: null, baseMonths: null };
@@ -1098,7 +1127,11 @@ EMI = (P + total interest) / n</code>
       /* A full moratorium capitalises interest, so the EMI is later re-struck on a grown balance.
          Solving as if repayment started today would hand back an amount whose real EMI is higher
          than the one asked for, so discount by the growth the holiday will apply. */
-      P = amountFor(E, r, n, st.scheme) / moraGrowth(st);
+      // repayment starts on `factor·P − lumpFV`, and that has to equal the balance the requested
+      // EMI amortises over n months — so solve that for P rather than discounting growth alone
+      const eff = moraEffect(st);
+      P = (amountFor(E, r, n, st.scheme) + eff.lumpFV) / eff.factor;
+      if (!(P > 0)) return fail("Those holiday prepayments already clear the loan — lower them or raise the EMI.");
       solved.amount = Math.round(P);
     } else if (st.mode === "tenure") {
       if (E <= 0) return fail("Enter a monthly EMI greater than zero.");
@@ -1219,7 +1252,7 @@ EMI = (P + total interest) / n</code>
     }
 
     // ---- Indian home-loan tax relief ----
-    const relief = S.currency === "INR" ? taxRelief(rows, S.taxSlab, S.propType) : null;
+    const relief = S.currency === "INR" ? taxRelief(rows, S.taxSlab, S.propType, P) : null;
     if (relief) {
       $("stat-tax").style.display = ""; $("stat-post").style.display = "";
       $("st-tax").textContent = money(relief.saved);
@@ -1246,7 +1279,7 @@ EMI = (P + total interest) / n</code>
     const g = S.investReturn / 1200;
     const prepaid = rows.reduce((a, x) => a + x.extra, 0);
     if (!(S.investReturn > 0) || prepaid <= 0 || baseMonths <= n) return "";
-    const { prepay, invest } = investCompare(rows, n, baseMonths, baseEmi + S.extraMonthly, g);
+    const { prepay, invest } = investCompare(n, baseMonths, baseEmi + S.extraMonthly, S.extraMonthly, S.lumps, g);
     const win = prepay >= invest;
     return `
       <div class="s-split">
@@ -1260,11 +1293,16 @@ EMI = (P + total interest) / n</code>
   // ---------- comparison bench ----------
   const BENCH_TABS = ["#4ecdc4", "#a78bfa", "#ff6b6b", "#3ddc84", "#ffdb58", "#60a5fa", "#f472b6", "#fb923c"];
 
+  // scenario names are user text and land in markup and in quoted attributes
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
   /* Lead with the rate — it is what actually differs between quotes. The amount is usually
-     identical across a comparison, so putting it first made every chip look the same. */
+     identical across a comparison, so putting it first made every chip look the same.
+     Tenure keeps its months: rounding made an 18-month and a 24-month offer both read "2y". */
   function benchName(st, i) {
     if (st.name) return st.name;
-    return st.rate + "%" + (st.rateType === "flat" ? " flat" : "") + " · " + Math.round(st.tenure / 12) + "y";
+    return st.rate + "%" + (st.rateType === "flat" ? " flat" : "") + " · " + tenureLabel(st.tenure);
   }
   function benchSub(st) {
     const bits = [cur(st.currency).sym + short(st.amount)];
@@ -1278,18 +1316,34 @@ EMI = (P + total interest) / n</code>
   // identity of a scenario's inputs, so the same setup can't be saved twice
   const benchSig = (st) => JSON.stringify(SNAP_KEYS.map((k) => st[k]));
 
-  // one saved scenario -> the numbers the matrix compares
+  /* One saved scenario -> the numbers the matrix compares. Memoised on the scenario's own
+     signature: a slider drag calls drawBench() every frame, and re-solving up to 1,200 schedule
+     rows per saved offer for snapshots that cannot have changed is pure waste. */
+  const BENCH_CACHE = new Map();
   function benchEval(st) {
+    const key = benchSig(st);
+    if (BENCH_CACHE.has(key)) return BENCH_CACHE.get(key);
+    const out = computeBench(st);
+    if (BENCH_CACHE.size > 64) BENCH_CACHE.clear();
+    BENCH_CACHE.set(key, out);
+    return out;
+  }
+  function computeBench(st) {
     const r = solve(st);
     if (r.error) return { error: r.error };
     const interest = r.rows.reduce((a, x) => a + x.interest, 0);
-    const principal = r.rows.reduce((a, x) => a + x.principal + x.extra, 0);
     const flows = r.rows.map((x) => x.emi + x.extra);
-    const apr = st.fees > 0 ? irrMonthly(r.P - st.fees, flows, st.scheme) * 1200 : st.rate;
+    /* Always derive the APR from the real cash flows. Falling back to the quoted rate when there
+       are no fees would report an 8% flat loan as 8% when it truly costs about 15%, and would
+       ignore rate steps entirely — and this figure decides a "Best" badge. Flat schedules pay at
+       month end, so they discount as arrears whatever the scheme setting says. */
+    const apr = irrMonthly(r.P - st.fees, flows, st.rateType === "flat" ? "arrears" : st.scheme) * 1200;
     const last = r.rows[r.rows.length - 1];
     return {
       emi: r.E, interest, fees: st.fees, months: r.rows.length,
-      total: principal + interest + st.fees,
+      // r.P, not the summed schedule principal — see present(): that double-counts capitalised
+      // moratorium interest and could crown the wrong scenario cheapest
+      total: r.P + interest + st.fees,
       apr: isNaN(apr) ? null : apr,
       end: last ? MONTHS[last.m] + " " + last.y : "—",
     };
@@ -1328,12 +1382,12 @@ EMI = (P + total interest) / n</code>
     $("bench").innerHTML = BENCH.map((st, i) => `
       <div class="chip">
         <span class="tab" style="background:${BENCH_TABS[i % BENCH_TABS.length]}"></span>
-        <button type="button" class="chip-main" data-i="${i}" aria-label="Load ${benchName(st, i)} back into the calculator">
-          <span class="nm">${benchName(st, i)}</span>
+        <button type="button" class="chip-main" data-i="${i}" aria-label="Load ${esc(benchName(st, i))} back into the calculator">
+          <span class="nm">${esc(benchName(st, i))}</span>
           <span class="sm">${benchSub(st)}</span>
         </button>
-        <button type="button" class="ed" data-ed="${i}" aria-label="Rename ${benchName(st, i)}">✎</button>
-        <button type="button" class="rm" data-rm="${i}" aria-label="Remove ${benchName(st, i)}">✕</button>
+        <button type="button" class="ed" data-ed="${i}" aria-label="Rename ${esc(benchName(st, i))}">✎</button>
+        <button type="button" class="rm" data-rm="${i}" aria-label="Remove ${esc(benchName(st, i))}">✕</button>
       </div>`).join("");
     if (!has) { $("matrix").innerHTML = ""; $("bench-bars").innerHTML = ""; return; }
 
@@ -1350,7 +1404,7 @@ EMI = (P + total interest) / n</code>
     ];
     const multi = BENCH.length > 1;
     let html = `<thead><tr><th class="metric">Metric</th>${BENCH.map((st, i) =>
-      `<th>${benchName(st, i)}</th>`).join("")}</tr></thead><tbody>`;
+      `<th>${esc(benchName(st, i))}</th>`).join("")}</tr></thead><tbody>`;
     for (const [label, vals, lower, fmt] of rows) {
       const bi = multi && lower !== null ? bestIndex(vals, lower) : -1;
       html += `<tr><td class="metric">${label}</td>` + vals.map((v, i) =>
@@ -1365,9 +1419,9 @@ EMI = (P + total interest) / n</code>
     // fills stop short of the label so the two never collide
     const max = Math.max(...totals.filter((v) => v != null), 1);
     $("bench-bars").innerHTML = BENCH.map((st, i) => {
-      if (res[i].error) return `<div class="bb-row"><span class="bl">${benchName(st, i)}</span><span class="muted" style="font-size:.78rem">can't be computed</span></div>`;
+      if (res[i].error) return `<div class="bb-row"><span class="bl">${esc(benchName(st, i))}</span><span class="muted" style="font-size:.78rem">can't be computed</span></div>`;
       return `<div class="bb-row">
-        <span class="bl" title="${benchName(st, i)}">${benchName(st, i)}</span>
+        <span class="bl" title="${esc(benchName(st, i))}">${esc(benchName(st, i))}</span>
         <div class="bb-track"><div class="bb-fill" style="width:${(totals[i] / max * 68).toFixed(1)}%;background:${BENCH_TABS[i % BENCH_TABS.length]}"></div>
         <span class="bb-val">${money(totals[i])}</span></div>
       </div>`;
@@ -1591,12 +1645,12 @@ Balance: ${money(g.balance)}</title>
 
   // ---------- events ----------
   function bind() {
-    document.querySelectorAll(".tab").forEach((b) =>
+    document.querySelectorAll("#mode-tabs .tab").forEach((b) =>
       b.addEventListener("click", () => { S.mode = b.dataset.mode; update(); }));
     /* role="tablist" promises arrow-key navigation, so honour it: arrows move between modes,
        Home/End jump to the ends, and only the selected tab stays in the tab order. */
     $("mode-tabs").addEventListener("keydown", (e) => {
-      const tabs = [...document.querySelectorAll(".tab")];
+      const tabs = [...$("mode-tabs").querySelectorAll(".tab")];
       const i = tabs.indexOf(document.activeElement);
       if (i < 0) return;
       let j = -1;
@@ -1792,7 +1846,14 @@ Balance: ${money(g.balance)}</title>
     });
 
     // a shared link pasted into an already-open tab changes only the hash — no reload fires
-    addEventListener("hashchange", () => { readURL(); renderEventRows(); update(); });
+    addEventListener("hashchange", () => {
+      const was = S.currency;
+      readURL();
+      // a shared link can switch currency without the select ever firing; the matrix formats every
+      // value in the current currency, so mixed scenarios would rank rupees against dollars
+      if (S.currency !== was) BENCH = [];
+      renderEventRows(); update();
+    });
 
     // redraw charts when the site toggles light/dark (colors are baked into the SVG)
     new MutationObserver(() => update()).observe(document.documentElement, {
@@ -1884,19 +1945,19 @@ Balance: ${money(g.balance)}</title>
     ok(keep.rows.reduce((a, x) => a + x.interest, 0) > cut, "finishing early beats a lower EMI on interest");
 
     // tax relief: a 30% payer on a self-occupied home caps at 2L interest + 1.5L principal a year
-    const tr = taxRelief(plain.rows, 30, "self");
+    const tr = taxRelief(plain.rows, 30, "self", 2.5e6);
     ok(tr.saved > 0 && tr.saved < 3.5e5 * 0.3 * 21, "tax relief stays inside the yearly caps");
     ok(Math.abs(tr.perMonthI.reduce((a, x) => a + x, 0) - tr.savedInterest) < 1, "monthly relief sums to the Sec 24 total");
     ok(tr.savedInterest < tr.saved, "the rate uses only the interest half of the relief");
-    ok(taxRelief(plain.rows, 0, "self") === null, "no slab means no relief");
+    ok(taxRelief(plain.rows, 0, "self", 2.5e6) === null, "no slab means no relief");
     // a let-out property has no Sec 24 cap, so it can never save less
-    ok(taxRelief(plain.rows, 30, "letout").saved >= tr.saved, "let-out relief is uncapped");
+    ok(taxRelief(plain.rows, 30, "letout", 2.5e6).saved >= tr.saved, "let-out relief is uncapped");
 
     // prepay-vs-invest: at a 0% return, prepaying must win (it saves real interest)
-    const ic0 = investCompare(fast.rows, fast.rows.length, 180, E14 + 5000, 0);
+    const ic0 = investCompare(fast.rows.length, 180, E14 + 5000, 5000, [], 0);
     ok(ic0.prepay > ic0.invest, "at 0% return, prepaying wins");
     // at a high enough return the ranking has to flip
-    const ic20 = investCompare(fast.rows, fast.rows.length, 180, E14 + 5000, 0.20 / 12);
+    const ic20 = investCompare(fast.rows.length, 180, E14 + 5000, 5000, [], 0.20 / 12);
     ok(ic20.invest / ic20.prepay > ic0.invest / ic0.prepay, "a higher return favours investing");
 
     /* Totals must equal the cash that actually leaves your pocket. Under a full moratorium the
@@ -1945,6 +2006,47 @@ Balance: ${money(g.balance)}</title>
       scheme: "arrears", startY: 2026, startM: 0, fees: 0, moraMonths: 12, moraType: "full",
       extraMonthly: 0, lumps: [], rateSteps: [], prepayMode: "tenure", rate: 9 });
     ok(!amt.error && Math.abs(amt.E - 22493) < 25, "loan amount solves back to the requested EMI");
+
+    // ---- PR #7 review fixes ----
+    const stBase = { mode: "emi", currency: "INR", rateType: "reducing", scheme: "arrears",
+      startY: 2026, startM: 0, fees: 0, moraMonths: 0, moraType: "interest", extraMonthly: 0,
+      lumps: [], rateSteps: [], prepayMode: "tenure", amount: 2.5e6, rate: 9, tenure: 240, emi: 0 };
+
+    // the invest path keeps contributing to the original end date, not to the early payoff
+    const icShort = investCompare(96, 180, 20000, 5000, [], 0.10 / 12);
+    let manualB = 0;
+    for (let i = 0; i < 180; i++) manualB += 5000 * Math.pow(1 + 0.10 / 12, 179 - i);
+    ok(Math.abs(icShort.invest - manualB) < 1, "invest path runs to the original end date");
+    ok(icShort.invest > 5000 * 96, "and is not truncated at the early payoff");
+
+    // bench totals must not double-count capitalised interest, same as present()
+    const benchMora = computeBench(Object.assign({}, stBase, { moraMonths: 12, moraType: "full" }));
+    ok(Math.abs(benchMora.total - (2.5e6 + benchMora.interest)) < 2, "bench total excludes capitalised double-count");
+
+    // a fee-free flat loan's APR is its true reducing cost, not the quoted flat number
+    const benchFlat = computeBench(Object.assign({}, stBase, { rateType: "flat", rate: 8, tenure: 60 }));
+    ok(benchFlat.apr > 14, "flat APR reflects the real cost, not the headline rate");
+
+    // solving a flat rate must clear the balance exactly, not leave a residue
+    const flatSolved = solve(Object.assign({}, stBase, { mode: "rate", rateType: "flat",
+      amount: 1e6, tenure: 60, emi: 23333 }));
+    ok(!flatSolved.error && flatSolved.rows.length === 60, "flat rate solve keeps its tenure");
+    ok(flatSolved.rows[flatSolved.rows.length - 1].balance < 0.5, "and closes to zero");
+
+    // loan amount honours a lump sum paid during the holiday
+    const amtLump = solve(Object.assign({}, stBase, { mode: "amount", emi: 22493, moraMonths: 12,
+      moraType: "full", lumps: [{ month: 6, amount: 3e5 }] }));
+    ok(!amtLump.error && Math.abs(amtLump.E - 22493) < 25, "holiday lump sums feed the amount inversion");
+
+    // 80C must not also claim interest that was capitalised and already relieved under Sec 24
+    const moraRows = simulate(2.5e6, 9, 240, E9, "arrears",
+      Object.assign({ moraMonths: 12, moraType: "full" }, base)).rows;
+    const trMora = taxRelief(moraRows, 30, "self", 2.5e6);
+    const trNaive = taxRelief(moraRows, 30, "self", 0);   // 0 disables the scaling
+    ok(trMora.saved < trNaive.saved, "capitalised interest is not claimed twice");
+
+    // a renamed scenario cannot inject markup
+    ok(esc('Bank "A" <b>') === "Bank &quot;A&quot; &lt;b&gt;", "scenario names are escaped");
 
     // the bench must agree with the main panel exactly — it runs the same solve()
     const snapA = Object.assign(snapshot(), { amount: 2.5e6, rate: 9, tenure: 240, fees: 0, mode: "emi",
