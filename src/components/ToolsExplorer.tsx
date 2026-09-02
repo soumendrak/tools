@@ -1,21 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { CATEGORIES, TOOLS, type Category } from "@/data/tools";
+import { useSearch } from "./Search";
 
 export default function ToolsExplorer() {
-  const [query, setQuery] = useState("");
+  const { query, setQuery } = useSearch();
   const [category, setCategory] = useState<Category | "All">("All");
-
-  useEffect(() => {
-    const initialQuery = new URLSearchParams(window.location.search).get("q");
-    if (initialQuery) {
-      // This intentionally synchronizes the client-only URL with the static page.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setQuery(initialQuery);
-    }
-  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -30,30 +22,7 @@ export default function ToolsExplorer() {
 
   return (
     <section id="tools" aria-label="Tool catalog" className="mx-auto w-full max-w-6xl px-6 pb-24">
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center">
-        <form action="/" role="search" className="relative flex-1">
-          <label className="block">
-            <span className="sr-only">Search tools</span>
-            <svg
-              aria-hidden="true"
-              className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path strokeLinecap="round" d="m21 21-4.35-4.35M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z" />
-            </svg>
-            <input
-              type="search"
-              name="q"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={`Search ${TOOLS.length} tools…`}
-              className="w-full rounded-xl border border-border bg-card py-3 pl-11 pr-4 text-sm placeholder:text-muted focus:border-accent focus:outline-none"
-            />
-          </label>
-        </form>
+      <div className="mb-6 flex flex-col gap-4">
         <div role="group" aria-label="Filter by category" className="flex flex-wrap gap-2">
           {(["All", ...CATEGORIES] as const).map((c) => (
             <button
@@ -72,14 +41,43 @@ export default function ToolsExplorer() {
         </div>
       </div>
 
-      <p className="sr-only" role="status">
-        {filtered.length} tools shown
+      <p
+        role="status"
+        className="mb-6 flex flex-wrap items-baseline gap-x-2 text-sm text-muted"
+      >
+        {query.trim() ? (
+          <>
+            <span>
+              <strong className="font-semibold text-foreground">
+                {filtered.length}
+              </strong>{" "}
+              {filtered.length === 1 ? "tool" : "tools"} matching “{query.trim()}”
+            </span>
+            <button
+              onClick={() => setQuery("")}
+              className="font-medium text-accent-soft underline-offset-4 hover:text-accent hover:underline"
+            >
+              Clear
+            </button>
+          </>
+        ) : (
+          <span>
+            Showing all {filtered.length} tools
+            {category !== "All" && ` in ${category}`}
+          </span>
+        )}
       </p>
 
       {filtered.length === 0 ? (
-        <p className="py-16 text-center text-muted">
-          No tools match “{query}”. Try a different search.
-        </p>
+        <div className="py-16 text-center">
+          <p className="text-muted">No tools match “{query.trim()}”.</p>
+          <button
+            onClick={() => setQuery("")}
+            className="mt-4 rounded-xl border border-border bg-card px-5 py-2.5 text-sm font-semibold transition-colors hover:border-accent/50"
+          >
+            Clear search
+          </button>
+        </div>
       ) : (
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((tool) => (

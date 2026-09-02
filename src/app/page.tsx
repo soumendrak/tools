@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ToolsExplorer from "@/components/ToolsExplorer";
+import { HideOnSearch, SearchBox, SearchProvider } from "@/components/Search";
 import { CATEGORIES, recentTools, SITE_URL, TOOLS, type Tool } from "@/data/tools";
 
 const fmtDate = (iso: string) =>
@@ -90,8 +91,9 @@ export default function Home() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
+      <SearchProvider>
       {/* Hero */}
-      <header className="relative overflow-hidden px-6 pb-20 pt-28 text-center sm:pt-36">
+      <header className="hero relative overflow-hidden px-6 pt-28 text-center sm:pt-36">
         <div
           aria-hidden="true"
           className="orb left-1/4 top-0 h-72 w-72 bg-accent"
@@ -133,26 +135,16 @@ export default function Home() {
             source, no sign-up. Everything runs in your browser.
           </p>
           <div
-            className="animate-rise mt-8 flex flex-wrap items-center justify-center gap-4"
+            className="animate-rise mx-auto mt-8 max-w-2xl"
             style={{ animationDelay: "0.3s" }}
           >
-            <a
-              href="#tools"
-              className="rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-white transition-transform hover:scale-105"
-            >
-              Browse the tools
-            </a>
-            <a
-              href="https://github.com/soumendrak"
-              className="rounded-xl border border-border bg-card px-6 py-3 text-sm font-semibold text-foreground transition-colors hover:border-accent/50"
-            >
-              Star on GitHub
-            </a>
+            <SearchBox big />
           </div>
         </div>
       </header>
 
-      {/* Recently added / updated — discoverability */}
+      {/* Recently added / updated — discoverability. Yields to results while searching. */}
+      <HideOnSearch>
       <section
         aria-label="Recent tools"
         className="mx-auto w-full max-w-6xl px-6 pb-16"
@@ -170,8 +162,10 @@ export default function Home() {
           />
         </div>
       </section>
+      </HideOnSearch>
 
       <ToolsExplorer />
+      </SearchProvider>
     </main>
   );
 }

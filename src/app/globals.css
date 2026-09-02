@@ -163,3 +163,27 @@ body {
     transform: none;
   }
 }
+
+/* Search mode: pull results up toward the search bar. */
+.hero {
+  padding-bottom: 5rem;
+  transition: padding-bottom 0.25s ease;
+}
+[data-searching] .hero {
+  padding-bottom: 2rem;
+}
+
+/* The native clear button is browser-blue; mute it into the palette. */
+input[type="search"]::-webkit-search-cancel-button {
+  cursor: pointer;
+  filter: grayscale(1) opacity(0.45);
+}
+input[type="search"]:hover::-webkit-search-cancel-button {
+  filter: grayscale(1) opacity(0.8);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero {
+    transition: none;
+  }
+}
