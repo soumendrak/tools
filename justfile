@@ -20,3 +20,6 @@ check-tools:
 
 deploy:
     pnpm deploy:cf
+
+install:
+    pnpm install
