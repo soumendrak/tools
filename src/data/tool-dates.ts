@@ -44,6 +44,7 @@ export const TOOL_DATES: Record<string, { added: string; updated: string }> = {
   "sip-calculator": { added: "2026-06-02", updated: "2026-07-30" },
   "call-log-explorer": { added: "2026-06-02", updated: "2026-07-30" },
   "ivr-flow-builder": { added: "2026-06-02", updated: "2026-08-29" },
+  "long-form-reader": { added: "2026-10-12", updated: "2026-10-12" },
   "writing-scheduler": { added: "2026-06-02", updated: "2026-07-30" },
   "citation-manager": { added: "2026-06-02", updated: "2026-07-30" },
   "blog-to-substack": { added: "2026-07-30", updated: "2026-07-30" },

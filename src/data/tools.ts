@@ -106,6 +106,7 @@ export const TOOLS: Tool[] = [
   t("call-log-explorer", "Call Log Explorer", "Plivo CDR analysis and visualization with drag-drop support.", "Telephony"),
   t("ivr-flow-builder", "IVR Flow Builder", "Visual drag-and-drop phone tree designer with Plivo XML/JSON export.", "Telephony"),
   // Writing & Content
+  t("long-form-reader", "Long-form Reader", "Read text and Markdown with key-sentence skim, focus mode, expandable sections, and a saved reading position. Private, offline, no API key.", "Writing & Content"),
   t("writing-scheduler", "Writing Scheduler", "Lightweight editorial calendar with drag-and-drop scheduling and GitHub commit linking.", "Writing & Content"),
   t("citation-manager", "Citation Manager", "Paste a URL, auto-fetch metadata, generate citations in 5 formats.", "Writing & Content"),
   t("blog-to-substack", "RSS → Substack", "Load any RSS or Atom feed, pick a post, and copy it as Substack-ready rich text — formatting, links, and images preserved.", "Writing & Content"),

@@ -4,11 +4,11 @@
 
 # Tools by Soumendra
 
-**44 free, zero-dependency browser tools — one searchable home.**
+**47 free, zero-dependency browser tools — one searchable home.**
 
 [![Live site](https://img.shields.io/badge/live-tools.soumendrak.com-b4522e?style=flat-square&logo=cloudflare&logoColor=white)](https://tools.soumendrak.com)
 &nbsp;
-![Tools](https://img.shields.io/badge/tools-44-b4522e?style=flat-square)
+![Tools](https://img.shields.io/badge/tools-47-b4522e?style=flat-square)
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=nextdotjs&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-38bdf8?style=flat-square&logo=tailwindcss&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?style=flat-square&logo=typescript&logoColor=white)
@@ -25,7 +25,7 @@ A single point of entry for all my [mini projects](https://www.soumendrak.com/pr
 
 ## ✨ Features
 
-- **44 tools, one origin** — most are single-file pages; the Fasting Tracker is an offline-first multi-file PWA. Every tool is vendored under `public/tools/` and embedded on its own page at `/t/<slug>` with one-click full screen.
+- **47 tools, one origin** — most are single-file pages; the Fasting Tracker is an offline-first multi-file PWA. Every tool is vendored under `public/tools/` and embedded on its own page at `/t/<slug>` with one-click full screen.
 - **Instant search & filter** — fuzzy search plus 7 category filters.
 - **Recently added / updated** — surfaced on the landing page and kept fresh automatically from git history.
 - **Light & dark** — a terracotta theme (matching [soumendrak.com](https://www.soumendrak.com)) shared across the site *and* every tool, with a persistent top-right toggle.
@@ -38,11 +38,11 @@ A single point of entry for all my [mini projects](https://www.soumendrak.com/pr
 | --- | :---: | --- |
 | ⏳ Time & Life | 9 | Fasting Tracker, Pomodoro, Life Calendar |
 | 🛠️ Developer Tools | 9 | JSON Pretty, Diff Checker, Base64 |
-| 🎨 Fun & Visual | 11 | Mandelbrot, Conway's Game of Life, Odia 2048 |
+| 🎨 Fun & Visual | 12 | Mandelbrot, Conway's Game of Life, Odia 2048 |
 | 📡 DevOps & Monitoring | 8 | API Playground, Webhook Inspector, Uptime Radar |
-| 💰 Finance | 2 | SIP Calculator, Portfolio Tracker |
+| 💰 Finance | 3 | EMI Calculator, SIP Calculator, Portfolio Tracker |
 | ☎️ Telephony | 2 | Call Log Explorer, IVR Flow Builder |
-| ✍️ Writing & Content | 3 | RSS → Substack, Citation Manager |
+| ✍️ Writing & Content | 4 | Long-form Reader, RSS → Substack, Citation Manager |
 
 ## 🧰 Tech stack
 

@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A private long-form reader for text and Markdown. Skim key sentences, focus while scrolling, fold sections, and pick up where you left off. No API key needed.">
+<title>Long-form Reader</title>
+<style id="reader-styles">
+:root{--bg:#f7f0e6;--surface:#fdf8f0;--text:#2a201a;--text-dim:#6f6255;--accent:#b4522e;--border:#e6dccc;--accent-subtle:rgba(180,82,46,.08);--reader-size:20px}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:100px}body{margin:0;background:var(--bg);color:var(--text);font-family:Verdana,sans-serif;font-size:13px;line-height:1.6}button,input,textarea{font:inherit}button,.file-button{background:transparent;color:var(--text);border:1px solid var(--border);border-radius:5px;cursor:pointer;padding:9px 13px;min-height:44px}button:hover,.file-button:hover{background:var(--accent-subtle);border-color:var(--accent)}button:focus-visible,a:focus-visible,summary:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:4px}button.primary{background:var(--accent);color:var(--bg);border-color:var(--accent)}a{color:var(--accent)}.toolbar{position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 32px;background:var(--bg);border-bottom:1px solid var(--border)}.brand{color:var(--text);text-decoration:none;font-family:Georgia,serif;font-size:22px;line-height:1.3}.brand em{font-weight:normal}.brand-mark{color:var(--accent);padding-right:12px;font-size:29px}.toolbar-actions{display:flex;gap:8px;flex-wrap:wrap}.reading-progress{position:sticky;top:73px;z-index:11;height:2px;background:var(--border)}#progress-bar{height:100%;width:0;background:var(--accent)}.layout{max-width:1250px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:80px;padding:60px 40px}.sidebar{position:sticky;top:108px;align-self:start;max-height:calc(100dvh - 130px);overflow:auto;padding:0 8px 16px 0}.eyebrow{font-size:10px;letter-spacing:.17em;line-height:1.8;color:var(--text-dim);font-weight:bold;margin:0 0 18px}.modes{display:grid;gap:5px}.modes button{border-color:transparent;text-align:left;font-size:14px}.modes span{color:var(--text-dim);margin-right:14px;font-size:11px}.modes button[aria-pressed=true]{background:var(--accent-subtle);border-color:var(--border);color:var(--accent)}.hint{font-size:11px;color:var(--text-dim);line-height:1.7}.switch{display:flex;align-items:center;gap:9px;min-height:44px;cursor:pointer}input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px;flex-shrink:0}.size-control{display:flex;flex-wrap:wrap;justify-content:space-between;margin:14px 0 24px}.size-control input{width:100%;accent-color:var(--accent);margin-top:14px}.size-control output{color:var(--text-dim)}.contents,.session{border-top:1px solid var(--border);padding-top:22px;margin-top:22px}#toc{display:grid;gap:3px}#toc a{display:block;padding:8px 0;color:var(--text-dim);text-decoration:none;font-size:12px;overflow-wrap:anywhere}#toc a[aria-current=true]{color:var(--accent);font-weight:bold}.quiet{border:0;padding:5px 0;font-size:11px;display:block;color:var(--text-dim)}main{max-width:730px;min-width:0}.article-header{border-bottom:1px solid var(--border);padding-bottom:32px}h1{font-family:Georgia,serif;font-size:clamp(36px,5vw,62px);font-weight:normal;letter-spacing:-.045em;line-height:1.09;margin:0 0 25px;overflow-wrap:anywhere}.metadata{display:flex;gap:20px;flex-wrap:wrap;color:var(--text-dim);font-size:11px}.method-note{color:var(--text-dim);font-size:11px;line-height:1.7;margin:22px 0 40px;max-width:560px}article{font-family:Georgia,'Times New Roman',serif;font-size:var(--reader-size);line-height:1.85;overflow-wrap:anywhere}article h2,article h3{font-weight:normal;line-height:1.3;margin:48px 0 24px;letter-spacing:-.02em}article h2{font-size:1.6em}article h3{font-size:1.25em}article p{margin:0 0 24px}article li{margin-bottom:18px}article pre{white-space:pre-wrap;font-size:.75em;line-height:1.6;background:var(--surface);padding:20px;border:1px solid var(--border);border-radius:5px;overflow-wrap:anywhere}article blockquote{border-left:2px solid var(--accent);margin:24px 0;padding-left:24px;color:var(--text-dim)}.sentence{transition:color .3s,opacity .5s}body[data-mode=focus].scrolling .sentence.secondary{opacity:.35}body[data-mode=focus].scrolling .sentence.key{color:var(--accent)}.skim-context{margin-bottom:28px}.skim-context summary{color:var(--text-dim);cursor:pointer;font-family:Verdana,sans-serif;font-size:11px;padding:6px 10px;display:list-item;width:fit-content;background:var(--accent-subtle);border-radius:4px;margin-bottom:12px}.context-copy{margin-top:16px}.section-fold>summary{cursor:pointer;padding:0 0 22px}.section-fold>summary h2,.section-fold>summary h3{display:inline}.section-fold{margin-top:45px}.section-fold[open]>summary{padding-bottom:0}.section-preview{font-size:.88em;color:var(--text-dim);padding:18px 22px;background:var(--surface);border-left:2px solid var(--border);margin-bottom:25px}.section-preview .excerpt-label{display:block;font:10px Verdana,sans-serif;letter-spacing:.12em;margin-bottom:10px;text-transform:uppercase}.end-note{text-align:center;padding:55px 0 20px;border-top:1px solid var(--border);margin-top:50px;color:var(--text-dim)}.end-note>span{font-size:26px;color:var(--accent)}.end-note p{font-family:Georgia,serif;font-style:italic;font-size:20px}.status{position:fixed;bottom:15px;left:50%;transform:translateX(-50%);max-width:calc(100% - 32px);z-index:30;background:var(--surface);border-radius:5px;box-shadow:0 3px 20px #0002;padding:10px 18px;margin:0}.status:empty{display:none}dialog{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:10px;width:min(680px,calc(100% - 28px));max-height:90dvh;padding:30px;overflow:auto}dialog::backdrop{background:#0007}dialog h2{font:36px Georgia,serif;letter-spacing:-.03em;margin:12px 0}dialog p{color:var(--text-dim)}.dialog-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.dialog-heading .eyebrow{margin:0}.dialog-heading button{font-size:24px;line-height:1}dialog label:not(.file-button){display:block;margin:20px 0 8px}dialog input[type=text],dialog textarea{display:block;width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:12px}dialog textarea{resize:vertical;line-height:1.6}.import-actions,.dialog-bottom{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-top:14px}.file-button{font-size:12px;position:relative;overflow:hidden}.file-button input{position:absolute;inset:0;opacity:0;width:100%;cursor:pointer}.file-button:focus-within{outline:2px solid var(--accent);outline-offset:3px}#char-count{font-size:11px;color:var(--text-dim)}#import-error{color:var(--accent);margin:12px 0;min-height:22px}
+#options-toggle{display:none}
+@media(max-width:950px){.layout{gap:35px;grid-template-columns:200px minmax(0,1fr);padding:40px 24px}}
+@media(max-width:680px){.toolbar{padding:10px 16px;align-items:center}.brand{font-size:17px}.brand-mark{padding-right:5px;font-size:22px}.toolbar-actions{gap:4px}.toolbar-actions button{font-size:10px;padding:8px}.reading-progress{top:65px}.layout{display:block;padding:24px 20px}.sidebar{position:static;max-height:none;overflow:visible;padding:0}.modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}.modes button{padding:8px;text-align:center;font-size:12px}.modes span{display:none}.sidebar>.eyebrow{margin-bottom:8px}.sidebar>#mode-description{margin:8px 0}.size-control{margin:8px 0 20px}.contents{margin:16px 0 30px;padding-top:14px}#toc{grid-template-columns:repeat(2,minmax(0,1fr));gap:0 15px}.session{margin:16px 0;padding:14px 0}.session .hint{max-width:400px}.session button{display:inline-block;margin-right:15px}.session #progress-text{float:right}.article-header{padding-top:28px}.article-header>.eyebrow{max-width:260px}.method-note{margin-bottom:30px}dialog{padding:20px}dialog h2{font-size:30px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.sentence{transition:none}}
+@media(max-width:680px){#options-toggle{display:block;width:100%;font-size:11px;text-align:left;margin:12px 0 6px}#reading-options:not(.expanded){display:none}}
+
+</style>
+<link id="site-canonical" rel="canonical" href="https://tools.soumendrak.com/t/long-form-reader">
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--card:#2d251f;--card2:#38302a;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--card:#ffffff;--card2:#efe6d8;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<header class="toolbar">
+  <a class="brand" href="#top"><span class="brand-mark" aria-hidden="true">¶</span> Long-form <em>Reader</em></a>
+  <div class="toolbar-actions"><button id="new-article">Open text</button><button id="theme" aria-label="Toggle light and dark theme">Light / dark</button></div>
+</header>
+<div class="reading-progress" role="progressbar" aria-label="Reading progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="progress-bar"></div></div>
+<div class="layout">
+<aside class="sidebar" aria-label="Reading controls">
+  <p class="eyebrow">YOUR READING LENS</p>
+  <div class="modes" role="group" aria-label="Reading mode">
+    <button data-mode="full" aria-pressed="true"><span>01</span> Full text</button>
+    <button data-mode="skim" aria-pressed="false"><span>02</span> Skim</button>
+    <button data-mode="focus" aria-pressed="false"><span>03</span> Focus</button>
+  </div>
+  <p id="mode-description" class="hint">The complete article, at your pace.</p>
+  <button id="options-toggle" aria-expanded="false" aria-controls="reading-options">Reading settings & contents</button>
+  <div id="reading-options">
+  <label class="switch"><input id="fold" type="checkbox"> Fold sections</label>
+  <label class="size-control" for="font-size">Text size <output id="size-label">20px</output><input id="font-size" type="range" min="16" max="28" value="20"></label>
+  <div class="contents"><p class="eyebrow">IN THIS PIECE</p><nav id="toc" aria-label="Article contents"></nav></div>
+  <div class="session"><p id="progress-text">0% read</p><label class="switch"><input id="save" type="checkbox"> Remember this article</label><p class="hint">Optional. Stores text and position in this browser. Nothing is sent anywhere.</p><button id="forget" class="quiet">Clear saved article</button><button id="download" class="quiet">Download original text</button></div>
+  </div>
+</aside>
+<main id="top">
+  <div class="article-header"><p class="eyebrow">A LITTLE LESS FRICTION. A LITTLE MORE READING.</p><h1 id="article-title"></h1><div class="metadata"><span id="stats"></span><span id="source-label">Built-in sample</span></div></div>
+  <p class="method-note">Reading cues are automatic excerpts, not AI summaries. Skim keeps selected original sentences; expand any passage for its full context.</p>
+  <article id="article" aria-label="Article text"></article>
+  <div class="end-note"><span aria-hidden="true">◇</span><p>End of this piece.</p><button id="another">Read something else</button></div>
+</main>
+</div>
+<p id="status" class="status" role="status"></p>
+<dialog id="import-dialog" aria-labelledby="dialog-title">
+  <form id="import-form">
+    <div class="dialog-heading"><p class="eyebrow">MAKE ROOM FOR A GOOD READ</p><button id="close-dialog" type="button" aria-label="Close import dialog">×</button></div>
+    <h2 id="dialog-title">Bring your own words.</h2>
+    <p>Paste an article or open a text / Markdown file. Headings, paragraphs, lists, and code blocks are preserved. Other Markdown syntax is shown as text.</p>
+    <label for="title-input">Title <span class="hint">(optional; a # heading also works)</span></label><input id="title-input" type="text" maxlength="200" placeholder="The piece you’ve been meaning to read">
+    <label for="text-input">Article text</label><textarea id="text-input" rows="10" maxlength="200000" placeholder="Paste your article here…" required></textarea>
+    <div class="import-actions"><label class="file-button" for="file-input">Open .txt / .md file<input id="file-input" type="file" accept=".txt,.md,.markdown,text/plain,text/markdown"></label><span id="char-count">0 / 200,000 characters</span></div>
+    <p id="import-error" role="alert"></p>
+    <div class="dialog-bottom"><button id="sample" type="button">Use sample</button><button class="primary" type="submit">Start reading →</button></div>
+    <p class="hint">No uploads, accounts, or API keys. To read a web article, copy its text here.</p>
+  </form>
+</dialog>
+<script id="reader-core">
+/* Pure text processing. Imported by the reader and by the Node regression tests.
+   Never interpret pasted HTML; every imported string is rendered as text. */
+(function (root) {
+  function words(text) {
+    // Unicode-aware: Odia and other scripts do not disappear from counts.
+    return text.match(/[\p{L}\p{N}][\p{L}\p{M}\p{N}]*(?:[’'-][\p{L}\p{M}\p{N}]+)*/gu) || [];
+  }
+  function sentences(text) {
+    if (typeof Intl.Segmenter === 'function') {
+      return [...new Intl.Segmenter(undefined, { granularity: 'sentence' }).segment(text)].map(s => s.segment);
+    }
+    return text.match(/[^.!?।]+[.!?।]+\s*|[^.!?।]+$/g) || [text];
+  }
+  function parse(text, suppliedTitle = '') {
+    const lines = text.replace(/\r\n?/g, '\n').split('\n');
+    let title = suppliedTitle.trim(), titleFound = false, section = { heading: '', level: 2, blocks: [] };
+    const sections = [section];
+    let pending = [], code = null;
+    const flush = () => { if (pending.length) section.blocks.push({ type: 'paragraph', text: pending.join(' ') }); pending = []; };
+    for (const line of lines) {
+      if (/^\s*```/.test(line)) {
+        flush();
+        if (code === null) code = [];
+        else { section.blocks.push({ type: 'code', text: code.join('\n') }); code = null; }
+        continue;
+      }
+      if (code !== null) { code.push(line); continue; }
+      const heading = line.match(/^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/);
+      if (heading) {
+        flush();
+        if (heading[1].length === 1 && !titleFound && !section.heading && !section.blocks.length && sections.length === 1) {
+          if (!title) title = heading[2];
+          titleFound = true;
+        } else {
+          section = { heading: heading[2], level: heading[1].length > 2 ? 3 : 2, blocks: [] };
+          sections.push(section);
+        }
+      } else if (!line.trim()) flush();
+      else {
+        const item = line.match(/^\s*(?:([-+*])|(\d+)[.)])\s+(.+)$/);
+        if (item) {
+          flush();
+          const ordered = !!item[2];
+          let list = section.blocks.at(-1);
+          if (!list || list.type !== 'list' || list.ordered !== ordered) {
+            list = { type: 'list', ordered, start: ordered ? Number(item[2]) : 1, items: [] };
+            section.blocks.push(list);
+          }
+          list.items.push(item[3]);
+        } else if (/^\s*>\s?/.test(line)) {
+          flush();
+          const quote = line.replace(/^\s*>\s?/, '');
+          const last = section.blocks.at(-1);
+          if (last?.type === 'quote') last.text += ' ' + quote;
+          else section.blocks.push({ type: 'quote', text: quote });
+        } else if (/^\s{2,}\S/.test(line) && section.blocks.at(-1)?.type === 'list') {
+          const list = section.blocks.at(-1); list.items[list.items.length - 1] += ' ' + line.trim();
+        } else pending.push(line.trim());
+      }
+    }
+    flush();
+    if (code !== null) section.blocks.push({ type: 'code', text: code.join('\n') });
+    return { title: title || 'Untitled reading', sections: sections.filter(s => s.heading || s.blocks.length), wordCount: words(text).length };
+  }
+  function analyze(section) {
+    const passages = section.blocks.flatMap(b => b.type === 'list' ? b.items : b.type === 'code' ? [] : [b.text]);
+    const all = passages.flatMap(sentences);
+    const frequencies = new Map();
+    // Long recurring words provide a modest topic signal. Openings and endings
+    // receive a bonus; this is an extractive aid, never a claim of understanding.
+    for (const token of words(passages.join(' '))) {
+      const key = token.toLocaleLowerCase();
+      if (key.length >= 5) frequencies.set(key, (frequencies.get(key) || 0) + 1);
+    }
+    const ranked = all.map((text, index) => {
+      const tokens = words(text), score = tokens.reduce((sum, w) => sum + Math.min(frequencies.get(w.toLocaleLowerCase()) || 0, 5), 0) / Math.sqrt(Math.max(tokens.length, 1));
+      return { index, score: score + (index === 0 ? 5 : 0) + (index === all.length - 1 ? 2 : 0) };
+    }).sort((a, b) => b.score - a.score || a.index - b.index);
+    const selected = new Set(ranked.slice(0, Math.max(1, Math.ceil(all.length * .3))).map(s => s.index));
+    return { all, selected, excerpt: all.filter((_, i) => selected.has(i)).slice(0, 2).join(' ').trim() };
+  }
+  root.ReaderCore = { words, sentences, parse, analyze };
+})(globalThis);
+
+</script>
+<script id="reader-app">
+/* Long-form Reader: all content stays in this tab unless saving is opted into. */
+'use strict';
+const $ = id => document.getElementById(id);
+const { parse, analyze, sentences } = ReaderCore;
+const STORAGE = 'long-form-reader:v1', SETTINGS = 'long-form-reader:settings:v1', MAX = 200000;
+const SAMPLE = `# The art of paying attention
+
+## A quieter way to read
+
+There is a peculiar kind of tiredness that comes from reading all day and remembering very little. We move from a message to a document, from a document to an article, and from that article to a dozen open tabs. Each piece feels urgent. Together, they become a blur.
+
+The problem is not always the amount of information. Sometimes it is the absence of a deliberate way to move through it. Reading asks us to choose what deserves a glance, what deserves a pause, and what deserves another visit.
+
+A good reading tool should make those choices easier without making them for us. It should leave the author's words intact, keep the surrounding context close, and let us change our pace as we go.
+
+## Three different speeds
+
+We do not read a recipe the same way we read a poem. We should not expect to read every essay at one speed either. Different questions call for different kinds of attention.
+
+1. Survey the landscape. Read the headings and a few original sentences to find the shape of the argument. This is a way to decide where to spend your attention, rather than a substitute for the whole piece.
+2. Follow the thread. Read continuously, taking in the examples and qualifications that connect one idea to another. The meaning often lives in those connections.
+3. Stay with a difficult passage. Slow down, read it twice, and notice the precise words the writer chose. Sometimes the sentence that initially looks unimportant is the one that changes everything.
+
+Moving between these speeds is a skill. A survey can lead to a careful reading; a careful reading can send you back to the beginning. There is no rule that says you must proceed at a constant pace.
+
+## Context is part of the meaning
+
+A memorable sentence can be misleading when it travels alone. A writer may be describing a possibility, quoting an opponent, or qualifying a claim they made earlier. The sentence survives, but the conditions around it disappear.
+
+That is why a useful skim view needs a way back to the full text. Keep a passage's context one click away. A short excerpt is an invitation to look more closely, not a verdict about what matters.
+
+> The purpose of a reading aid is to help us return to the words with better questions.
+
+Automatic selection is imperfect. A rule that favors an opening sentence may miss the reversal in the middle. A rule that favors repeated words may overlook the most surprising idea. Treat highlighted sentences as suggestions, and check the passages around them.
+
+## Build a small reading ritual
+
+Before you begin, ask what you hope to understand. A question gives your attention somewhere to go. It can be as simple as wanting to know why the writer changed their mind.
+
+- Remove one distraction. You do not need a perfect environment; one fewer interruption is a useful beginning.
+- Choose your first pace. Start with the whole piece or survey its sections, depending on your question.
+- Stop at an interesting claim. Ask what evidence supports it, and what might change your view.
+- Leave a way back. Remember your position if you plan to return, and keep the original text available.
+
+At the end, try describing the argument in your own words. If you cannot do it yet, that is useful information. Return to the part that still feels unclear instead of collecting another article.
+
+Reading well is not a race to finish. It is the practice of noticing what a piece of writing makes possible: a new distinction, a better question, or a change in how we see something familiar.
+`;
+let raw = SAMPLE, titleOverride = '', article, mode = 'full', folded = false, savedProgress = 0;
+let scrollTimer, saveTimer, statusTimer, pendingImport = 0;
+function el(tag, text, className) {
+  const node = document.createElement(tag);
+  if (text !== undefined) node.textContent = text;
+  if (className) node.className = className;
+  return node;
+}
+function notice(text) { $('status').textContent = text; clearTimeout(statusTimer); statusTimer = setTimeout(() => $('status').textContent = '', 4500); }
+function storageGet(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } }
+function persist() {
+  if (!$('save').checked) return;
+  try {
+    savedProgress = locationMark();
+    const expanded = [...$('article').children].flatMap((s, i) => s.querySelector('.section-fold')?.open ? [i] : []);
+    localStorage.setItem(STORAGE, JSON.stringify({ text: raw, title: titleOverride, progress: savedProgress, expanded }));
+  }
+  catch { $('save').checked = false; notice('Could not save. Browser storage may be unavailable or full. Your article is still open.'); }
+}
+function settings() {
+  try { localStorage.setItem(SETTINGS, JSON.stringify({ mode, folded, size: Number($('font-size').value) })); } catch { /* Reading remains usable with storage blocked. */ }
+}
+function renderPassage(text, parent, analysis, cursor, tag = 'p') {
+  const parts = sentences(text), start = cursor.value;
+  cursor.value += parts.length;
+  if (mode !== 'skim') {
+    const p = el(tag);
+    parts.forEach((s, i) => p.append(el('span', s, 'sentence ' + (analysis.selected.has(start + i) ? 'key' : 'secondary'))));
+    parent.append(p); return;
+  }
+  const selected = parts.filter((_, i) => analysis.selected.has(start + i));
+  // Keep list markers attached to content even when an item's sentences were not selected.
+  const visible = selected.length ? selected : tag === 'li' ? [parts[0]] : [];
+  const wrapper = tag === 'li' ? el('li') : parent;
+  if (tag === 'li') parent.append(wrapper);
+  if (visible.length) wrapper.append(el('p', visible.join(' ')));
+  if (visible.length < parts.length) {
+    const details = el('details', undefined, 'skim-context');
+    details.append(el('summary', visible.length ? '… Read full passage' : '… Read supporting passage'), el('p', text, 'context-copy'));
+    wrapper.append(details);
+  }
+}
+function renderBlocks(section, parent, analysis) {
+  const cursor = { value: 0 };
+  section.blocks.forEach(b => {
+    if (b.type === 'code') parent.append(el('pre', b.text));
+    else if (b.type === 'list') {
+      const list = el(b.ordered ? 'ol' : 'ul');
+      if (b.ordered) list.start = b.start;
+      b.items.forEach(text => renderPassage(text, list, analysis, cursor, 'li')); parent.append(list);
+    } else if (b.type === 'quote') {
+      const quote = el('blockquote'); renderPassage(b.text, quote, analysis, cursor); parent.append(quote);
+    } else renderPassage(b.text, parent, analysis, cursor);
+  });
+}
+function render() {
+  article = parse(raw, titleOverride);
+  $('article-title').textContent = article.title;
+  $('stats').textContent = `${article.wordCount.toLocaleString()} words · ${Math.max(1, Math.ceil(article.wordCount / 220))} min read`;
+  $('article').replaceChildren(); $('toc').replaceChildren();
+  article.sections.forEach((s, i) => {
+    const section = el('section'); section.id = 'section-' + i;
+    const analysis = analyze(s);
+    if (s.heading && folded) {
+      const details = el('details', undefined, 'section-fold');
+      const summary = el('summary'); summary.append(el('h' + s.level, s.heading));
+      const preview = el('div', undefined, 'section-preview');
+      preview.append(el('span', 'Opening / key excerpt', 'excerpt-label'), el('span', analysis.excerpt || 'This section contains code or no prose. Expand to read it.'));
+      details.append(summary); section.append(details, preview);
+      renderBlocks(s, details, analysis);
+      details.addEventListener('toggle', () => { preview.hidden = details.open; updateProgress(); });
+    } else {
+      if (s.heading) section.append(el('h' + s.level, s.heading));
+      renderBlocks(s, section, analysis);
+    }
+    $('article').append(section);
+    const link = el('a', s.heading || 'Opening'); link.href = '#' + section.id;
+    link.addEventListener('click', event => {
+      event.preventDefault();
+      const details = section.querySelector('.section-fold'); if (details) details.open = true;
+      section.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+      section.tabIndex = -1; section.focus({ preventScroll: true });
+    });
+    $('toc').append(link);
+  });
+  document.body.dataset.mode = mode;
+  document.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
+  $('mode-description').textContent = { full: 'The complete article, at your pace.', skim: 'Selected original sentences. Expand the gaps for context.', focus: 'While scrolling, key sentences stand out. At rest, all text returns.' }[mode];
+  updateProgress();
+}
+// Track a location in the *original document*, not page height: changing lenses
+// or folding a section must not silently rewrite the saved reading position.
+function locationMark() {
+  if ($('article').getBoundingClientRect().top > 150) return { section: 0, offset: 0, before: true, scrollY: window.scrollY };
+  const sections = [...$('article').children];
+  let index = 0;
+  sections.forEach((s, i) => { if (s.getBoundingClientRect().top <= 150) index = i; });
+  const section = sections[index];
+  if (!section) return { section: 0, offset: 0 };
+  return { section: index, offset: Math.max(0, Math.min(1, (150 - section.getBoundingClientRect().top) / Math.max(1, section.offsetHeight))) };
+}
+function restoreMark(mark) {
+  if (mark.before) { window.scrollTo({ top: mark.scrollY || 0, behavior: 'instant' }); return; }
+  const section = $('article').children[mark.section];
+  if (section) window.scrollTo({ top: Math.max(0, section.getBoundingClientRect().top + window.scrollY + section.offsetHeight * mark.offset - 150), behavior: 'instant' });
+}
+function updateProgress() {
+  const start = $('article').getBoundingClientRect().top + window.scrollY;
+  const end = $('article').getBoundingClientRect().bottom + window.scrollY;
+  const ratio = Math.max(0, Math.min(1, (window.scrollY + window.innerHeight - start) / Math.max(1, end - start)));
+  const percent = Math.round(ratio * 100);
+  $('progress-bar').style.width = percent + '%';
+  document.querySelector('.reading-progress').setAttribute('aria-valuenow', percent);
+  $('progress-text').textContent = percent + '% read';
+  const mark = locationMark();
+  [...$('toc').children].forEach((a, i) => { if (i === mark.section) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current'); });
+}
+function changeLens(change) { const mark = locationMark(); change(); render(); restoreMark(mark); settings(); }
+function openImport() {
+  $('import-error').textContent = ''; $('import-dialog').showModal(); $('title-input').focus();
+}
+function load(text, title = '', source = 'Your text') {
+  raw = text; titleOverride = title; savedProgress = { section: 0, offset: 0 };
+  $('source-label').textContent = source;
+  render(); window.scrollTo({ top: 0, behavior: 'instant' }); persist();
+}
+document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => changeLens(() => mode = b.dataset.mode)));
+$('fold').addEventListener('change', () => changeLens(() => folded = $('fold').checked));
+$('font-size').addEventListener('input', () => {
+  const mark = locationMark(); document.documentElement.style.setProperty('--reader-size', $('font-size').value + 'px');
+  $('size-label').textContent = $('font-size').value + 'px'; restoreMark(mark); updateProgress(); settings();
+});
+['new-article', 'another'].forEach(id => $(id).addEventListener('click', openImport));
+$('options-toggle').addEventListener('click', () => {
+  const expanded = $('reading-options').classList.toggle('expanded');
+  $('options-toggle').setAttribute('aria-expanded', String(expanded));
+});
+$('import-dialog').addEventListener('cancel', () => { pendingImport++; });
+$('close-dialog').addEventListener('click', () => { pendingImport++; $('import-dialog').close(); });
+$('theme').addEventListener('click', () => {
+  const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = theme;
+  try { localStorage.setItem('theme', theme); } catch { /* Optional preference. */ }
+});
+$('text-input').addEventListener('input', () => { pendingImport++; $('char-count').textContent = `${$('text-input').value.length.toLocaleString()} / 200,000 characters`; $('import-error').textContent = ''; });
+$('file-input').addEventListener('change', async () => {
+  const file = $('file-input').files[0], token = ++pendingImport;
+  if (!file) return;
+  if (!/\.(txt|md|markdown)$/i.test(file.name)) { $('import-error').textContent = 'Choose a .txt or .md file.'; $('file-input').value = ''; return; }
+  if (file.size > MAX * 4) { $('import-error').textContent = 'This file is too large. Use up to 200,000 characters.'; $('file-input').value = ''; return; }
+  try {
+    const text = await file.text();
+    if (token !== pendingImport) return;
+    if (text.length > MAX) { $('import-error').textContent = 'This file exceeds 200,000 characters.'; return; }
+    $('text-input').value = text; $('char-count').textContent = `${text.length.toLocaleString()} / 200,000 characters`;
+    $('import-error').textContent = ''; $('text-input').focus();
+  } catch { $('import-error').textContent = 'Could not read this file. Try pasting its text.'; }
+  finally { $('file-input').value = ''; }
+});
+$('import-form').addEventListener('submit', event => {
+  event.preventDefault(); const text = $('text-input').value;
+  if (!text.trim()) { $('import-error').textContent = 'Paste some text to begin.'; return; }
+  if (text.length > MAX) { $('import-error').textContent = 'Use up to 200,000 characters.'; return; }
+  pendingImport++; load(text, $('title-input').value.trim()); $('import-dialog').close(); notice('Your article is ready.');
+});
+$('sample').addEventListener('click', () => { pendingImport++; load(SAMPLE, '', 'Built-in sample'); $('import-dialog').close(); });
+$('save').addEventListener('change', () => {
+  if ($('save').checked) { savedProgress = locationMark(); persist(); if ($('save').checked) notice('Saved in this browser. You can return to this reading position.'); }
+  else clearSaved();
+});
+function clearSaved() {
+  try { localStorage.removeItem(STORAGE); $('save').checked = false; notice('Saved article removed. The current text stays open in this tab.'); }
+  catch { notice('Browser storage is unavailable. Could not remove the saved article.'); }
+}
+$('forget').addEventListener('click', clearSaved);
+$('download').addEventListener('click', () => {
+  const blob = new Blob([raw], { type: 'text/plain;charset=utf-8' }), url = URL.createObjectURL(blob);
+  const a = el('a'); a.href = url; a.download = (article.title.replace(/[^\p{L}\p{N} _-]/gu, '').trim().slice(0, 80) || 'article') + '.txt';
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+window.addEventListener('scroll', () => {
+  document.body.classList.add('scrolling'); clearTimeout(scrollTimer);
+  scrollTimer = setTimeout(() => document.body.classList.remove('scrolling'), 1300);
+  updateProgress(); savedProgress = locationMark(); clearTimeout(saveTimer); saveTimer = setTimeout(persist, 400);
+}, { passive: true });
+window.addEventListener('resize', updateProgress);
+window.addEventListener('pagehide', persist);
+const prefs = storageGet(SETTINGS);
+if (prefs && typeof prefs === 'object') {
+  if (['full', 'skim', 'focus'].includes(prefs.mode)) mode = prefs.mode;
+  folded = prefs.folded === true; $('fold').checked = folded;
+  if (Number.isFinite(prefs.size) && prefs.size >= 16 && prefs.size <= 28) {
+    $('font-size').value = prefs.size; $('size-label').textContent = prefs.size + 'px'; document.documentElement.style.setProperty('--reader-size', prefs.size + 'px');
+  }
+}
+const saved = storageGet(STORAGE);
+if (saved && typeof saved.text === 'string' && saved.text.trim() && saved.text.length <= MAX) {
+  raw = saved.text; titleOverride = typeof saved.title === 'string' ? saved.title.slice(0, 200) : '';
+  $('save').checked = true; $('source-label').textContent = 'Saved in this browser';
+  if (saved.progress && Number.isInteger(saved.progress.section) && saved.progress.section >= 0 && Number.isFinite(saved.progress.offset)) {
+    savedProgress = { section: saved.progress.section, offset: Math.max(0, Math.min(1, saved.progress.offset)), before: saved.progress.before === true, scrollY: Number.isFinite(saved.progress.scrollY) ? Math.max(0, saved.progress.scrollY) : 0 };
+  }
+}
+render();
+if ($('save').checked && Array.isArray(saved?.expanded)) {
+  for (const i of saved.expanded) {
+    if (!Number.isInteger(i) || i < 0) continue;
+    const details = $('article').children[i]?.querySelector('.section-fold');
+    if (details) details.open = true;
+  }
+}
+if (savedProgress && typeof savedProgress === 'object') requestAnimationFrame(() => { restoreMark(savedProgress); updateProgress(); });
+
+</script>
+</body>
+</html>
