@@ -14,7 +14,7 @@
     "skin:tools": "python3 scripts/skin-tools.py",
     "check:tools": "python3 scripts/check-tools.py",
     "tool-dates": "python3 scripts/tool-dates.py",
-    "test": "node scripts/test-emi.mjs && node --test scripts/test-reader.mjs",
+    "test": "node scripts/test-emi.mjs && node --test scripts/test-reader.mjs scripts/test-bmi.mjs",
     "test:reader": "node --test scripts/test-reader.mjs",
     "test:ui": "playwright test",
     "test:all": "pnpm test && pnpm test:ui"

@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BMI Calculator</title>
+<meta name="description" content="Calculate adult body mass index with metric or imperial units, a live BMI scale, and a reference weight range. Private calculations in your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#fff6e5; --surface:#fff; --text:#0d0d0d; --text-dim:#4a4a4a;
+  --ink:var(--text); --yellow:#ffdb58; --red:#ff6b6b; --teal:#4ecdc4; --purple:#a78bfa;
+  --bw:3px; --shadow:5px 5px 0 var(--ink);
+  --sans:"Space Grotesk",system-ui,sans-serif; --display:"Archivo Black",var(--sans);
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+[hidden] { display:none !important; }
+body { font-family:var(--sans); background:var(--bg); color:var(--text); line-height:1.5; min-height:100vh;
+  background-image:radial-gradient(color-mix(in srgb,var(--ink) 7%,transparent) 1.2px,transparent 1.2px); background-size:22px 22px; }
+header { padding:42px 24px 8px; text-align:center; }
+h1 { font-family:var(--display); font-size:2.3rem; text-transform:uppercase; letter-spacing:.01em; text-wrap:balance; }
+h1 mark { background:var(--yellow); color:#0d0d0d; padding:0 8px; box-shadow:var(--shadow); border:var(--bw) solid var(--ink); }
+header p { color:var(--text-dim); font-size:.95rem; font-weight:500; margin-top:12px; }
+.wrap { max-width:1080px; margin:0 auto; padding:30px 20px 64px; }
+.layout { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(0,.95fr); gap:24px; align-items:start; }
+.panel { min-width:0; background:var(--surface); border:var(--bw) solid var(--ink); box-shadow:var(--shadow); padding:24px; }
+h2 { font-family:var(--display); font-size:1rem; text-transform:uppercase; margin-bottom:16px; }
+.panel-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
+.panel-head h2 { margin-bottom:0; }
+.eyebrow { font-size:.68rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+.badge { border:2px solid var(--ink); background:var(--yellow); color:#0d0d0d; padding:3px 8px; }
+.unit-settings { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+.unit-settings .eyebrow { display:block; margin-bottom:7px; }
+.unit-toggle { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); border:var(--bw) solid var(--ink); box-shadow:3px 3px 0 var(--ink); margin-bottom:12px; }
+button { font-family:var(--sans); color:var(--text); background:var(--surface); cursor:pointer; touch-action:manipulation; }
+.unit-toggle button { border:0; min-height:46px; padding:10px 12px; font-size:.85rem; font-weight:700; }
+.unit-toggle button + button { border-left:var(--bw) solid var(--ink); }
+.unit-toggle button[aria-pressed="true"] { background:var(--yellow); color:#0d0d0d; }
+button:focus-visible, summary:focus-visible, a:focus-visible { outline:3px solid var(--teal); outline-offset:4px; }
+.ctrl { padding:22px 0 16px; border-bottom:var(--bw) dashed color-mix(in srgb,var(--ink) 20%,transparent); }
+.ctrl-head { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px; }
+.ctrl-head > label, .ctrl-title { font-weight:700; text-transform:uppercase; font-size:.92rem; }
+.field { display:inline-flex; align-items:center; gap:6px; border:var(--bw) solid var(--ink); padding:0 10px; background:var(--surface); box-shadow:3px 3px 0 var(--ink); }
+.field:focus-within { outline:3px solid var(--teal); outline-offset:1px; }
+.field:has([aria-invalid="true"]) { border-style:dashed; }
+.field input { width:88px; min-height:44px; font:700 1rem var(--sans); font-variant-numeric:tabular-nums; border:0; background:none; color:var(--text); text-align:right; }
+.field input:focus { outline:none; }
+.affix { font-weight:700; font-size:.85rem; }
+.height-pair { display:flex; gap:10px; }
+.height-pair input { width:49px; }
+.slider { appearance:none; width:100%; height:44px; background:none; border:0; cursor:pointer; display:block; }
+.slider::-webkit-slider-runnable-track { height:10px; background:var(--surface); border:2px solid var(--ink); }
+.slider::-moz-range-track { height:10px; background:var(--surface); border:2px solid var(--ink); }
+.slider::-webkit-slider-thumb { appearance:none; width:22px; height:22px; margin-top:-8px; border-radius:0; background:var(--yellow); border:var(--bw) solid var(--ink); box-shadow:2px 2px 0 var(--ink); cursor:grab; }
+.slider::-moz-range-thumb { width:18px; height:18px; border-radius:0; background:var(--yellow); border:var(--bw) solid var(--ink); cursor:grab; }
+.slider:focus-visible { outline:3px solid var(--teal); outline-offset:-5px; }
+.scale { display:flex; justify-content:space-between; gap:8px; font-size:.7rem; color:var(--text-dim); font-weight:500; }
+.error { font-size:.8rem; font-weight:700; margin-top:10px; }
+.controls-bottom { display:flex; justify-content:space-between; gap:14px; align-items:center; margin-top:22px; }
+.hint { font-size:.76rem; font-weight:500; color:var(--text-dim); }
+.btn { flex-shrink:0; min-height:44px; font-size:.76rem; font-weight:700; text-transform:uppercase; padding:8px 14px; border:var(--bw) solid var(--ink); box-shadow:3px 3px 0 var(--ink); transition:transform .12s,box-shadow .12s; }
+.btn:hover { transform:translate(-1px,-1px); box-shadow:4px 4px 0 var(--ink); }
+.btn:active { transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink); }
+.result-hero { text-align:center; padding:4px 0 22px; border-bottom:var(--bw) solid var(--ink); }
+.result-label { display:inline-block; font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; background:var(--teal); color:#0d0d0d; border:2px solid var(--ink); padding:3px 10px; transform:rotate(-1deg); }
+.result-value { font-family:var(--display); font-size:4.2rem; line-height:1.15; margin:16px 0 10px; font-variant-numeric:tabular-nums; }
+.category { display:inline-block; font-weight:700; font-size:.88rem; padding:4px 12px; border:2px solid var(--ink); color:#0d0d0d; background:var(--teal); box-shadow:2px 2px 0 var(--ink); }
+.result-sub { color:var(--text-dim); font-size:.74rem; margin-top:12px; }
+.gauge { margin:28px 0 18px; }
+.gauge-track { position:relative; height:23px; border:var(--bw) solid var(--ink); background:linear-gradient(to right,var(--purple) 0% 28.3333%,var(--teal) 28.3333% 50%,var(--yellow) 50% 66.6667%,var(--red) 66.6667% 100%); }
+.gauge-marker { position:absolute; left:50%; top:-10px; bottom:-10px; width:5px; background:var(--ink); border:1px solid var(--surface); transform:translateX(-50%); }
+.gauge-marker::before { content:""; position:absolute; left:50%; top:-7px; transform:translateX(-50%); border-left:6px solid transparent; border-right:6px solid transparent; border-top:7px solid var(--ink); }
+.gauge-ticks { position:relative; height:23px; margin-top:8px; font-size:.67rem; font-weight:700; }
+.gauge-ticks span { position:absolute; transform:translateX(-50%); }
+.gauge-ticks span:first-child { left:0; transform:none; }
+.gauge-ticks span:last-child { right:0; transform:none; }
+.range-box { padding:14px; border:var(--bw) solid var(--ink); background:var(--teal); color:#0d0d0d; box-shadow:3px 3px 0 var(--ink); }
+.range-box strong { font-family:var(--display); display:block; font-size:1.35rem; margin:5px 0; font-variant-numeric:tabular-nums; }
+.range-box p { font-size:.74rem; font-weight:500; }
+.empty { padding:26px 0 10px; text-align:center; color:var(--text-dim); font-size:.88rem; }
+.reference-panel,.about-panel { grid-column:1 / -1; }
+.reference-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+.reference-item { position:relative; border:2px solid var(--ink); padding:15px 12px; border-top:8px solid var(--category-color); }
+.reference-item[aria-current="true"] { box-shadow:3px 3px 0 var(--ink); background:color-mix(in srgb,var(--category-color) 14%,var(--surface)); }
+.reference-item h3 { font-size:.84rem; font-weight:700; }
+.reference-item p { font-size:.8rem; color:var(--text-dim); margin-top:5px; }
+.current { display:block; font-size:.62rem; letter-spacing:.04em; text-transform:uppercase; font-weight:700; margin-top:9px; }
+.reference-note { margin-top:16px; font-size:.76rem; color:var(--text-dim); }
+.about-panel details { border-bottom:2px dashed color-mix(in srgb,var(--ink) 20%,transparent); }
+.about-panel details:last-of-type { border:0; }
+summary { cursor:pointer; font-weight:700; font-size:.9rem; padding:12px 0; }
+.a-body { color:var(--text-dim); font-size:.85rem; padding-bottom:16px; max-width:83ch; }
+.formula { display:block; color:var(--text); background:color-mix(in srgb,var(--ink) 6%,transparent); border-left:var(--bw) solid var(--ink); font: .85rem ui-monospace,monospace; padding:10px 12px; margin:10px 0; overflow-wrap:anywhere; }
+a { color:var(--text); text-underline-offset:3px; }
+.privacy { margin:22px auto 0; text-align:center; font-size:.75rem; color:var(--text-dim); }
+@media(max-width:860px) { .layout { grid-template-columns:minmax(0,1fr); } }
+@media(max-width:560px) {
+  header { padding:30px 18px 8px; } h1 { font-size:1.8rem; } header p { font-size:.85rem; }
+  .wrap { padding:24px 16px 44px; } .panel { padding:20px 16px; } .reference-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media(prefers-reduced-motion:reduce) { * { transition:none !important; } }
+</style>
+<link id="site-canonical" rel="canonical" href="https://tools.soumendrak.com/t/bmi">
+<style id="site-theme-override">
+:root[data-theme="dark"]{--bg:#231c17;--surface:#2d251f;--bg-card:#2d251f;--bg-toggle:#38302a;--card-bg:#2d251f;--card:#2d251f;--card2:#38302a;--border:#3a3129;--text:#f2ebe0;--fg:#f2ebe0;--text-dim:#b0a496;--text-muted:#8a7d6f;--muted:#b0a496;--accent:#d17d5c;--accent-light:#e19b7f;--accent-dark:#b4522e;--accent-dim:#b4522e;--accent-hover:#e19b7f;--accent-glow:rgba(209,125,92,.25);--accent-subtle:rgba(209,125,92,.12);--orange:#d17d5c;--orange-glow:rgba(209,125,92,.4);--orange-dim:rgba(209,125,92,.14);color-scheme:dark;}
+:root[data-theme="light"]{--bg:#f7f0e6;--surface:#fdf8f0;--bg-card:#ffffff;--bg-toggle:#efe6d8;--card-bg:#ffffff;--card:#ffffff;--card2:#efe6d8;--border:#e6dccc;--text:#2a201a;--fg:#2a201a;--text-dim:#6f6255;--text-muted:#948676;--muted:#6f6255;--accent:#b4522e;--accent-light:#c96a44;--accent-dark:#9c4527;--accent-dim:#b4522e;--accent-hover:#9c4527;--accent-glow:rgba(180,82,46,.18);--accent-subtle:rgba(180,82,46,.08);--orange:#b4522e;--orange-glow:rgba(180,82,46,.28);--orange-dim:rgba(180,82,46,.12);color-scheme:light;}
+</style>
+<script id="site-theme-sync">(function(){function a(t){document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}var t;try{t=localStorage.getItem('theme');}catch(e){}if(!t){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}a(t);addEventListener('storage',function(e){if(e.key==='theme'&&e.newValue)a(e.newValue);});addEventListener('message',function(e){if(e.data&&e.data.__theme)a(e.data.__theme);});})();</script>
+</head>
+<body>
+<header>
+  <h1><mark>BMI</mark> Calculator</h1>
+  <p>A little perspective on your height and weight. Numbers, with context.</p>
+</header>
+<main class="wrap">
+<div class="layout">
+  <section class="panel" aria-labelledby="measurements-heading">
+    <div class="panel-head"><h2 id="measurements-heading">Your measurements</h2><span class="eyebrow badge">Adults 20+</span></div>
+    <div class="unit-settings">
+      <div><span class="eyebrow" id="height-units-label">Height unit</span><div class="unit-toggle" role="group" aria-labelledby="height-units-label">
+        <button id="height-metric" type="button" aria-pressed="true">cm</button>
+        <button id="height-imperial" type="button" aria-pressed="false">ft / in</button>
+      </div></div>
+      <div><span class="eyebrow" id="weight-units-label">Weight unit</span><div class="unit-toggle" role="group" aria-labelledby="weight-units-label">
+        <button id="weight-metric" type="button" aria-pressed="true">kg</button>
+        <button id="weight-imperial" type="button" aria-pressed="false">lb</button>
+      </div></div>
+    </div>
+    <form id="measurements" novalidate autocomplete="off">
+      <div class="ctrl">
+        <div class="ctrl-head">
+          <label id="height-label" for="height-cm">Height</label>
+          <div class="field" id="metric-height"><input id="height-cm" type="number" inputmode="decimal" min="100" max="250" step="any" value="170" aria-describedby="height-error"><span class="affix">cm</span></div>
+          <div class="height-pair" id="imperial-height" hidden>
+            <label class="field"><input id="height-ft" type="number" inputmode="numeric" min="3" max="8" step="1" aria-label="Height in feet" aria-describedby="height-error"><span class="affix">ft</span></label>
+            <label class="field"><input id="height-in" type="number" inputmode="decimal" min="0" max="11.9" step="0.1" aria-label="Additional inches" aria-describedby="height-error"><span class="affix">in</span></label>
+          </div>
+        </div>
+        <input class="slider" id="height-slider" type="range" min="100" max="250" step="0.1" value="170" aria-label="Height in centimeters">
+        <div class="scale"><span id="height-min">100 cm</span><span id="height-max">250 cm</span></div>
+        <p class="error" id="height-error" aria-live="polite" hidden></p>
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-head"><label for="weight">Weight</label><div class="field"><input id="weight" type="number" inputmode="decimal" min="20" max="350" step="any" value="70" aria-describedby="weight-error"><span id="weight-unit" class="affix">kg</span></div></div>
+        <input class="slider" id="weight-slider" type="range" min="20" max="350" step="0.1" value="70" aria-label="Weight in kilograms">
+        <div class="scale"><span id="weight-min">20 kg</span><span id="weight-max">350 kg</span></div>
+        <p class="error" id="weight-error" aria-live="polite" hidden></p>
+      </div>
+      <div class="controls-bottom"><p class="hint">Change a value or drag a slider.<br>Your result updates instantly.</p><button type="button" class="btn" id="reset">Reset</button></div>
+    </form>
+  </section>
+  <section class="panel" aria-labelledby="result-heading">
+    <h2 id="result-heading">Your result</h2>
+    <div class="result-hero" role="status" aria-live="polite" aria-atomic="true">
+      <span class="result-label">Body mass index</span>
+      <div id="bmi-value" class="result-value">—</div>
+      <span id="bmi-category" class="category" hidden></span>
+      <p id="result-sub" class="result-sub">Enter your height and weight.</p>
+    </div>
+    <div id="result-details" hidden>
+      <div class="gauge" aria-hidden="true"><div class="gauge-track"><span id="gauge-marker" class="gauge-marker"></span></div><div class="gauge-ticks"><span>10</span><span style="left:28.3333%">18.5</span><span style="left:50%">25</span><span style="left:66.6667%">30</span><span>40</span></div></div>
+      <div class="range-box"><span class="eyebrow">Reference weight range</span><strong id="weight-range"></strong><p id="range-context"></p></div>
+    </div>
+    <p id="empty-result" class="empty">Add valid measurements to see your BMI and reference range.</p>
+  </section>
+  <section class="panel reference-panel" aria-labelledby="reference-heading">
+    <h2 id="reference-heading">Where the number sits</h2>
+    <div class="reference-grid">
+      <div class="reference-item" data-category="underweight" style="--category-color:var(--purple)"><h3>Underweight</h3><p>Below 18.5</p><span class="current" hidden>Your category</span></div>
+      <div class="reference-item" data-category="healthy" style="--category-color:var(--teal)"><h3>Healthy weight</h3><p>18.5 to &lt; 25</p><span class="current" hidden>Your category</span></div>
+      <div class="reference-item" data-category="overweight" style="--category-color:var(--yellow)"><h3>Overweight</h3><p>25 to &lt; 30</p><span class="current" hidden>Your category</span></div>
+      <div class="reference-item" data-category="obesity" style="--category-color:var(--red)"><h3>Obesity</h3><p>30 and above</p><span class="current" hidden>Your category</span></div>
+    </div>
+    <p class="reference-note">Standard adult categories. Classification uses your unrounded BMI; the large number is rounded to two decimals. The visual scale runs from 10 to 40; results outside it sit at the nearest edge.</p>
+  </section>
+  <section class="panel about-panel" aria-labelledby="about-heading">
+    <h2 id="about-heading">Behind the number</h2>
+    <details open><summary>What does BMI tell me?</summary><div class="a-body">BMI is a screening measure based on height and weight, not a diagnosis or a direct measure of body fat. It does not distinguish muscle from fat. A clinician can interpret it alongside your health history and other measurements. This calculator uses adult categories for ages 20 and older; children and teens need BMI-for-age assessment.</div></details>
+    <details><summary>How is it calculated?</summary><div class="a-body">Weight in kilograms divided by height in meters squared.<code class="formula">BMI = weight (kg) / height (m)²</code>Imperial measurements are converted using 1 inch = 2.54 cm and 1 pound = 0.45359237 kg before calculating. This tool accepts heights from 100 to 250 cm and weights from 20 to 350 kg, or their imperial equivalents.</div></details>
+    <details><summary>What is the reference weight range?</summary><div class="a-body">It is the weight interval that corresponds to a BMI of 18.5 up to, but not including, 25 at your height. It is a mathematical reference, not a personal weight goal. The lower displayed endpoint is rounded up and the upper endpoint down to the nearest 0.1 unit so the displayed values stay inside the interval.</div></details>
+    <p class="reference-note">Source: <a href="https://www.cdc.gov/bmi/adult-calculator/bmi-categories.html" target="_blank" rel="noopener noreferrer">CDC adult BMI categories</a> and <a href="https://www.cdc.gov/bmi/faq/" target="_blank" rel="noopener noreferrer">BMI limitations</a>.</p>
+  </section>
+</div>
+<p class="privacy">Calculated in your browser. Your measurements are never uploaded or saved.</p>
+</main>
+<script id="bmi-core">
+"use strict";
+const BMI = (() => {
+  const LB_KG = 0.45359237;
+  function category(value) {
+    if (value < 18.5) return { key:"underweight", label:"Underweight", color:"var(--purple)" };
+    if (value < 25) return { key:"healthy", label:"Healthy weight", color:"var(--teal)" };
+    if (value < 30) return { key:"overweight", label:"Overweight", color:"var(--yellow)" };
+    return { key:"obesity", label:"Obesity", color:"var(--red)" };
+  }
+  function calculate(heightCm, weightKg) {
+    if (!Number.isFinite(heightCm) || heightCm < 100 || heightCm > 250 || !Number.isFinite(weightKg) || weightKg < 20 || weightKg > 350) return null;
+    const square = (heightCm / 100) ** 2;
+    const value = weightKg / square;
+    return { value, category:category(value), low:18.5 * square, high:25 * square };
+  }
+  // Displayed endpoints stay inside the half-open reference interval [18.5, 25).
+  function range(low, high) { return [Math.ceil(low * 10) / 10, (Math.ceil(high * 10) - 1) / 10]; }
+  return { LB_KG, category, calculate, range };
+})();
+</script>
+<script id="bmi-ui">
+(() => {
+  const $ = id => document.getElementById(id);
+  let heightUnits = "metric";
+  let weightUnits = "metric";
+  let heightCm = 170;
+  let weightKg = 70;
+  const number = id => $(id).value.trim() === "" ? NaN : $(id).valueAsNumber;
+  const rounded = value => Number(value.toFixed(6));
+  const inBounds = (value, min, max) => Number.isFinite(value) && value >= min && value <= max;
+
+  function heightFields() {
+    const metric = heightUnits === "metric";
+    $("height-metric").setAttribute("aria-pressed", String(metric));
+    $("height-imperial").setAttribute("aria-pressed", String(!metric));
+    $("metric-height").hidden = !metric;
+    $("imperial-height").hidden = metric;
+    $("height-label").htmlFor = metric ? "height-cm" : "height-ft";
+    $("height-cm").value = Number.isFinite(heightCm) ? rounded(heightCm) : "";
+    if (Number.isFinite(heightCm)) {
+      // Round the total first so 11.96 inches carries into the next whole foot.
+      const inches = Math.round(heightCm / 2.54 * 10) / 10;
+      $("height-ft").value = Math.floor(inches / 12);
+      $("height-in").value = Number((inches % 12).toFixed(1));
+    } else { $("height-ft").value = ""; $("height-in").value = ""; }
+    $("height-min").textContent = metric ? "100 cm" : "3 ft 3.4 in";
+    $("height-max").textContent = metric ? "250 cm" : "8 ft 2.4 in";
+    // Keep the height slider in canonical cm so its endpoints stay exact in both systems.
+    $("height-slider").setAttribute("aria-label", metric ? "Height in centimeters" : "Height");
+  }
+  function weightFields() {
+    const metric = weightUnits === "metric";
+    $("weight-metric").setAttribute("aria-pressed", String(metric));
+    $("weight-imperial").setAttribute("aria-pressed", String(!metric));
+    $("weight").value = Number.isFinite(weightKg) ? (metric ? rounded(weightKg) : Number((weightKg / BMI.LB_KG).toFixed(1))) : "";
+    $("weight-unit").textContent = metric ? "kg" : "lb";
+    $("weight").min = metric ? 20 : 44.1;
+    $("weight").max = metric ? 350 : 771.6;
+    $("weight").step = metric ? "any" : "0.1";
+    $("weight-min").textContent = metric ? "20 kg" : "44.1 lb";
+    $("weight-max").textContent = metric ? "350 kg" : "771.6 lb";
+    $("weight-slider").min = metric ? 20 : 20 / BMI.LB_KG;
+    $("weight-slider").max = metric ? 350 : 350 / BMI.LB_KG;
+    $("weight-slider").setAttribute("aria-label", metric ? "Weight in kilograms" : "Weight in pounds");
+  }
+  function fields() { heightFields(); weightFields(); }
+
+  function error(id, message, inputs) {
+    $(id).textContent = message;
+    $(id).hidden = !message;
+    inputs.forEach(input => $(input).setAttribute("aria-invalid", String(Boolean(message))));
+  }
+  function render() {
+    const heightMetric = heightUnits === "metric";
+    const weightMetric = weightUnits === "metric";
+    const validHeight = inBounds(heightCm,100,250);
+    const validWeight = inBounds(weightKg,20,350);
+    error("height-error", validHeight ? "" : heightMetric ? "Enter a height from 100 to 250 cm." : "Enter whole feet and 0 to less than 12 inches, totaling 100–250 cm.", ["height-cm","height-ft","height-in"]);
+    error("weight-error", validWeight ? "" : weightMetric ? "Enter a weight from 20 to 350 kg." : "Enter a weight from 44.1 to 771.6 lb (20–350 kg).", ["weight"]);
+    if (validHeight) {
+      $("height-slider").value = heightCm;
+      $("height-slider").setAttribute("aria-valuetext", heightMetric ? `${rounded(heightCm)} centimeters` : `${$("height-ft").value} feet ${$("height-in").value} inches`);
+    }
+    if (validWeight) $("weight-slider").value = weightMetric ? weightKg : weightKg / BMI.LB_KG;
+    const result = BMI.calculate(heightCm,weightKg);
+    $("result-details").hidden = !result;
+    $("empty-result").hidden = Boolean(result);
+    $("bmi-category").hidden = !result;
+    document.querySelectorAll(".reference-item").forEach(item => {
+      const active = Boolean(result && item.dataset.category === result.category.key);
+      if (active) item.setAttribute("aria-current","true"); else item.removeAttribute("aria-current");
+      item.querySelector(".current").hidden = !active;
+    });
+    if (!result) {
+      $("bmi-value").textContent = "—";
+      $("bmi-category").textContent = "";
+      $("weight-range").textContent = "";
+      $("result-sub").textContent = "Enter valid measurements to calculate.";
+      return;
+    }
+    $("bmi-value").textContent = result.value.toFixed(2);
+    $("bmi-category").textContent = result.category.label;
+    $("bmi-category").style.background = result.category.color;
+    $("result-sub").textContent = "kg/m² · standard adult categories";
+    $("gauge-marker").style.left = `${Math.max(0,Math.min(100,(result.value-10)/30*100))}%`;
+    const [low, high] = BMI.range(result.low / (weightMetric ? 1 : BMI.LB_KG), result.high / (weightMetric ? 1 : BMI.LB_KG));
+    $("weight-range").textContent = `${low.toFixed(1)} – ${high.toFixed(1)} ${weightMetric ? "kg" : "lb"}`;
+    $("range-context").textContent = `At your height, this corresponds to BMI 18.5 to below 25. A reference, not a personal target.`;
+  }
+  function readHeight() {
+    if (heightUnits === "metric") heightCm = number("height-cm");
+    else {
+      const feet = number("height-ft"), inches = number("height-in");
+      heightCm = Number.isInteger(feet) && feet >= 0 && inBounds(inches,0,11.999999) ? (feet*12 + inches)*2.54 : NaN;
+    }
+    render();
+  }
+  ["height-cm","height-ft","height-in"].forEach(id => $(id).addEventListener("input",readHeight));
+  $("weight").addEventListener("input",() => { weightKg = number("weight") * (weightUnits === "metric" ? 1 : BMI.LB_KG); render(); });
+  $("height-slider").addEventListener("input",() => { heightCm = number("height-slider"); heightFields(); render(); });
+  $("weight-slider").addEventListener("input",() => { weightKg = number("weight-slider") * (weightUnits === "metric" ? 1 : BMI.LB_KG); weightFields(); render(); });
+  ["metric","imperial"].forEach(unit => {
+    $("height-" + unit).addEventListener("click",() => { if (heightUnits === unit) return; heightUnits = unit; heightFields(); render(); });
+    $("weight-" + unit).addEventListener("click",() => { if (weightUnits === unit) return; weightUnits = unit; weightFields(); render(); });
+  });
+  $("reset").addEventListener("click",() => { heightUnits = "metric"; weightUnits = "metric"; heightCm = 170; weightKg = 70; fields(); render(); });
+  $("measurements").addEventListener("submit",event => event.preventDefault());
+  fields(); render();
+})();
+</script>
+</body>
+</html>

@@ -51,6 +51,7 @@ export const CATEGORIES: Category[] = [
 
 export const TOOLS: Tool[] = [
   // Time & Life
+  t("bmi", "BMI Calculator", "Calculate adult BMI with metric or imperial units, a live category scale, and the reference weight range for your height. Private, browser-local calculations.", "Time & Life"),
   t("dayleft", "Day Left", "Minimal countdown showing how much time is left in the day. Custom targets, calendar picker, localStorage.", "Time & Life"),
   t("yearprogress", "Year Progress", "Live year progress bar with circular ring, day-of-year counter, and free days remaining.", "Time & Life"),
   t("weekprogress", "Week Progress", "Live work week progress bar — shows day, week number, hours remaining. Toggle 5-day / 7-day.", "Time & Life"),

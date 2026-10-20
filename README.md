@@ -25,7 +25,7 @@ A single point of entry for all my [mini projects](https://www.soumendrak.com/pr
 
 ## ✨ Features
 
-- **47 tools, one origin** — most are single-file pages; the Fasting Tracker is an offline-first multi-file PWA. Every tool is vendored under `public/tools/` and embedded on its own page at `/t/<slug>` with one-click full screen.
+- **48 tools, one origin** — most are single-file pages; the Fasting Tracker is an offline-first multi-file PWA. Every tool is vendored under `public/tools/` and embedded on its own page at `/t/<slug>` with one-click full screen.
 - **Instant search & filter** — fuzzy search plus 7 category filters.
 - **Recently added / updated** — surfaced on the landing page and kept fresh automatically from git history.
 - **Light & dark** — a terracotta theme (matching [soumendrak.com](https://www.soumendrak.com)) shared across the site *and* every tool, with a persistent top-right toggle.
@@ -36,7 +36,7 @@ A single point of entry for all my [mini projects](https://www.soumendrak.com/pr
 
 | Category | Tools | Examples |
 | --- | :---: | --- |
-| ⏳ Time & Life | 9 | Fasting Tracker, Pomodoro, Life Calendar |
+| ⏳ Time & Life | 10 | BMI Calculator, Fasting Tracker, Pomodoro, Life Calendar |
 | 🛠️ Developer Tools | 9 | JSON Pretty, Diff Checker, Base64 |
 | 🎨 Fun & Visual | 12 | Mandelbrot, Conway's Game of Life, Odia 2048 |
 | 📡 DevOps & Monitoring | 8 | API Playground, Webhook Inspector, Uptime Radar |
