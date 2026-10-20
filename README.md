@@ -78,6 +78,10 @@ Full steps live in the `tools-catalog` skill (`.claude/skills/tools-catalog/`). 
 
 The site owns `<html data-theme>` and persists to `localStorage`; because the tools are served same-origin, they pick up the theme and live toggles automatically. `scripts/skin-tools.py` injects one stylesheet per tool that remaps its CSS variables to the shared terracotta palette for both modes — recolor everything by editing the palette in `src/app/globals.css` (site) and `scripts/skin-tools.py` (tools), plus `public/logo.svg` / `src/app/icon.svg` for the mark.
 
+## Sponsor
+
+If this project helps you, consider [sponsoring my work on GitHub](https://github.com/sponsors/soumendrak). Your support helps fund maintenance, documentation, and continued development.
+
 ---
 
 <div align="center">
